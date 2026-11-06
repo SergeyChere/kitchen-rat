@@ -1,0 +1,21 @@
+# Node / Electron
+node_modules/
+dist/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Unity (if you open unity/ as a project)
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/*.csproj
+unity/*.sln
+unity/*.user
+unity/.vs/
