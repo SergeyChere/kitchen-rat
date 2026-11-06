@@ -44,8 +44,9 @@ npm start
 
 Build each platform on that platform. GitHub also builds all of them on every push to `main`
 (downloads on the workflow run page). To publish a new downloadable version, bump `version` in
-`package.json`, then push a tag: `git tag v0.2.0 && git push origin v0.2.0`. The builds get attached to
-a GitHub Release and the download links above switch to it automatically.
+`package.json`, push, then on GitHub open **Releases → Draft a new release**, type a new tag such as
+`v0.2.0` and click **Publish release**. The workflow builds the game and attaches the files to that
+release (takes about 10 minutes), and the download links above switch to it automatically.
 
 ### In a browser
 
