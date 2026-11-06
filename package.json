@@ -43,20 +43,30 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "KitchenRat-Setup-${version}.${ext}"
+      "artifactName": "KitchenRat-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "KitchenRat-Portable-${version}.${ext}"
+      "artifactName": "KitchenRat-Windows.${ext}"
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
-      "category": "public.app-category.games"
+      "category": "public.app-category.games",
+      "artifactName": "KitchenRat-Mac-${arch}.${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "build/icon.png",
-      "category": "Game"
+      "category": "Game",
+      "artifactName": "KitchenRat-Linux.${ext}"
     }
   }
 }

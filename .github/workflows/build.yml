@@ -53,4 +53,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: Kitchen Rat ${{ github.ref_name }}
+          body: |
+            Download the file for your system and run it. No installation needed.
+
+            - **Windows:** `KitchenRat-Windows.exe` (just run it). `KitchenRat-Setup.exe` installs the game with a Start menu shortcut instead.
+            - **Mac:** `KitchenRat-Mac-arm64.dmg` for Apple Silicon (M1 and newer), `KitchenRat-Mac-x64.dmg` for Intel.
+            - **Linux:** `KitchenRat-Linux.AppImage`
+
+            The builds are not code-signed yet. On Windows click **More info → Run anyway**; on Mac right-click the app → **Open**.
           files: ${{ matrix.files }}

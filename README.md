@@ -6,9 +6,24 @@ wanted level, from a wary cat to mousetraps, the owner with a flashlight, and po
 
 ![icon](build/icon.png)
 
-## Play it
+## Download and play
 
-### On your computer (desktop app)
+No installation, no setup. Download one file and run it.
+
+| System | Download | How to run |
+|---|---|---|
+| **Windows** | [KitchenRat-Windows.exe](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Windows.exe) | Double-click. If Windows shows "Windows protected your PC", click **More info → Run anyway** |
+| **Mac (Apple Silicon)** | [KitchenRat-Mac-arm64.dmg](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Mac-arm64.dmg) | Open the .dmg, then right-click Kitchen Rat → **Open** |
+| **Mac (Intel)** | [KitchenRat-Mac-x64.dmg](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Mac-x64.dmg) | Same as above |
+| **Linux** | [KitchenRat-Linux.AppImage](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Linux.AppImage) | `chmod +x KitchenRat-Linux.AppImage`, then run it |
+
+These links always point to the newest release. All versions: [Releases](https://github.com/SergeyChere/kitchen-rat/releases).
+
+**Скачать и играть (RU):** для Windows скачай [KitchenRat-Windows.exe](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Windows.exe) и запусти двойным кликом. Ничего устанавливать не нужно. Если появится окно «Windows защитила ваш компьютер», нажми **Подробнее → Выполнить в любом случае**.
+
+## For developers
+
+### Run from source
 
 You need [Node.js](https://nodejs.org) 20 or newer.
 
@@ -23,13 +38,14 @@ npm start
 
 | Platform | Command | Output in `dist/` |
 |---|---|---|
-| Windows | `npm run dist:win` | `KitchenRat-Setup-x.y.z.exe` and a portable `.exe` |
+| Windows | `npm run dist:win` | `KitchenRat-Windows.exe` (portable) and `KitchenRat-Setup.exe` (installer) |
 | macOS | `npm run dist:mac` | `.dmg` |
 | Linux | `npm run dist:linux` | `.AppImage` |
 
-Build each platform on that platform. You can also let GitHub do it: every push to `main` runs the
-**Build desktop app** workflow, and its run page has the Windows, macOS and Linux builds as downloads.
-Pushing a tag like `v0.1.0` also attaches them to a GitHub Release.
+Build each platform on that platform. GitHub also builds all of them on every push to `main`
+(downloads on the workflow run page). To publish a new downloadable version, bump `version` in
+`package.json`, then push a tag: `git tag v0.2.0 && git push origin v0.2.0`. The builds get attached to
+a GitHub Release and the download links above switch to it automatically.
 
 ### In a browser
 
@@ -64,13 +80,6 @@ docs/            Game design notes and roadmap
 
 The HTML version is where new gameplay ideas get tried first. Features that stick get ported to
 Unity, which is the long-term engine for the Steam release.
-
-## Быстрый старт (RU)
-
-1. Установи [Node.js](https://nodejs.org) 20+.
-2. `npm install`, затем `npm start`: игра откроется в отдельном окне.
-3. Установщик для Windows: `npm run dist:win` (на Windows), файл появится в папке `dist/`.
-   Или открой вкладку **Actions** на GitHub, выбери последний запуск **Build desktop app** и скачай готовый `.exe`.
 
 ## Credits
 
