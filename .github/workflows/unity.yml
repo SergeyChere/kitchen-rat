@@ -30,7 +30,7 @@ jobs:
           lfs: true
 
       - name: Build Unity
-        shell: pwsh
+        shell: powershell
         run: |
           $editor = "C:\Program Files\Unity\Hub\Editor\6000.3.28f1\Editor\Unity.exe"
           $project = Join-Path $env:GITHUB_WORKSPACE "unity"
@@ -70,7 +70,7 @@ jobs:
           }
 
       - name: Pack build
-        shell: pwsh
+        shell: powershell
         run: |
           if (!(Test-Path "build")) {
             throw "Build output folder was not found"
