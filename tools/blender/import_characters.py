@@ -410,6 +410,10 @@ def build(out, path, turn, height, clips, recolor, face=None):
 
 
 only = os.environ.get("ONLY", "")
+HAND_EDITED = ("rat_mother", "rat_pup")  # polished by hand in art/characters/*.blend: export those instead
 for c in CHARS:
+    if c[0] in HAND_EDITED and not os.environ.get("REBUILD_RATS"):
+        print("skipped", c[0], "(hand-edited: art/characters/%s.blend)" % c[0])
+        continue
     if not only or c[0] in only.split(","):
         build(*c)

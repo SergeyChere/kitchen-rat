@@ -12,5 +12,7 @@ To put an edited rat into the game: File → Export → glTF 2.0, format glTF Bi
 Objects off, Animation on with mode "Actions", and save over `godot/assets/models/characters/rat_mother.glb`
 (or `rat_pup.glb`). Keep the bone named `Head` (the food she carries is held at it) and the action names.
 
-Note: running `tools/blender/import_characters.py` again rebuilds these files and the .glb from the free model and
-would overwrite hand edits, so once the rat is edited by hand, use ONLY=… to skip it.
+These two are now polished by hand (bigger ears, lighter fur, finer mesh), so `tools/blender/import_characters.py`
+skips the rats (set REBUILD_RATS=1 to rebuild them from the free model, which would overwrite the hand edits).
+After editing, export from the .blend as described above, or run:
+`blender -b art/characters/rat_mother.blend --python-expr "import bpy; [o.select_set(True) for o in bpy.context.scene.objects]; bpy.ops.export_scene.gltf(filepath='godot/assets/models/characters/rat_mother.glb', export_format='GLB', use_selection=True, export_animation_mode='ACTIONS', export_force_sampling=True)"`
