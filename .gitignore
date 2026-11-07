@@ -16,3 +16,4 @@ art/previews/_tmp/
 # licensed source sounds (only the README is committed)
 sounds_incoming/*
 !sounds_incoming/README.md
+art/library/**/_thumbs/
