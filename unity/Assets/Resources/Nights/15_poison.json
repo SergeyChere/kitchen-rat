@@ -1,0 +1,429 @@
+{
+ "number": 15,
+ "id": "poison",
+ "name": "Poison",
+ "act": 3,
+ "goal": 20,
+ "seconds": 900,
+ "prologue": false,
+ "finale": false,
+ "cat": "awake",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [
+  700,
+  470
+ ],
+ "catBed": [
+  200,
+  480
+ ],
+ "bowl": [],
+ "dock": [
+  900,
+  440
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [
+  "poison",
+  "owner"
+ ],
+ "starTip": "More poison appears as the wanted level rises",
+ "openFood": false,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [
+  "curious",
+  "greedy"
+ ],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 3,
+ "door": 330,
+ "lamp": "chandelier",
+ "decor": "dining",
+ "window": {
+  "x": 660,
+  "w": 200,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "A robot vacuum joins the hunt. Act 4: the siege.",
+ "blurb": "Some of the food is poisoned. Curious and Greedy come along.",
+ "startTitle": "Poison in the food",
+ "startSub": "Green scent means poison. Greedy grabs anything he sees.",
+ "introMom": "The owner is putting out poison now. Sniff everything. Curious helps… and Greedy needs watching.",
+ "introPups": [
+  "Mom, the cheese smells funny…",
+  "Squeak?",
+  "Can we both come?"
+ ],
+ "pal": {
+  "fog": 1183252,
+  "sky": 10128048,
+  "ground": 3023400,
+  "hemi": 0.7,
+  "moon": 0.75,
+  "floor": "wood",
+  "floorA": "#4a3226",
+  "wall": "panel",
+  "wallA": "#5c3a46",
+  "wallB": "#2e1f1a",
+  "trim": 2759704,
+  "ceil": 2366498
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "cheese",
+    "x": 480,
+    "y": 28,
+    "tag": "wheel",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 480,
+    "y": 270,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 560,
+    "y": 300,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 400,
+    "y": 240,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 800,
+    "y": 160,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 160,
+    "y": 480,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 760,
+    "y": 560,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 260,
+    "y": 120,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 120,
+    "y": 520,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 880,
+    "y": 400,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 4,
+  "randomCheese": 2,
+  "refill": 6
+ },
+ "tasks": {
+  "goal": "Bring home only clean food",
+  "chain": [
+   {
+    "text": "Sniff out 3 poisoned pieces",
+    "hint": "Hold E. Poisoned cheese has a green scent trail. Curious spots food near him too.",
+    "type": "count",
+    "arg": "poisonSeen",
+    "n": 3,
+    "reveal": -1
+   },
+   {
+    "text": "Have a pup fetch clean food (R)",
+    "hint": "Greedy grabs anything, even poison. Send him only after you’ve sniffed.",
+    "type": "count",
+    "arg": "pupFetch",
+    "n": 1,
+    "reveal": -1
+   },
+   {
+    "text": "Steal the cheese wheel from the sideboard",
+    "hint": "Up on the sideboard. Get there from the footstool.",
+    "type": "pick",
+    "arg": "wheel",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Bring it home",
+    "hint": "",
+    "type": "deliver",
+    "arg": "wheel",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Never bring poison home",
+    "hint": "",
+    "type": "keep",
+    "arg": "poison",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Keep both pups safe all night",
+    "hint": "",
+    "type": "keep",
+    "arg": "pup",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the silver spoon",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "table",
+   "x": 330,
+   "y": 200,
+   "w": 300,
+   "h": 160,
+   "cloth": 14209216,
+   "dining": true
+  },
+  {
+   "t": "chair",
+   "x": 370,
+   "y": 162,
+   "back": "n"
+  },
+  {
+   "t": "chair",
+   "x": 464,
+   "y": 162,
+   "back": "n"
+  },
+  {
+   "t": "chair",
+   "x": 558,
+   "y": 162,
+   "back": "n"
+  },
+  {
+   "t": "chair",
+   "x": 370,
+   "y": 366,
+   "back": "s"
+  },
+  {
+   "t": "chair",
+   "x": 464,
+   "y": 366,
+   "back": "s"
+  },
+  {
+   "t": "chair",
+   "x": 558,
+   "y": 366,
+   "back": "s"
+  },
+  {
+   "t": "chair",
+   "x": 292,
+   "y": 264,
+   "back": "w"
+  },
+  {
+   "t": "chair",
+   "x": 636,
+   "y": 264,
+   "back": "e"
+  },
+  {
+   "t": "sideboard",
+   "x": 360,
+   "y": 0,
+   "w": 260,
+   "h": 55
+  },
+  {
+   "t": "ottoman",
+   "x": 440,
+   "y": 82,
+   "w": 46,
+   "h": 46
+  },
+  {
+   "t": "cabinetTall",
+   "x": 0,
+   "y": 90,
+   "w": 56,
+   "h": 220
+  },
+  {
+   "t": "ottoman",
+   "x": 720,
+   "y": 150,
+   "w": 46,
+   "h": 46
+  },
+  {
+   "t": "barCart",
+   "x": 780,
+   "y": 140,
+   "w": 70,
+   "h": 52
+  },
+  {
+   "t": "plant",
+   "x": 892,
+   "y": 16,
+   "w": 52,
+   "h": 52
+  },
+  {
+   "t": "plant",
+   "x": 892,
+   "y": 530,
+   "w": 52,
+   "h": 52
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 160,
+   "y": 430,
+   "w": 120,
+   "h": 18,
+   "kind": "board"
+  },
+  {
+   "t": "noisy",
+   "x": 600,
+   "y": 230,
+   "kind": "glasses",
+   "r": 16
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "vase",
+   "x": 392,
+   "y": 24,
+   "toX": 392,
+   "toY": 72,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "bottle",
+   "x": 830,
+   "y": 160,
+   "toX": 832,
+   "toY": 214,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 400
+  },
+  {
+   "wall": "s",
+   "x": 650,
+   "y": 0
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 200
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "button",
+   "x": 700,
+   "y": 580,
+   "floor": true,
+   "always": false,
+   "label": "A silver spoon!"
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 2
+  },
+  {
+   "a": 1,
+   "b": 2
+  }
+ ]
+}

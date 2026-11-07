@@ -10,7 +10,7 @@ namespace KitchenRat
 
         public override void Stay(RatController rat, float dt)
         {
-            if (rat.carried.Count > 0 && !rat.Jumping) GameManager.I.Deliver();
+            if (rat.carried.Count > 0 && !rat.Jumping && GameManager.I.Playing) GameManager.I.Deliver();
         }
 
         protected override Color GizmoColor => new Color(1f, 0.7f, 0.3f, 0.6f);

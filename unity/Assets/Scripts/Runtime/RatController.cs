@@ -36,7 +36,8 @@ namespace KitchenRat
         public bool Sneaking { get; private set; }
         public bool Running { get; private set; }
         public bool Sniffing { get; private set; }
-        public bool Hidden { get; set; }
+        public bool Hidden => hide != null && transform.position.y < 0.05f && !jumping;
+        public string HideKind => Hidden ? hide.id : null;
         public bool InNest { get; set; }
         public bool Jumping => jumping;
         public float MoveSpeed { get; private set; }
@@ -45,6 +46,12 @@ namespace KitchenRat
         public string SurfaceId { get; private set; } = "floor";
         public bool HasJumpTarget => hasTarget;
         public event Action<string> SurfaceChanged;
+        /// <summary>Called when a jump ends, with how far she dropped (m).</summary>
+        public event Action<float> Landed;
+        /// <summary>Dragging big food: slow, no running, no jumping up.</summary>
+        public bool Dragging { get { foreach (var f in carried) if (f.Big) return true; return false; } }
+        public int CarryWeight { get { int w = 0; foreach (var f in carried) w += f.Weight; return w; } }
+        public bool Blocked { get; private set; }
         public readonly List<Food> carried = new List<Food>();
 
         CharacterController cc;
@@ -54,6 +61,22 @@ namespace KitchenRat
         Vector3 jumpFrom, jumpTo;
         float jumpT, jumpDur, landT;
         bool hasTarget, targetUp;
+        HideSpot hide;
+
+        public void EnterHide(HideSpot h) { hide = h; }
+        public void ExitHide(HideSpot h) { if (hide == h) hide = null; }
+
+        /// <summary>Put her somewhere instantly (after being caught).</summary>
+        public void Teleport(Vector3 pos, Quaternion rot)
+        {
+            jumping = false;
+            cc.enabled = false;
+            transform.SetPositionAndRotation(pos, rot);
+            cc.enabled = true;
+            vy = 0f;
+            hide = null;
+            InNest = false;
+        }
         Vector3 target;
 
         void Awake() { cc = GetComponent<CharacterController>(); }
@@ -92,7 +115,7 @@ namespace KitchenRat
             Vector2 mv = GameInput.Move;
             if (GameInput.SneakToggle) sneakToggle = !sneakToggle;
             Sniffing = GameInput.Sniff && cc.isGrounded;
-            Running = GameInput.Run && mv.sqrMagnitude > 0.01f && !Sniffing;
+            Running = GameInput.Run && mv.sqrMagnitude > 0.01f && !Sniffing && !Dragging;
             if (Running) sneakToggle = false;
             Sneaking = !Running && (GameInput.SneakHeld || sneakToggle);
 
@@ -105,7 +128,7 @@ namespace KitchenRat
             Vector3 right = Vector3.Cross(Vector3.up, fwd);
             Vector3 dir = Sniffing ? Vector3.zero : fwd * mv.y + right * mv.x;
             float spd = Running ? runSpeed : Sneaking ? sneakSpeed : walkSpeed;
-            if (carried.Count > 0) spd *= 0.85f;
+            spd *= Dragging ? 0.55f : 1f - 0.13f * CarryWeight;
             if (dir.sqrMagnitude > 1e-4f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(dir), turnSpeed * dt);
 
@@ -116,6 +139,7 @@ namespace KitchenRat
             Vector3 moved = transform.position - before;
             moved.y = 0f;
             MoveSpeed = dt > 0f ? moved.magnitude / dt : 0f;
+            Blocked = dir.sqrMagnitude > 0.01f && MoveSpeed < spd * 0.35f;
             if (Moving) AddNoise(Running ? 0.8f : Sneaking ? 0f : 0.25f);
             if (landT > 0f) landT -= dt;
 
@@ -123,7 +147,7 @@ namespace KitchenRat
             FindJumpTarget();
             if (GameInput.Jump)
             {
-                if (hasTarget) StartJump(target, targetUp);
+                if (hasTarget && !(targetUp && Dragging)) StartJump(target, targetUp);
                 else if (cc.isGrounded) vy = 2.2f; // a little hop in place
             }
             PlayAnim();
@@ -235,6 +259,7 @@ namespace KitchenRat
             landT = 0.2f;
             AddNoise(jumpUp ? 0.15f : 0.35f);
             UpdateSurface();
+            Landed?.Invoke(jumpFrom.y - jumpTo.y);
         }
 
         // ---------- animation ----------
@@ -246,7 +271,7 @@ namespace KitchenRat
             if (jumping) clip = jumpUp ? "jump_up" : "jump_down";
             else if (landT > 0f) clip = "land";
             else if (Sniffing) clip = "sniff";
-            else if (Moving) clip = Running ? "run" : Sneaking ? "sneak" : carried.Count > 0 ? "carry_walk" : "walk";
+            else if (Moving) clip = Dragging ? "drag" : Running ? "run" : Sneaking ? "sneak" : carried.Count > 0 ? "carry_walk" : "walk";
             else clip = "idle";
             anim.Play(clip);
             float baseSpeed = Running ? runSpeed : Sneaking ? sneakSpeed : walkSpeed;

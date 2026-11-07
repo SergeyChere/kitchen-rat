@@ -21,6 +21,14 @@ namespace KitchenRat
             current = distance;
         }
 
+        /// <summary>Jump straight behind the target (after a respawn).</summary>
+        public void Snap(float newYaw)
+        {
+            yaw = newYaw;
+            pitch = 16f;
+            current = distance;
+        }
+
         void LateUpdate()
         {
             if (!target) return;

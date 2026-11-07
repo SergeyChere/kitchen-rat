@@ -1,0 +1,410 @@
+{
+ "number": 9,
+ "id": "laundry",
+ "name": "The Laundry Room",
+ "act": 2,
+ "goal": 16,
+ "seconds": 780,
+ "prologue": false,
+ "finale": false,
+ "cat": "eating",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 45,
+ "catStart": [],
+ "catBed": [
+  330,
+  500
+ ],
+ "bowl": [
+  560,
+  520
+ ],
+ "dock": [
+  900,
+  380
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [],
+ "starTip": "The cat sleeps lighter now",
+ "openFood": true,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 300,
+ "lamp": "bulb",
+ "decor": "pantry",
+ "window": {
+  "x": 520,
+  "w": 140,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "A stormy night. Thunder hides your noise, lightning shows you.",
+ "blurb": "The cat eats at night. Wait for it to fall asleep.",
+ "startTitle": "The cat is eating",
+ "startSub": "Wait until it lies down, then steal from its bowl.",
+ "introMom": "The laundry room. The cat has a midnight snack there, then naps. I just have to be patient.",
+ "introPups": [
+  "Mom, the cat eats at night!",
+  "Squeak?",
+  "Wait till it sleeps!"
+ ],
+ "pal": {
+  "fog": 790548,
+  "sky": 8032424,
+  "ground": 2369064,
+  "hemi": 0.66,
+  "moon": 0.62,
+  "floor": "tile",
+  "floorA": "#4a5058",
+  "floorB": "#555c66",
+  "wall": "stripes",
+  "wallA": "#4a5a62",
+  "wallB": "#52646c",
+  "trim": 2764336,
+  "ceil": 1843236
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "cheese",
+    "x": 586,
+    "y": 528,
+    "tag": "kibble",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 600,
+    "y": 500,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 540,
+    "y": 548,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 520,
+    "y": 380,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 460,
+    "y": 360,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 580,
+    "y": 400,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 60,
+    "y": 52,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 870,
+    "y": 160,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 300,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 720,
+    "y": 420,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 160,
+    "y": 420,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 3,
+  "randomCheese": 1,
+  "refill": 5
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Wait until the cat finishes eating and lies down",
+    "hint": "It eats at its bowl, then goes to bed. While it eats it only notices you right in front of it.",
+    "type": "flag",
+    "arg": "catNapping",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Steal food from the cat’s bowl",
+    "hint": "Sneak. The cat sleeps right by our path now.",
+    "type": "pick",
+    "arg": "kibble",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Climb onto the folding table",
+    "hint": "Use the stool next to it.",
+    "type": "surf",
+    "arg": "table",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Find a sock for the nest in the laundry basket",
+    "hint": "The basket is next to the washing machines. Climb on top of it.",
+    "type": "flag",
+    "arg": "sock",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Start the washing machine to hide your steps",
+    "hint": "",
+    "type": "flag",
+    "arg": "washer",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Don’t wake the cat once it’s asleep",
+    "hint": "",
+    "type": "keep",
+    "arg": "catWoke",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the lost earring",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "washer",
+   "x": 40,
+   "y": 12,
+   "w": 90,
+   "h": 80,
+   "dryer": true
+  },
+  {
+   "t": "washer",
+   "x": 140,
+   "y": 12,
+   "w": 90,
+   "h": 80
+  },
+  {
+   "t": "basket",
+   "x": 260,
+   "y": 40,
+   "w": 52,
+   "h": 44,
+   "ht": 45
+  },
+  {
+   "t": "shelfUnit",
+   "x": 700,
+   "y": 0,
+   "w": 200,
+   "h": 50
+  },
+  {
+   "t": "box",
+   "x": 760,
+   "y": 120,
+   "w": 60,
+   "h": 60,
+   "ht": 50
+  },
+  {
+   "t": "box",
+   "x": 820,
+   "y": 120,
+   "w": 60,
+   "h": 60,
+   "ht": 92
+  },
+  {
+   "t": "table",
+   "x": 420,
+   "y": 330,
+   "w": 200,
+   "h": 110,
+   "cloth": 9085112
+  },
+  {
+   "t": "stool",
+   "x": 376,
+   "y": 360
+  },
+  {
+   "t": "lowShelf",
+   "x": 100,
+   "y": 480,
+   "w": 80,
+   "h": 50
+  },
+  {
+   "t": "boiler",
+   "x": 870,
+   "y": 470,
+   "w": 80,
+   "h": 110
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 185,
+   "y": 50,
+   "kind": "washer"
+  },
+  {
+   "t": "noisy",
+   "x": 330,
+   "y": 110,
+   "w": 40,
+   "h": 20,
+   "kind": "hanger"
+  },
+  {
+   "t": "noisy",
+   "x": 120,
+   "y": 140,
+   "kind": "puddle",
+   "r": 24
+  },
+  {
+   "t": "noisy",
+   "x": 640,
+   "y": 470,
+   "kind": "squeaky"
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "bottle",
+   "x": 600,
+   "y": 350,
+   "toX": 600,
+   "toY": 312,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "spoon",
+   "x": 470,
+   "y": 420,
+   "toX": 470,
+   "toY": 456,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 300
+  },
+  {
+   "wall": "s",
+   "x": 700,
+   "y": 0
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 250
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "sock",
+   "x": 286,
+   "y": 60,
+   "floor": false,
+   "always": true,
+   "label": ""
+  },
+  {
+   "kind": "button",
+   "x": 880,
+   "y": 300,
+   "floor": true,
+   "always": false,
+   "label": "A lost earring!"
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

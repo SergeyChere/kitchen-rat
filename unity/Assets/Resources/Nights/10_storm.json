@@ -1,0 +1,447 @@
+{
+ "number": 10,
+ "id": "storm",
+ "name": "The Storm",
+ "act": 2,
+ "goal": 18,
+ "seconds": 840,
+ "prologue": false,
+ "finale": false,
+ "cat": "awake",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [
+  700,
+  200
+ ],
+ "catBed": [
+  215,
+  500
+ ],
+ "bowl": [],
+ "dock": [
+  900,
+  330
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [
+  "owner"
+ ],
+ "starTip": "The owner will come if you’re too loud",
+ "openFood": true,
+ "tvOff": true,
+ "storm": true,
+ "blackout": 0.62,
+ "pups": [],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 240,
+ "lamp": "shade",
+ "decor": "living",
+ "window": {
+  "x": 680,
+  "w": 200,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "Mousetraps. The owner is getting serious.",
+ "blurb": "Thunder hides your noise. Lightning shows you. Then the power goes out.",
+ "startTitle": "A stormy night",
+ "startSub": "Move when the thunder rolls. Hide when the lightning flashes.",
+ "introMom": "A storm. When the thunder rolls, nobody can hear me. When the lightning flashes, everyone can see me.",
+ "introPups": [
+  "Mom, the thunder is scary!",
+  "Squeak!!",
+  "Don’t go!"
+ ],
+ "pal": {
+  "fog": 790550,
+  "sky": 9083576,
+  "ground": 3024416,
+  "hemi": 0.6,
+  "moon": 0.5,
+  "floor": "wood",
+  "floorA": "#5a4232",
+  "wall": "damask",
+  "wallA": "#3c5655",
+  "wallB": "#466361",
+  "trim": 3024418,
+  "ceil": 2500654
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "pizza",
+    "x": 470,
+    "y": 236,
+    "tag": "pizza",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 372,
+    "y": 28,
+    "tag": "p1",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 175,
+    "y": 175,
+    "tag": "p2",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 770,
+    "y": 470,
+    "tag": "p3",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 880,
+    "y": 250,
+    "tag": "p4",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 340,
+    "y": 308,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 430,
+    "y": 312,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 548,
+    "y": 310,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 90,
+    "y": 120,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 620,
+    "y": 560,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 360,
+    "y": 480,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 3,
+  "randomCheese": 1,
+  "refill": 5
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Move while the thunder rumbles",
+    "hint": "A flash, then BOOM. While the thunder rolls, nobody can hear you, even running.",
+    "type": "flag",
+    "arg": "thunderMove",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Be hidden when the lightning flashes",
+    "hint": "The flash lights up the whole room. Out in the open, you’ll be seen.",
+    "type": "flag",
+    "arg": "hidLightning",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Collect the party leftovers",
+    "hint": "Cheese on the TV stand, the footstool, behind the armchair and by the window.",
+    "type": "pickN",
+    "arg": "p",
+    "n": 4,
+    "reveal": -1
+   },
+   {
+    "text": "Steal a slice of pizza",
+    "hint": "It’s on the coffee table.",
+    "type": "pick",
+    "arg": "pizza",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Drag the pizza home",
+    "hint": "Move during the thunder.",
+    "type": "deliver",
+    "arg": "pizza",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Be in the nest when the power goes out",
+    "hint": "",
+    "type": "flag",
+    "arg": "homeAtBlackout",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Don’t pop any balloons",
+    "hint": "",
+    "type": "keep",
+    "arg": "balloon",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the party whistle",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "bookcase",
+   "x": 0,
+   "y": 0,
+   "w": 60,
+   "h": 190
+  },
+  {
+   "t": "tvStand",
+   "x": 330,
+   "y": 0,
+   "w": 300,
+   "h": 55
+  },
+  {
+   "t": "sofa",
+   "x": 300,
+   "y": 330,
+   "w": 360,
+   "h": 110,
+   "face": "n",
+   "color": 6969999
+  },
+  {
+   "t": "coffeeTable",
+   "x": 380,
+   "y": 200,
+   "w": 200,
+   "h": 80,
+   "plate": true
+  },
+  {
+   "t": "armchair",
+   "x": 720,
+   "y": 330,
+   "w": 96,
+   "h": 96,
+   "face": "n",
+   "color": 10115656
+  },
+  {
+   "t": "sideTable",
+   "x": 840,
+   "y": 350,
+   "w": 50,
+   "h": 50,
+   "ht": 62
+  },
+  {
+   "t": "lamp",
+   "x": 860,
+   "y": 470,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "t": "plant",
+   "x": 892,
+   "y": 16,
+   "w": 52,
+   "h": 52
+  },
+  {
+   "t": "fireplace",
+   "x": 0,
+   "y": 250,
+   "w": 46,
+   "h": 150
+  },
+  {
+   "t": "ottoman",
+   "x": 150,
+   "y": 150,
+   "w": 50,
+   "h": 50
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 260,
+   "y": 300,
+   "kind": "balloon"
+  },
+  {
+   "t": "noisy",
+   "x": 680,
+   "y": 300,
+   "kind": "balloon"
+  },
+  {
+   "t": "noisy",
+   "x": 600,
+   "y": 520,
+   "kind": "balloon"
+  },
+  {
+   "t": "noisy",
+   "x": 330,
+   "y": 450,
+   "w": 80,
+   "h": 50,
+   "kind": "confetti"
+  },
+  {
+   "t": "noisy",
+   "x": 700,
+   "y": 120,
+   "w": 70,
+   "h": 50,
+   "kind": "confetti"
+  },
+  {
+   "t": "noisy",
+   "x": 440,
+   "y": 250,
+   "kind": "plate",
+   "r": 16
+  },
+  {
+   "t": "noisy",
+   "x": 300,
+   "y": 330,
+   "w": 516,
+   "h": 110,
+   "kind": "sofa",
+   "surf": "sofa"
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "vase",
+   "x": 865,
+   "y": 375,
+   "toX": 908,
+   "toY": 382,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "book",
+   "x": 352,
+   "y": 26,
+   "toX": 352,
+   "toY": 82,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "cup",
+   "x": 550,
+   "y": 230,
+   "toX": 598,
+   "toY": 302,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "s",
+   "x": 600,
+   "y": 0
+  },
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 470
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 540
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "button",
+   "x": 80,
+   "y": 480,
+   "floor": true,
+   "always": false,
+   "label": "A party whistle! Don’t blow it."
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

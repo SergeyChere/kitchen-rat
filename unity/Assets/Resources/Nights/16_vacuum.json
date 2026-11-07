@@ -1,0 +1,430 @@
+{
+ "number": 16,
+ "id": "vacuum",
+ "name": "The Robot Vacuum",
+ "act": 4,
+ "goal": 20,
+ "seconds": 900,
+ "prologue": false,
+ "finale": false,
+ "cat": "sleep",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [],
+ "catBed": [
+  470,
+  545
+ ],
+ "bowl": [
+  770,
+  215
+ ],
+ "dock": [
+  900,
+  430
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [
+  "owner"
+ ],
+ "starTip": "The owner will come if you’re too loud",
+ "openFood": true,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [
+  "brave",
+  "shy"
+ ],
+ "pupAge": 0.75,
+ "vacuumStart": true,
+ "poisonStart": 0,
+ "door": 320,
+ "lamp": "shade",
+ "decor": "kitchen",
+ "window": {
+  "x": 410,
+  "w": 220,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "The neighbors’ dog is staying over. It follows your scent.",
+ "blurb": "A robot vacuum roams the kitchen and eats the crumbs. Brave and Shy come along.",
+ "startTitle": "The robot vacuum",
+ "startSub": "It eats crumbs and bumps into you. Things that fall in its way confuse it.",
+ "introMom": "The owner bought a robot vacuum. It eats every crumb on the floor… and it doesn’t sleep. Brave, Shy, stay close.",
+ "introPups": [
+  "Mom, there’s a robot!",
+  "It beeps! It eats crumbs!",
+  "Can we ride it?"
+ ],
+ "pal": {
+  "fog": 1053734,
+  "sky": 9080784,
+  "ground": 2761782,
+  "hemi": 0.76,
+  "moon": 0.86,
+  "floor": "tile",
+  "floorA": "#383c5c",
+  "floorB": "#474c76",
+  "wall": "stripes",
+  "wallA": "#474e70",
+  "wallB": "#50587c",
+  "trim": 3812912,
+  "ceil": 2106426
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "crumb",
+    "x": 700,
+    "y": 300,
+    "tag": "v1",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 760,
+    "y": 330,
+    "tag": "v2",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 820,
+    "y": 300,
+    "tag": "v3",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 650,
+    "y": 560,
+    "tag": "v4",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 880,
+    "y": 560,
+    "tag": "v5",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 680,
+    "y": 432,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 116,
+    "y": 30,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 539,
+    "y": 298,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 300,
+    "y": 460,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 160,
+    "y": 200,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 420,
+    "y": 420,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 6,
+  "randomCheese": 2,
+  "refill": 8
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Grab 3 crumbs before the vacuum eats them",
+    "hint": "The vacuum eats every crumb on the floor. Be quicker.",
+    "type": "pickN",
+    "arg": "v",
+    "n": 3,
+    "reveal": -1
+   },
+   {
+    "text": "Drop something in the vacuum’s way",
+    "hint": "Push the spoon, jar or apple off (F) when the vacuum is close: it stops to think.",
+    "type": "flag",
+    "arg": "vacBlock",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Ride the vacuum",
+    "hint": "Sneak (hold Ctrl) right onto it and keep sneaking. Wheee!",
+    "type": "flag",
+    "arg": "ride",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Lead both pups home",
+    "hint": "Brave and Shy follow you. Walk into the nest.",
+    "type": "flag",
+    "arg": "pupHome",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Keep both pups safe all night",
+    "hint": "",
+    "type": "keep",
+    "arg": "pup",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Don’t wake the cat",
+    "hint": "",
+    "type": "keep",
+    "arg": "catWoke",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find what the vacuum swallowed",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "counter",
+   "x": 0,
+   "y": 0,
+   "w": 960,
+   "h": 72
+  },
+  {
+   "t": "counter",
+   "x": 0,
+   "y": 72,
+   "w": 72,
+   "h": 240,
+   "join": true
+  },
+  {
+   "t": "fridge",
+   "x": 830,
+   "y": 72,
+   "w": 130,
+   "h": 110
+  },
+  {
+   "t": "island",
+   "x": 380,
+   "y": 250,
+   "w": 200,
+   "h": 90
+  },
+  {
+   "t": "box",
+   "x": 586,
+   "y": 262,
+   "w": 44,
+   "h": 44,
+   "ht": 44
+  },
+  {
+   "t": "table",
+   "x": 620,
+   "y": 380,
+   "w": 200,
+   "h": 130,
+   "cloth": 13196106,
+   "plate": true
+  },
+  {
+   "t": "chair",
+   "x": 580,
+   "y": 404,
+   "back": "w"
+  },
+  {
+   "t": "chair",
+   "x": 580,
+   "y": 456,
+   "back": "w"
+  },
+  {
+   "t": "chair",
+   "x": 830,
+   "y": 430,
+   "back": "e"
+  },
+  {
+   "t": "lowShelf",
+   "x": 200,
+   "y": 300,
+   "w": 62,
+   "h": 50
+  },
+  {
+   "t": "stool",
+   "x": 84,
+   "y": 236
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 900,
+   "y": 455,
+   "kind": "dock"
+  },
+  {
+   "t": "noisy",
+   "x": 480,
+   "y": 112,
+   "kind": "puddle",
+   "r": 26
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "spoon",
+   "x": 300,
+   "y": 44,
+   "toX": 300,
+   "toY": 102,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "jar",
+   "x": 470,
+   "y": 60,
+   "toX": 470,
+   "toY": 102,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "apple",
+   "x": 520,
+   "y": 330,
+   "toX": 522,
+   "toY": 364,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "cup",
+   "x": 810,
+   "y": 392,
+   "toX": 840,
+   "toY": 370,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "s",
+   "x": 330,
+   "y": 0
+  },
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 420
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 230
+  },
+  {
+   "wall": "s",
+   "x": 760,
+   "y": 0
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "button",
+   "x": 920,
+   "y": 400,
+   "floor": true,
+   "always": false,
+   "label": "Your shiny button from the first night! The vacuum had it."
+  }
+ ],
+ "trapSpots": [],
+ "lights": [
+  {
+   "x": 900,
+   "y": 560,
+   "h": 60,
+   "c": 16754784,
+   "i": 1,
+   "r": 520
+  }
+ ],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

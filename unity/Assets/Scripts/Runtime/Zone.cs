@@ -14,6 +14,13 @@ namespace KitchenRat
             return Mathf.Abs(l.x) <= size.x * 0.5f && Mathf.Abs(l.z) <= size.z * 0.5f && l.y >= -0.05f && l.y <= size.y;
         }
 
+        /// <summary>Is the point inside the zone's footprint, grown by margin (height ignored)?</summary>
+        public bool ContainsXZ(Vector3 p, float margin)
+        {
+            var l = transform.InverseTransformPoint(p);
+            return Mathf.Abs(l.x) <= size.x * 0.5f + margin && Mathf.Abs(l.z) <= size.z * 0.5f + margin;
+        }
+
         public virtual void Enter(RatController rat) { }
         public virtual void Stay(RatController rat, float dt) { }
         public virtual void Exit(RatController rat) { }

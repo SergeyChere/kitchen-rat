@@ -4,93 +4,77 @@ using System.Collections.Generic;
 namespace KitchenRat
 {
     /// <summary>
-    /// The night's tasks: a chain shown one step at a time, side tasks revealed after N steps, secret tasks shown once done.
-    /// Game events are reported as (check, arg); a step that was already satisfied earlier completes as soon as it comes up.
+    /// The night's tasks, ported from the prototype (checkTask / keepBroken / tickTasks): a chain shown one step at a time,
+    /// side tasks revealed after N steps ("keep" ones fail when broken), secrets shown once found.
+    /// The game records what happened (picked tags, deliveries, knocks, flags); the tracker polls it every frame.
     /// </summary>
     public class TaskTracker
     {
-        public readonly NightDef night;
+        public readonly TaskSet set;
         public int step;
+        public readonly HashSet<string> picked = new HashSet<string>(), delivered = new HashSet<string>(), knocked = new HashSet<string>();
+        public bool deliveredAny;
+        public readonly Dictionary<string, int> flags = new Dictionary<string, int>();
         public readonly HashSet<int> sideDone = new HashSet<int>(), sideFailed = new HashSet<int>(), secretDone = new HashSet<int>();
-        public event Action<string> Completed;
-        public event Action<string> Failed;
 
-        readonly HashSet<string> history = new HashSet<string>();
-        readonly List<string> picked = new List<string>();
+        /// <summary>Live checks the game answers: is the rat on a surface whose id starts with arg / hidden in a spot of this kind / was a "keep" broken.</summary>
+        public Func<string, bool> onSurface = _ => false, hiddenIn = _ => false, keepBroken = _ => false;
+        public event Action<string> Completed, Failed;
 
-        public TaskTracker(NightDef night) { this.night = night; }
+        public TaskTracker(TaskSet set) { this.set = set ?? new TaskSet(); }
 
-        public TaskDef Current => step < night.chain.Length ? night.chain[step] : null;
+        public bool HasTasks => set.chain.Length > 0;
+        public bool ChainDone => step >= set.chain.Length;
+        public TaskData Current => step < set.chain.Length ? set.chain[step] : null;
+        public bool SideVisible(int i) => set.side[i].reveal < 0 || step >= set.side[i].reveal || sideDone.Contains(i);
 
-        public void Report(Check c, string arg)
+        public void Flag(string name, int add = 1)
         {
-            arg = arg ?? "";
-            if (c == Check.Pick) picked.Add(arg);
-            history.Add(c + ":" + arg);
-
-            for (int i = 0; i < night.side.Length; i++)
-            {
-                var t = night.side[i];
-                if (sideDone.Contains(i) || sideFailed.Contains(i)) continue;
-                if (t.check == Check.Keep)
-                {
-                    if (c == Check.Knock && arg == t.arg) { sideFailed.Add(i); Failed?.Invoke(t.text); }
-                }
-                else if (Matches(t, c, arg)) { sideDone.Add(i); Completed?.Invoke(t.text); }
-            }
-            for (int i = 0; i < night.secret.Length; i++)
-                if (!secretDone.Contains(i) && Matches(night.secret[i], c, arg)) { secretDone.Add(i); Completed?.Invoke("Secret: " + night.secret[i].text); }
-
-            if (Current != null && Matches(Current, c, arg)) Advance();
+            flags.TryGetValue(name, out int v);
+            flags[name] = v + add;
         }
 
-        void Advance()
-        {
-            Completed?.Invoke(Current.text);
-            step++;
-            while (Current != null && AlreadyDone(Current)) { Completed?.Invoke(Current.text); step++; }
-        }
+        public void SetFlag(string name) { if (!flags.ContainsKey(name)) flags[name] = 1; }
+        public int FlagValue(string name) => flags.TryGetValue(name, out int v) ? v : 0;
 
-        bool AlreadyDone(TaskDef t)
+        bool Check(TaskData t)
         {
-            switch (t.check)
+            switch (t.type)
             {
-                case Check.PickN: return Count(t.arg) >= t.n;
-                case Check.Deliver: return !string.IsNullOrEmpty(t.arg) && history.Contains("Deliver:" + t.arg);
-                case Check.Keep: return false;
-                case Check.Surf:
-                    foreach (var h in history) if (h.StartsWith("Surf:" + t.arg)) return true;
-                    return false;
-                default: return history.Contains(t.check + ":" + (t.arg ?? ""));
+                case "pick": return picked.Contains(t.arg);
+                case "deliver": return string.IsNullOrEmpty(t.arg) ? deliveredAny : delivered.Contains(t.arg);
+                case "surf": return onSurface(t.arg);
+                case "hide": return hiddenIn(t.arg);
+                case "knock": return knocked.Contains(t.arg);
+                case "flag": return FlagValue(t.arg) > 0;
+                case "count": return FlagValue(t.arg) >= t.n;
+                case "pickN":
+                    int k = 0;
+                    foreach (var p in picked) if (p.StartsWith(t.arg)) k++;
+                    return k >= t.n;
+                default: return false;
             }
         }
 
-        int Count(string prefix)
+        public void Tick()
         {
-            int k = 0;
-            foreach (var p in picked) if (p.StartsWith(prefix ?? "")) k++;
-            return k;
-        }
-
-        bool Matches(TaskDef t, Check c, string arg)
-        {
-            switch (t.check)
+            while (Current != null && Check(Current)) { Completed?.Invoke(Current.text); step++; }
+            for (int i = 0; i < set.side.Length; i++)
             {
-                case Check.Deliver: return c == Check.Deliver && (string.IsNullOrEmpty(t.arg) || arg == t.arg);
-                case Check.Surf: return c == Check.Surf && arg.StartsWith(t.arg ?? "");
-                case Check.PickN: return c == Check.Pick && arg.StartsWith(t.arg ?? "") && Count(t.arg) >= t.n;
-                case Check.Keep: return false;
-                default: return c == t.check && arg == (t.arg ?? "");
+                var t = set.side[i];
+                if (sideDone.Contains(i) || sideFailed.Contains(i) || !SideVisible(i)) continue;
+                if (t.type == "keep") { if (keepBroken(t.arg)) { sideFailed.Add(i); Failed?.Invoke(t.text); } }
+                else if (Check(t)) { sideDone.Add(i); Completed?.Invoke(t.text); }
             }
+            for (int i = 0; i < set.secret.Length; i++)
+                if (!secretDone.Contains(i) && Check(set.secret[i])) { secretDone.Add(i); Completed?.Invoke("Secret: " + set.secret[i].text); }
         }
 
-        /// <summary>At dawn / when the nest is full: every "keep" task that wasn't broken counts as done.</summary>
+        /// <summary>When the night is won, every "keep" task that wasn't broken counts.</summary>
         public void FinishNight()
         {
-            for (int i = 0; i < night.side.Length; i++)
-                if (night.side[i].check == Check.Keep && !sideFailed.Contains(i)) sideDone.Add(i);
+            for (int i = 0; i < set.side.Length; i++)
+                if (set.side[i].type == "keep" && !sideFailed.Contains(i)) sideDone.Add(i);
         }
-
-        public bool SideVisible(int i) => step >= night.side[i].reveal;
     }
 }
