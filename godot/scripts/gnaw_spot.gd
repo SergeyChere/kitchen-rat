@@ -27,6 +27,7 @@ func gnaw(dt: float) -> void:
 	if _snd <= 0.0:
 		_snd = 0.45
 		g.noise(global_position, 2.0, "Gnaw gnaw", false, 0.3)
+		Sfx.play("gnaw", global_position + Vector3.UP * 0.1)
 	if progress < 1.0:
 		return
 	done = true

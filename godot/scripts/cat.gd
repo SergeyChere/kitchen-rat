@@ -74,6 +74,8 @@ func hear(at: Vector3, radius: float, big: bool, amt: float, from_knock: bool) -
 	if d < radius * _sense() and mode != Mode.CHASE and mode != Mode.WATCH:
 		if from_knock and mode != Mode.INVESTIGATE:
 			G.tasks.flag("lure")
+		if mode != Mode.INVESTIGATE:
+			Sfx.play("meow_q", global_position + Vector3.UP * 0.3)
 		mode = Mode.INVESTIGATE
 		_last = at
 		alert = maxf(alert, 0.25 if radius < 1.0 else 0.4)
@@ -96,6 +98,7 @@ func wake_up(toward = null) -> void:
 	if toward is Vector3:
 		turn(toward - global_position, 1.0)
 	G.bubble_on("MRRAW?!", self, 0.46, 1.6)
+	Sfx.play("meow_angry", global_position + Vector3.UP * 0.3)
 	if str(night.get("cat", "")) == "sleep" and not G.run.catWoke:
 		G.banner("You woke the cat!", "Now it prowls the room. Stay out of its sight and hide under furniture.", 4.5)
 	G.run.catWoke = true
@@ -126,6 +129,7 @@ func _process(dt: float) -> void:
 			if _zzz <= 0.0:
 				_zzz = 2.6
 				G.bubble_on("Crunch crunch", self, 0.4, 1.2)
+				Sfx.play("crunch", global_position + Vector3.UP * 0.2)
 			if _eat <= 0.0:
 				mode = Mode.TO_BED
 				path_to(bed)
@@ -153,6 +157,10 @@ func _process(dt: float) -> void:
 			G.bubble_on("Mrr…" if st == 1 else "…?", self, 0.44, 1.4)
 		_stage = st
 		play(["sleep", "stir", "head_up"][st], 0.4)
+		_zzz -= dt
+		if _zzz <= 0.0 and st == 0:
+			_zzz = 3.2
+			Sfx.play("purr", global_position + Vector3.UP * 0.2)
 		if st == 2:
 			turn(_last - global_position, dt * 2.0)
 			if not _rat_hidden() and dist < 1.7 and angle_to_rat() < 46.0 and line_of_sight():
@@ -179,6 +187,7 @@ func _process(dt: float) -> void:
 		_lost = 0.0; _watch = 4.0; _repath = 0.0; _sit = 0.0
 		G.add_alarm(6.0)
 		G.bubble_on("Meow?!" if rat_high else "MEOW!", self, 0.52, 1.2)
+		Sfx.play("meow" if rat_high else "meow_angry", global_position + Vector3.UP * 0.3)
 	elif alert > 0.35 and sees and (mode == Mode.WANDER or mode == Mode.IDLE):
 		mode = Mode.INVESTIGATE
 		path_to(rat.global_position)
@@ -209,6 +218,7 @@ func _process(dt: float) -> void:
 				if _meow <= 0.0 and sees:
 					_meow = 2.2
 					G.bubble_on("Meow…" if randf() < 0.5 else "Get down here!", self, 0.52, 1.4)
+					Sfx.play("meow", global_position + Vector3.UP * 0.3)
 			_watch -= dt * 0.35 if sees else dt
 			if not rat_high and sees:
 				mode = Mode.CHASE; _lost = 0.0; _repath = 0.0

@@ -426,5 +426,28 @@
  "sleepers": [],
  "dog": [],
  "zones": [],
- "tunnels": []
+ "tunnels": [],
+ "music": {
+  "root": 50,
+  "minor": true,
+  "bpm": 86,
+  "prog": [
+   [
+    0,
+    "m"
+   ],
+   [
+    -4,
+    "M"
+   ],
+   [
+    -9,
+    "M"
+   ],
+   [
+    -2,
+    "M"
+   ]
+  ]
+ }
 }

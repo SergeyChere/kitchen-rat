@@ -50,12 +50,14 @@ func _wake() -> void:
 	G.run.sleeperWoke = true
 	if kind == "kid":
 		G.bubble_on("MOOOM! A RAT!!!", self, 1.1, 2.6)
+		Sfx.play("meow_angry", global_position + Vector3.UP * 0.8, 3.0, 1.6)
 		G.add_alarm(45.0)
 		anim.play("sit_up_scream", 0.1, true)
 		if G.cat.mode == CatAI.Mode.SLEEP:
 			G.cat.wake_up(global_position)
 	else:
 		G.bubble_on("Huh? Wha…", self, 1.1, 2.0)
+		Sfx.play("snore", global_position + Vector3.UP * 0.5, 2.0, 1.4)
 		G.add_alarm(20.0)
 		anim.play("sit_up", 0.1, true)
 
@@ -98,5 +100,6 @@ func _process(dt: float) -> void:
 	_snore -= dt
 	if _snore <= 0.0 and st == 0:
 		_snore = 3.4
+		Sfx.play("snore", global_position + Vector3.UP * 0.4, -4.0 if kind == "kid" else 0.0, 1.3 if kind == "kid" else 1.0)
 		if kind != "kid" and G.rat.global_position.distance_to(global_position) < 5.0:
 			G.bubble_on("Zzzz", self, 0.9, 1.4)

@@ -36,6 +36,9 @@ var pups: Array[Pup] = []
 var sleepers: Array[Sleeper] = []
 var pup_warn_t := 0.0
 var prompt := ""
+var _rain: Node
+const KNOCK_SND := {"cup": "clink", "glass": "clink", "spoon": "clink", "vase": "crash", "jar": "bang", "bottle": "bang",
+	"can": "bang", "apple": "thud", "book": "thud", "carton": "thud", "ball": "thud"}
 var fed := 0
 var lives := 3
 var stars := 0
@@ -93,8 +96,8 @@ func _ready() -> void:
 	I = self
 	night = Nights.load_night(night_id)
 	tasks = TaskTracker.new(night.get("tasks", {}))
-	tasks.completed.connect(func(t): toast("✓ " + t))
-	tasks.failed.connect(func(t): toast("✗ " + t))
+	tasks.completed.connect(func(t): toast("✓ " + t); Sfx.play("task"))
+	tasks.failed.connect(func(t): toast("✗ " + t); Sfx.play("fail"))
 	tasks.on_surface = func(a): return not rat.jumping and rat.surface_id.begins_with(a)
 	tasks.hidden_in = func(a): return rat.hide_kind() == a
 	tasks.keep_broken = _keep_broken
@@ -140,6 +143,10 @@ func _ready() -> void:
 	_moon_e = moon.light_energy if moon else 0.5
 	_last_rp = rat.global_position
 	print_verbose("night ready: ", foods.size(), " food, ", zones.size(), " zones")
+	Sfx.music_night(night.get("music", {}))
+	Sfx.music_duck(false)
+	if bool(night.get("storm", false)):
+		_rain = Sfx.loop("rain_loop")
 	rat.frozen = true
 
 
@@ -372,6 +379,7 @@ func deliver() -> void:
 	rat.carried.clear()
 	fed = maxi(0, fed + value - poison * 4)
 	var top := hole + Vector3.UP * 0.32
+	Sfx.play("poison" if poison > 0 else "deliver")
 	if poison > 0:
 		run.poisonDelivered = true
 		bubble_at("Poison! −%d" % (poison * 4), top, 1.6, Color(0.6, 0.88, 0.4))
@@ -391,6 +399,9 @@ func caught(text: String, at: Vector3) -> void:
 		return
 	lives -= 1
 	run.caught = true
+	Sfx.play("caught")
+	if text.begins_with("WHACK"):
+		Sfx.play("whack", at)
 	rat.carrier = null
 	bubble_at(text, at, 1.6, Color(0.91, 0.4, 0.29))
 	for f in rat.carried:
@@ -412,6 +423,7 @@ func caught(text: String, at: Vector3) -> void:
 
 func knock_landed(k: Knockable, at: Vector3) -> void:
 	noise(at, 4.6, k.sound(), true, -1.0, true)
+	Sfx.play(KNOCK_SND.get(k.kind, "thud"), at)
 	if vacuum and vacuum.on and vacuum.global_position.distance_to(at) < 0.8:
 		vacuum.stun()
 	if dog:
@@ -428,6 +440,7 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 
 
 func _on_landed(drop: float) -> void:
+	Sfx.play("land_big" if drop > 0.5 else "land", rat.global_position)
 	if drop > 0.5 and rat.surface_id == "floor":
 		noise(rat.global_position, 1.6, "Thud", false, 0.55)
 	for z in zones:
@@ -488,6 +501,8 @@ func _process(dt: float) -> void:
 	_tick_flags()
 	tasks.tick()
 	_tick_wanted(dt)
+	var chase := cat.mode == CatAI.Mode.CHASE or owner_ai.mode == OwnerAI.Mode.CHASE or (dog != null and dog.mode == DogAI.Mode.CHASE)
+	Sfx.music_layers(stars / 4.0, chase)
 	if fed >= int(night.goal) and (not tasks.has_tasks() or tasks.chain_done()):
 		if bool(night.get("finale", false)):
 			_end(true, "The End", "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom.")
@@ -502,12 +517,15 @@ func _tick_rat_noise(dt: float) -> void:
 		return
 	var on_floor := rat.surface_id == "floor"
 	if rat.dragging() and _noise_t <= 0.0:
+		Sfx.play("scrape", rat.global_position, -4.0 if rat.sneaking else 0.0)
 		_noise_t = 0.6
 		noise(rat.global_position, 0.6 if rat.sneaking else 1.2, "", false, 0.05 if rat.sneaking else 0.15)
 	elif rat.running and _noise_t <= 0.0:
+		Sfx.play("step", rat.global_position, 5.0, 0.9)
 		_noise_t = 0.35
 		noise(rat.global_position, 2.1, "", false, 0.3)
 	elif not rat.running and not rat.sneaking and on_floor and in_hum == 0 and _noise_t <= 0.0:
+		Sfx.play("step", rat.global_position)
 		_noise_t = 0.45
 		noise(rat.global_position, 0.95, "", false, 0.1)
 	if rat.running and on_floor and rat.blocked and _bump_t <= 0.0:
@@ -526,6 +544,7 @@ func _pick_up(rp: Vector3) -> void:
 		if absf(d.y) > 0.12 or Vector2(d.x, d.z).length() > 0.17:
 			continue
 		if f.is_find:
+			Sfx.play("cheese")
 			toast(f.label if f.label != "" else "A find for the nest!")
 			tasks.set_flag(f.type)
 			tasks.flag("collected")
@@ -535,6 +554,7 @@ func _pick_up(rp: Vector3) -> void:
 		if rat.carry_weight() + f.weight() > rat.capacity:
 			continue
 		rat.carry(f)
+		Sfx.play("cheese" if f.is_cheese() else "pickup", rp)
 		if f.id != "":
 			tasks.picked[f.id] = true
 			if owner_ai.mode == OwnerAI.Mode.DRINK:
@@ -578,6 +598,7 @@ func _tick_sniff(dt: float) -> void:
 	var rp := rat.global_position
 	if want and not _sniffing:
 		_sniffing = true
+		Sfx.play("sniff", rat.global_position)
 		_sniff_hold = 0.0
 		for t in traps:
 			if t.sprung or t.global_position.distance_to(rp) > 2.6:
@@ -699,6 +720,7 @@ func _on_stars(ns: int, os: int) -> void:
 		if _stars_done.has(s):
 			continue
 		_stars_done[s] = true
+		Sfx.play("star_up", null, 0.0, 1.0 + s * 0.03)
 		var st := "★".repeat(s)
 		var t: String = threats[s - 1] if s - 1 < threats.size() else ""
 		if t != "":
@@ -747,6 +769,7 @@ func _tick_sticky(dt: float) -> void:
 		if _stuck_snd <= 0.0:
 			_stuck_snd = 0.6
 			noise(rat.global_position, 2.0, "Gnaw gnaw" if rat.stuck_t > 2.5 else "Squeak! Stuck!", false, 0.4)
+			Sfx.play("gnaw" if rat.stuck_t > 2.5 else "squeak", rat.global_position, 0.0, 1.2)
 		if rat.stuck_t <= 0.0:
 			_stuck_imm = 1.6
 		return
@@ -761,6 +784,7 @@ func _tick_sticky(dt: float) -> void:
 				run.caged = true
 			tasks.flag("stuck")
 			bubble_at(z.label, rat.global_position + Vector3.UP * 0.3, 1.6)
+			if z.kind == "cage": Sfx.play("snap", rat.global_position)
 			return
 
 
@@ -784,6 +808,7 @@ func use_tunnel() -> bool:
 		return false
 	rat.teleport(cracks[to], rat.rotation.y + PI)
 	tasks.flag("tunnel")
+	Sfx.play("scrape")
 	bubble_at("…through the wall", cracks[to] + Vector3.UP * 0.25, 1.4, Color(0.62, 0.82, 0.48))
 	return true
 
@@ -820,6 +845,8 @@ func _tick_world(dt: float) -> void:
 		prompt = "Space — crawl through the wall"
 	if _wash_t > 0.0:
 		_wash_t -= dt
+		if _wash_zone and randf() < dt * 3.0:
+			Sfx.play("scrape", _wash_zone.global_position + Vector3.UP * 0.4, -4.0, randf_range(0.6, 0.9))
 		if _wash_t <= 0.0 and _wash_zone:
 			if _wash_zone.inside: _wash_zone.exit(rat)
 			zones.erase(_wash_zone)
@@ -832,8 +859,9 @@ func _tick_world(dt: float) -> void:
 	if bool(night.get("catBell", false)) and cat.awake() and cat.speed > 0.2:
 		_bell_t -= dt
 		if _bell_t <= 0.0:
-			_bell_t = 1.6
-			if cat.global_position.distance_to(rp) < 6.0:
+			_bell_t = 0.5
+			Sfx.play("bell", cat.global_position + Vector3.UP * 0.25)
+			if randf() < 0.25 and cat.global_position.distance_to(rp) < 6.0:
 				bubble_on("♪ ding", cat, 0.42, 0.8)
 	if bool(night.get("storm", false)):
 		_tick_storm(dt, rp)
@@ -867,6 +895,7 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 		_thunder_t -= dt
 		if _thunder_t <= 0.0:
 			_storm_mask = 2.6
+			Sfx.play("thunder")
 			bubble_at("BOOM", rp + Vector3.UP * 0.9, 1.2, Color(0.81, 0.85, 1.0))
 	if _storm_mask > 0.0:
 		_mud += Vector2(rp.x - _last_rp.x, rp.z - _last_rp.z).length()
@@ -887,6 +916,7 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 		if room_light: room_light.visible = false
 		owner_ai.room_light = null
 		banner("The power went out!", "It’s pitch dark. Thunder still hides your steps.", 3.5)
+		Sfx.play("light_switch")
 		if rat.in_nest or rp.distance_to(hole) < 0.6:
 			tasks.set_flag("homeAtBlackout")
 
@@ -899,7 +929,10 @@ func _tick_lights(dt: float) -> void:
 		if not is_instance_valid(l):
 			continue
 		match str(f[2]):
-			"fire": l.light_energy = float(f[1]) * _light_mul * (0.82 + 0.12 * sin(t * 7.3 + i) + 0.08 * sin(t * 13.1 + i * 2.0))
+			"fire":
+				l.light_energy = float(f[1]) * _light_mul * (0.82 + 0.12 * sin(t * 7.3 + i) + 0.08 * sin(t * 13.1 + i * 2.0))
+				if randf() < dt * 5.0:
+					Sfx.play("crackle", l.global_position, 0.0, 1.0, 0.2)
 			"tv":
 				l.light_energy = float(f[1]) * (1.9 if tv_on else 1.0) * (0.8 + 0.2 * sin(t * 3.0) * sin(t * 5.7 + 1.0))
 			_: l.light_energy = float(f[1]) * _light_mul
@@ -1087,6 +1120,7 @@ func begin() -> void:
 
 func _set_paused(on: bool) -> void:
 	state = "pause" if on else "play"
+	Sfx.music_duck(on)
 	get_tree().paused = false
 	rat.frozen = on
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if on else Input.MOUSE_MODE_CAPTURED
@@ -1096,11 +1130,18 @@ func _end(won: bool, title: String, text: String) -> void:
 	if won:
 		tasks.finish_night()
 	state = "won" if won else "lost"
+	Sfx.play("win" if won else "lose")
+	Sfx.music_layers(0.0, false)
 	end_title = title
 	end_text = text
 	rat.frozen = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	ended.emit(won)
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(_rain):
+		_rain.queue_free()
 
 
 func _restart() -> void:

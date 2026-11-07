@@ -4,6 +4,14 @@ extends Zone
 ## balloons… mode: walk (any non-sneaking step), step (any step, even sneaking), run (only running),
 ## land (landing on it after a jump), landrun (landing or running). Foil also sets a flag when crossed sneaking.
 
+## The prototype's NOISY[kind].snd.
+const SOUNDS := {
+	"foil": "crinkle", "plate": "clink", "sofa": "scratch", "remote": "tv", "squeaky": "squeaky", "board": "creak",
+	"bag": "crinkle", "grain": "crunch", "puddle": "splash", "cord": "buzz", "washer": "buzz", "hanger": "clink",
+	"balloon": "bang", "confetti": "crinkle", "glasses": "clink", "litter": "crunch", "dock": "beep", "pipe": "bang",
+	"lego": "crunch", "musicbox": "musicbox", "nightlight": "light_switch", "bottles": "clink", "popper": "bang",
+}
+
 var kind := "foil"
 var mode := "walk"
 var sound := "Crinkle!"
@@ -56,6 +64,7 @@ func _trigger(rat: Rat) -> void:
 	_cd = cooldown
 	used = true
 	Game.I.noise(rat.global_position, radius, sound, big, amount)
+	Sfx.play(SOUNDS.get(kind, "crinkle"), rat.global_position + Vector3.UP * 0.05)
 	Game.I.noisy_effect(kind, self)
 	if hide_when_used:
 		hide_when_used.visible = false

@@ -25,6 +25,7 @@ func spring() -> void:
 		return
 	sprung = true
 	visible = true
+	Sfx.play("snap", global_position)
 
 
 func _process(dt: float) -> void:

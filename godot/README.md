@@ -56,7 +56,10 @@ Pups come along from night 11. Each has a personality: Brave runs ahead for food
 green cheese), Shy freezes at loud noises and warns about the cat, Curious sniffs out hidden food and secrets.
 The cat, the dog or the owner can catch a pup. Walk up to it to rescue it.
 
-Not yet in the Godot version: sound and music.
+Sound and music: every effect from the prototype (squeaks, meows, the cat's bell, barking, the vacuum hum,
+thunder and rain, traps, crashes, footsteps…) plays from where it happens in the room. Each night has its own music
+with three layers that blend in as the house wakes up: calm, the "wanted" layer (ticking hats, pulsing bass) as
+the stars go up, and drums when something is chasing you. Music and sound volume are in the menu.
 
 ## Run the automated checks
 
@@ -73,3 +76,5 @@ godot --headless --path godot -- --night=living --auto --test=hides   # every hi
 - `assets/models/*.glb` is made by `tools/blender/*.py`. Run it with Blender's Python.
 - `data/nights/*.json` is made by `node tools/export_nights.mjs` from the prototype's night definitions.
 - The level is built in code at runtime by `scripts/level_builder.gd`.
+- `assets/sounds/*.wav` and `assets/music/*.ogg` are made by `python3 tools/make_audio.py`. It renders the
+  prototype's synthesizer recipes from `game/js/audio.js` offline, so there are no third-party sound files to license.

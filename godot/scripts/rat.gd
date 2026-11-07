@@ -244,6 +244,7 @@ func _show_marker(on: bool) -> void:
 
 func _start_jump(to: Vector3, up: bool) -> void:
 	jumping = true
+	Sfx.play("jump", global_position)
 	_jump_up = up
 	_from = global_position
 	_to = to

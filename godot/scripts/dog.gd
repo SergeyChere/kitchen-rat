@@ -46,6 +46,7 @@ func wake_up() -> void:
 	sleep = 0.0
 	G.run.dogWoke = true
 	G.bubble_on("*sniff sniff* WOOF?", self, 0.75, 1.8)
+	Sfx.play("bark", global_position + Vector3.UP * 0.5, -3.0, 1.1)
 	if anim:
 		anim.play("wake_up", 0.1, true)
 
@@ -119,6 +120,7 @@ func _process(dt: float) -> void:
 			if _bark <= 0.0:
 				_bark = 1.3
 				G.noise(global_position, 5.0, "WOOF! WOOF!", true, 0.6, false, "dog")
+				Sfx.play("bark", global_position + Vector3.UP * 0.5)
 			if _lost > 2.5:
 				mode = Mode.TRACK
 				path.clear()

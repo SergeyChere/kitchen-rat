@@ -65,10 +65,12 @@ LEVELS.forEach((d, i) => {
     dog: d.dog ? [d.dog.x, d.dog.y] : [],
     zones: (d.zones || []).map(z => pick(z, ['id', 'x', 'y', 'w', 'h'])),
     tunnels: (d.tunnels || []).map(([a, b]) => ({ a, b })),
+    music: d.music || ctx.window.MENU_MUSIC,
   };
   const file = String(i + 1).padStart(2, '0') + '_' + d.id + '.json';
   for (const o of outs) fs.writeFileSync(path.join(o, file), JSON.stringify(n, null, 1));
   index.push(file.replace('.json', ''));
 });
 for (const o of outs) fs.writeFileSync(path.join(o, 'index.txt'), index.join('\n') + '\n');
+fs.writeFileSync(path.join(root, 'godot/data/menu_music.json'), JSON.stringify(ctx.window.MENU_MUSIC));
 console.log('exported', index.length, 'nights to', path.relative(root, out));

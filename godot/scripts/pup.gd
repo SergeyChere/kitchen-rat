@@ -42,6 +42,7 @@ func say(t: String, d := 1.4) -> void:
 		return
 	_said = 1.5
 	G.bubble_on(t, self, 0.22, d)
+	Sfx.play("squeak", global_position + Vector3.UP * 0.1, -4.0, randf_range(1.15, 1.35))
 
 
 func force_say(t: String, d := 1.4) -> void:

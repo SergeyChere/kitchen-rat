@@ -22,6 +22,8 @@ func start() -> void:
 	visible = true
 	global_position = dock
 	path.clear()
+	Sfx.play("beep", global_position)
+	Sfx.loop("hum_loop", self)
 	G.bubble_on("Beep boop!", self, 0.3, 1.6)
 
 
@@ -30,6 +32,7 @@ func stun() -> void:
 		return
 	_stun = 6.0
 	path.clear()
+	Sfx.play("beep", global_position, 0.0, 0.8)
 	G.bubble_on("Error: obstacle", self, 0.3, 1.6)
 	G.tasks.set_flag("vacBlock")
 
@@ -75,6 +78,7 @@ func _process(dt: float) -> void:
 		if G.sphere_free(to + Vector3.UP * 0.08, 0.05):
 			rat.global_position = to
 		G.noise(global_position, 6.5, "BEEP BEEP!", true)
+		Sfx.play("beep", global_position, 4.0)
 		path.clear()
 
 

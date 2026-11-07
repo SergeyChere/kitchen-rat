@@ -10,6 +10,7 @@ var mode := Mode.AWAY
 var door := Vector3.ZERO
 var flashlight: SpotLight3D
 var room_light: Light3D
+var _step_d := 0.0
 var body: Node3D
 var sees := false
 var night: Dictionary
@@ -54,6 +55,8 @@ func _show(on: bool) -> void:
 
 func _room_light(on: bool) -> void:
 	if room_light:
+		if room_light.visible != on:
+			Sfx.play("light_switch", room_light.global_position)
 		room_light.visible = on
 
 
@@ -101,6 +104,7 @@ func _process(dt: float) -> void:
 		mode = Mode.PATROL
 		global_position = door
 		rotation.y = Nights.yaw_to(Vector3.LEFT)
+		Sfx.play("door", door + Vector3.UP)
 		path.clear(); _lost = 0.0; _see = 0.0; _low = 0.0; _t = 0.0
 		_show(true)
 		_room_light(not (_plan_active and _has_plan() and not bool(_plan.get("light", true))))
@@ -185,6 +189,7 @@ func _process(dt: float) -> void:
 			elif not follow(0.95, dt):
 				var clean := _plan_active and not _chased
 				mode = Mode.AWAY; _known = false; _plan_active = false; _plan_started = false
+				Sfx.play("door", door + Vector3.UP)
 				_show(false)
 				_room_light(false)
 				G.tasks.flag("ownerLeft")
@@ -206,6 +211,10 @@ func _process(dt: float) -> void:
 		flashlight.visible = _plan_active and _has_plan() and not bool(_plan.get("light", true))
 		flashlight.rotation = Vector3(deg_to_rad(-18.0), _sweep + PI, 0.0)
 
+	_step_d += speed * dt
+	if _step_d > 0.6:
+		_step_d = 0.0
+		Sfx.play("stomp", global_position, 0.0, 1.0, 0.1)
 	if speed > 1.2: play("run", 0.15)
 	elif speed > 0.05: play("walk")
 	elif mode == Mode.DRINK: play("drink")

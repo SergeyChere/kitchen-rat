@@ -17,6 +17,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	Sfx.setup(self)
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
@@ -55,6 +56,7 @@ func _unhandled_input(e: InputEvent) -> void:
 
 
 func start_night(id: String) -> void:
+	Sfx.play("click")
 	_clear()
 	game = Game.new(id)
 	game.name = "Game"
@@ -63,6 +65,8 @@ func start_night(id: String) -> void:
 
 func show_menu() -> void:
 	_clear()
+	Sfx.music_menu()
+	Sfx.music_duck(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	menu = Control.new()
 	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -111,17 +115,36 @@ func show_menu() -> void:
 			b.disabled = true
 			b.tooltip_text = "This room is not built in Godot yet"
 		grid.add_child(b)
-	var note := Label.new()
-	note.text = "Nights in the kitchen are playable; the other rooms are coming."
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.add_theme_color_override("font_color", Color(0.7, 0.72, 0.8))
-	box.add_child(note)
+	var vol := HBoxContainer.new()
+	vol.alignment = BoxContainer.ALIGNMENT_CENTER
+	vol.add_theme_constant_override("separation", 12)
+	box.add_child(vol)
+	for which in ["Music", "Sound"]:
+		var l := Label.new()
+		l.text = which
+		vol.add_child(l)
+		var sl := HSlider.new()
+		sl.min_value = 0.0
+		sl.max_value = 1.0
+		sl.step = 0.05
+		sl.custom_minimum_size = Vector2(200, 24)
+		sl.value = Sfx.music_volume if which == "Music" else Sfx.sfx_volume
+		sl.value_changed.connect(_on_volume.bind(which))
+		vol.add_child(sl)
 	var quit := Button.new()
 	quit.text = "Quit"
 	quit.custom_minimum_size = Vector2(160, 40)
 	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	quit.pressed.connect(get_tree().quit)
 	box.add_child(quit)
+
+
+func _on_volume(v: float, which: String) -> void:
+	if which == "Music":
+		Sfx.set_volumes(v, Sfx.sfx_volume)
+	else:
+		Sfx.set_volumes(Sfx.music_volume, v)
+		Sfx.play("squeak")
 
 
 func _clear() -> void:
