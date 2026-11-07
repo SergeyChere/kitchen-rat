@@ -10,6 +10,7 @@ var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
 var _rings: Array = []  # [MeshInstance3D, t, life, max_r]
 var _glints: Array = []  # [Sprite3D, node it marks, phase]
+var _beacon: MeshInstance3D  # a green column of light over the nest hole while she carries food
 static var _tex: ImageTexture
 static var _star: ImageTexture
 static var _dot: ImageTexture
@@ -76,10 +77,10 @@ func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: 
 	p.initial_velocity_min = speed * 0.5
 	p.initial_velocity_max = speed
 	p.gravity = Vector3(0, gravity, 0)
-	p.scale_amount_min = size * 0.6
-	p.scale_amount_max = size
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.0
 	var q := QuadMesh.new()
-	q.size = Vector2(1, 1)
+	q.size = Vector2(size, size)  # sized on the mesh: particle scale isn't applied to billboards on every renderer
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -124,9 +125,10 @@ func _motes() -> void:
 	p.initial_velocity_min = 0.005
 	p.initial_velocity_max = 0.03
 	p.gravity = Vector3(0, -0.004, 0)
-	p.scale_amount_min = 0.006
-	p.scale_amount_max = 0.014
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.2
 	var q := QuadMesh.new()
+	q.size = Vector2(0.012, 0.012)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -165,7 +167,41 @@ func _make_glints() -> void:
 		_glints.append([s, n, randf() * TAU])
 
 
+func _make_beacon() -> void:
+	_beacon = MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.07
+	cyl.bottom_radius = 0.07
+	cyl.height = 2.4
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	_beacon.mesh = cyl
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_texture = _fade_tex()
+	m.albedo_color = Color(0.35, 1.0, 0.45, 0.55)
+	_beacon.material_override = m
+	_beacon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beacon.visible = false
+	add_child(_beacon)
+	_beacon.global_position = g.hole + Vector3(0, 1.2, -0.05)
+
+
+## Bright at the bottom, fading out upward (the cylinder's V runs top to bottom).
+static func _fade_tex() -> ImageTexture:
+	var img := Image.create(4, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		var a := pow(y / 63.0, 1.6)
+		for x in 4:
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	return ImageTexture.create_from_image(img)
+
+
 func _ready() -> void:
+	_make_beacon()
 	_motes()
 	_make_glints()
 	for z in g.zones:
@@ -221,6 +257,10 @@ func ring(at: Vector3, radius: float, big: bool) -> void:
 
 
 func _process(dt: float) -> void:
+	if _beacon:
+		_beacon.visible = not g.rat.carried.is_empty() and not g.rat.in_nest
+		if _beacon.visible:
+			(_beacon.material_override as StandardMaterial3D).albedo_color.a = 0.45 + 0.15 * sin(Time.get_ticks_msec() / 250.0)
 	var rp := g.rat.global_position
 	var playing := g.state == "play" or g.state == "pause"
 	for e in _marks:

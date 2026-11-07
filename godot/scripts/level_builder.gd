@@ -148,8 +148,29 @@ func furn_piece(path: String, x: float, y: float, rot: float, surface: String, w
 	if n == null:
 		return null
 	fit(n, w, d, h)
-	collide(n, surface)
+	if surface in ["fridge", "cabinet"]:
+		collide_box(n, surface)  # closed boxes: no way inside, a flat top to walk on
+	else:
+		collide(n, surface)
 	return n
+
+
+## One solid box over the whole model.
+func collide_box(n: Node3D, surface := "") -> void:
+	var bb := world_aabb(n)
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	var sh := BoxShape3D.new()
+	sh.size = bb.size
+	cs.shape = sh
+	body.add_child(cs)
+	furn.add_child(body)
+	body.global_position = bb.get_center()
+	if surface != "":
+		body.set_meta("surface", surface)
+	n.set_meta("box_body", body)
 
 
 ## The top of whatever is at (x, y): floor, counter, table…
@@ -254,6 +275,8 @@ func _lighting() -> void:
 	moon.light_color = Color(0.62, 0.7, 1.0)
 	moon.light_energy = 0.5 * float(pal.get("moon", 0.9))
 	moon.shadow_enabled = true
+	moon.shadow_bias = 0.08  # no striped shadow acne on the flat counter tops
+	moon.shadow_normal_bias = 2.5
 	root.add_child(moon)
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
@@ -299,6 +322,15 @@ func _room() -> void:
 	var fm := (fl as MeshInstance3D).mesh as BoxMesh
 	fm.size = Vector3(9.6, 0.1, 6.0)
 	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), mat(hex(pal.get("ceil", 0x22263a))), root, false)
+	var cb := StaticBody3D.new()  # only the camera bumps into the ceiling (layer 3), up on the cabinets
+	cb.collision_layer = 4
+	cb.collision_mask = 0
+	var ccs := CollisionShape3D.new()
+	var csh := BoxShape3D.new()
+	csh.size = Vector3(9.6, 0.1, 6.0)
+	ccs.shape = csh
+	cb.add_child(ccs)
+	ceil.add_child(cb)
 	(ceil as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var north := []; var south := []; var west := []; var east := []
@@ -391,6 +423,86 @@ func _furniture() -> void:
 	furn_piece("furniture/low_shelf", 231, 325, 0.0, "lowShelf", 62, 50)
 	_hide("shelf", 231, 325, 54, 42)
 	furn_piece("furniture/stool", 100, 252, 0.0, "stool")
+	if bool(night.get("kitchenUpper", false)):
+		_kitchen_upper()
+
+
+## The kitchen's second level (night 1): wall cabinets over the counter left and right of the window, a shelf over
+## the window joining them, two open shelves on the west wall to climb up by (counter 92 → 140 → 180 → cabinet tops
+## 215 → fridge top 185), a kettle and a toaster on the counter, a clock and pictures on the free walls.
+func _kitchen_upper() -> void:
+	var white := Color8(0xee, 0xe2, 0xc8)
+	for blk in [[0.0, 400.0], [640.0, 830.0]]:
+		var n := int(round((blk[1] - blk[0]) / 64.0))
+		var cw: float = (blk[1] - blk[0]) / n
+		for i in n:
+			var c := spawn("furniture/upper_cabinet", W(0, 0), 0.0, furn)
+			if c:
+				fit(c, cw, 35, 70)
+				_recolor(c, white)
+				var bb := world_aabb(c)
+				c.global_position += W(blk[0] + cw * (i + 0.5), 17.5, 145) - Vector3(bb.get_center().x, bb.position.y, bb.get_center().z)
+				collide_box(c, "cabinet")
+	var wood := mat(hex(0x8a5a34))
+	box("Shelf over the window", W(520, 13, 213.5), Vector3(2.4, 0.03, 0.26), wood, furn).get_child(0).set_meta("surface", "shelf")
+	for sh in [[195.0, 138.5], [100.0, 178.5]]:  # [y centre, top − 1.5]
+		var b := box("Wall shelf", W(14, sh[0], sh[1]), Vector3(0.28, 0.03, 1.0), wood, furn)
+		b.get_child(0).set_meta("surface", "shelf")
+		for j in 3:  # jars and cups standing at the back
+			var jar := spawn("props/jar" if j % 2 == 0 else "props/mug", W(6, sh[0] - 35 + j * 35, sh[1] + 1.5), 90.0, decor)
+			if jar:
+				jar.scale *= 0.8
+				collide(jar)
+	var ket := spawn("rooms/kettle", on_top(260, 30), 180.0, decor)
+	collide(ket)
+	var toast := spawn("furniture/toaster", on_top(340, 28), 180.0, decor)
+	if toast:
+		var tb := world_aabb(toast)
+		toast.global_position -= Vector3(tb.get_center().x - W(340, 28).x, 0, tb.get_center().z - W(340, 28).z)
+		collide(toast)
+	_wall_art("rooms/wall_clock", 958, 200, 195, -90.0)
+	_wall_art("rooms/wall_art_landscape", 2, 430, 160, 90.0)
+	_wall_art("rooms/wall_art_flowers", 2, 540, 160, 90.0)
+	_wall_art("rooms/wall_art_portrait", 720, 598, 165, 180.0)
+
+
+## A few kibbles left in the cat's bowl.
+func _bowl_leftovers(bowl: Node3D) -> void:
+	var bb := world_aabb(bowl)
+	var c := bb.get_center()
+	var r := minf(bb.size.x, bb.size.z) * 0.28
+	var kib := mat(hex(0x8a5a2e))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for i in 22:
+		var a := rng.randf() * TAU
+		var d := sqrt(rng.randf()) * r
+		var k := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.009
+		sm.height = 0.012
+		k.mesh = sm
+		k.material_override = kib
+		decor.add_child(k)
+		k.global_position = Vector3(c.x + cos(a) * d, bb.position.y + bb.size.y * 0.6 + rng.randf() * 0.008, c.z + sin(a) * d)
+
+
+## A picture or clock on a wall, centred at (x, y) and h cm up, facing into the room.
+func _wall_art(model: String, x: float, y: float, h: float, rot: float) -> void:
+	var n := spawn(model, W(x, y, h), rot, decor)
+	if n:
+		n.global_position.y = h / 100.0 - world_aabb(n).size.y / 2.0
+
+
+func _recolor(n: Node3D, col: Color) -> void:
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			if src and src.albedo_color.r > 0.6 and src.albedo_color.b < 0.45:  # Kenney's wood → our cabinet white
+				var c := src.duplicate() as BaseMaterial3D
+				c.albedo_color = col
+				m.set_surface_override_material(i, c)
 
 
 func _decor() -> void:
@@ -419,7 +531,10 @@ func _decor() -> void:
 		_exit(Nights.pos(ex))
 	spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # no collision: the cat lies in it
 	if (night.get("bowl", []) as Array).size() >= 2:
-		collide(spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor))
+		var bowl := spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor)
+		collide(bowl)
+		if bowl and bool(night.get("kitchenUpper", false)):
+			_bowl_leftovers(bowl)
 	if (night.get("dock", []) as Array).size() >= 2 and (bool(night.get("vacuumStart", false)) or (night.get("threats", []) as Array).has("vacuum")):
 		collide(spawn("props/vacuum_dock", Nights.pos(night.dock), -90.0, decor))
 
@@ -635,7 +750,9 @@ func _nest() -> void:
 	nest.add_child(light)
 	light.global_position = W(140, 690, 45)
 	for p in [[70, 715, 20, "sleep"], [105, 735, -60, "sleep"], [80, 745, 150, "idle"], [125, 705, 200, "sniff"]]:
-		var pup := spawn("characters/rat_pup", W(p[0], p[1], 2), p[2], nest)
+		var o := W(p[0], p[1], 60)
+		var hit := g.ray(o, o + Vector3.DOWN * 1.0)  # on top of the nest bedding, not inside it
+		var pup := spawn("characters/rat_pup", (hit.position if not hit.is_empty() else W(p[0], p[1], 2)) + Vector3.UP * 0.006, p[2], nest)
 		if pup:
 			var cp := ClipPlayer.new(pup)
 			cp.play(p[3], 0.0)

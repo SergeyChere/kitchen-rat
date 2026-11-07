@@ -41,6 +41,20 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "ypos":
+		await _wait(host, 1.0)
+		print("rat y ", g.rat.global_position.y, " floor ", g.rat.is_on_floor())
+		print("rat ", g.rat.global_position, " mouth ", g.rat.mouth.global_position, " mouth scale ", g.rat.mouth.global_transform.basis.get_scale())
+		var sk := g.rat.model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		print("head rest ", sk.global_transform * sk.get_bone_global_rest(sk.find_bone("Head")).origin, " head pose ", sk.global_transform * sk.get_bone_global_pose(sk.find_bone("Head")).origin)
+		for mi in g.rat.model.find_children("*", "MeshInstance3D", true, false):
+			print("mesh aabb ", mi.global_transform * (mi as MeshInstance3D).get_aabb(), " sk ", sk.global_transform.basis.get_scale())
+		for c in g._builder.furn.get_children():
+			if str(c.name).contains("upper") or c.has_meta("box_body"):
+				print("furn ", c.name, " ", LevelBuilder.world_aabb(c))
+		for p in g.nest_pups: print("nest pup y ", p.global_position.y)
+		host.get_tree().quit()
+		return
 	if name == "probe":
 		await _wait(host, 0.3)
 		for zi in range(0, 14):
@@ -50,6 +64,49 @@ func _run(host: Node) -> void:
 				row += " y%.2f=%s" % [yi, "." if g.sphere_free(Vector3(-3.0, yi, z), 0.02) else "#"]
 			print(row)
 		print("hole ", g.hole)
+		host.get_tree().quit()
+		return
+	if name == "upper":
+		var r := g.rat
+		await _wait(host, 0.5)
+		var steps := [[Vector3(-1, 0, 0), "shelf", 1.38], [Vector3(0, 0, -1), "shelf", 1.78], [Vector3(0, 0, -1), "cabinet", 2.14]]
+		r.teleport(Nights.world(45, 205, 93), Nights.yaw_to(Vector3.LEFT))
+		await _wait(host, 0.4)
+		for st in steps:
+			r.rotation.y = Nights.yaw_to(st[0])
+			g.cam.snap(r.rotation.y)
+			if st[1] == "cabinet":  # walk to the far end of the upper shelf first
+				Input.action_press("forward")
+				await _wait(host, 0.8)
+				Input.action_release("forward")
+			await _wait(host, 0.4)
+			_check("sees a jump target toward " + str(st[0]), r.has_jump_target(), "at " + str(r.global_position))
+			Input.action_press("jump")
+			await _wait(host, 0.05)
+			Input.action_release("jump")
+			await _wait(host, 1.3)
+			_check("climbed onto the " + st[1], r.surface_id == st[1] and absf(r.global_position.y - st[2]) < 0.05, "surface " + r.surface_id + " y %.2f" % r.global_position.y)
+		# along the cabinet tops and the shelf over the window to the fridge
+		r.teleport(Nights.world(380, 15, 216), Nights.yaw_to(Vector3.RIGHT))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.3)
+		Input.action_press("forward")
+		await _wait(host, 5.5)
+		Input.action_release("forward")
+		await _wait(host, 0.5)
+		_check("walked over the window shelf and the cabinets onto the fridge", r.surface_id == "fridge", "surface " + r.surface_id + " at " + str(r.global_position))
+		# push the mug off the table: it slides to the edge, falls and breaks
+		var cup: Knockable = null
+		for k in g.knockables:
+			if k.kind == "cup": cup = k
+		if cup:
+			r.teleport(cup.global_position + Vector3(0, 0, 0.2), PI)
+			await _wait(host, 0.3)
+			g.tasks.step = maxi(g.tasks.step, 3)  # the side task shows after 3 main steps
+			await _press(host, "push")
+			await _wait(host, 2.5)
+			_check("the mug fell off the table and broke", not cup.visible, "cup at " + str(cup.global_position) + " visible " + str(cup.visible))
+			_check("side task: push the mug off the table", g.tasks.side_done.has(0))
 		host.get_tree().quit()
 		return
 	if name == "mech":

@@ -1,6 +1,8 @@
 class_name FollowCamera
 extends Node3D
-## Third-person orbit camera close to the floor. Mouse looks around, the wheel zooms, walls push it in (SpringArm3D).
+## Third-person orbit camera close to the floor. Mouse looks around, the wheel changes the field of view, walls push it
+## in (SpringArm3D; when that brings it right up to her, the rat is hidden instead of filling the screen). V switches to
+## the rat's-eye view (from her head).
 
 var target: Node3D
 var distance := 0.75
@@ -9,7 +11,9 @@ var max_distance := 1.8
 var height := 0.12
 var sensitivity := 0.25
 var invert_y := false
-var fov := 60.0
+var fov := 60.0  # from the settings
+var zoom := 0.0  # the wheel: degrees added to the field of view
+var first_person := false
 var yaw := PI  # 0 looks toward +Z (south)
 var pitch := -16.0
 var arm: SpringArm3D
@@ -18,7 +22,7 @@ var cam: Camera3D
 
 func _ready() -> void:
 	arm = SpringArm3D.new()
-	arm.collision_mask = 1
+	arm.collision_mask = 1 | 4  # the world and the ceiling
 	var sh := SphereShape3D.new()
 	sh.radius = 0.04
 	arm.shape = sh
@@ -42,24 +46,40 @@ func _unhandled_input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseMotion:
 		yaw -= deg_to_rad(e.relative.x * sensitivity)
-		pitch = clampf(pitch - e.relative.y * sensitivity * (-1.0 if invert_y else 1.0), -70.0, 20.0)
+		pitch = pitch - e.relative.y * sensitivity * (-1.0 if invert_y else 1.0)
 	elif e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
-			distance = clampf(distance - 0.08, min_distance, max_distance)
+			zoom = clampf(zoom - 4.0, -30.0, 40.0)
 		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			distance = clampf(distance + 0.08, min_distance, max_distance)
+			zoom = clampf(zoom + 4.0, -30.0, 40.0)
 
 
 func _process(_dt: float) -> void:
 	if target == null:
 		return
+	if Input.is_action_just_pressed("view") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		first_person = not first_person
 	var look := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+	var lo := -70.0
+	var hi := 45.0 if first_person else 8.0  # looking up from behind would push the camera into the floor
 	if look.length() > 0.1:
 		yaw -= look.x * 2.6 * _dt
-		pitch = clampf(pitch - look.y * 120.0 * _dt, -70.0, 20.0)
-	global_position = target.global_position + Vector3.UP * height
-	cam.fov = fov
+		pitch = pitch - look.y * 120.0 * _dt
+	pitch = clampf(pitch, lo, hi)
+	cam.fov = clampf(fov + zoom, 30.0, 110.0)
 	rotation = Vector3(deg_to_rad(pitch), yaw + PI, 0.0)  # the camera looks along -Z; +PI makes yaw 0 look toward +Z
-	arm.spring_length = distance
+	var rat := target as Rat
+	if first_person and rat and rat.mouth:
+		# from her eyes: a little behind and above the snout
+		global_position = rat.mouth.global_position + Vector3.UP * 0.03 - rat.global_transform.basis.z * 0.05
+		arm.spring_length = 0.0
+		cam.near = 0.005
+	else:
+		global_position = target.global_position + Vector3.UP * height
+		arm.spring_length = distance
+		cam.near = 0.02
+	if rat and rat.model:
+		# hidden in the rat's-eye view, and when a wall has pushed the camera right up to her
+		rat.model.visible = not first_person and cam.global_position.distance_to(global_position) > 0.2
 	if target is Rat:
 		(target as Rat).cam_yaw = yaw

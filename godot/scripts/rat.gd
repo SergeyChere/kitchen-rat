@@ -17,7 +17,8 @@ var max_jump_reach := 0.9
 var capacity := 3
 
 var anim: ClipPlayer
-var mouth: Node3D
+var model: Node3D  # the rat model (tilted while she climbs)
+var mouth: Node3D  # follows the head bone: what she carries is held in her teeth
 var marker: Node3D
 var cam_yaw := 0.0  # set by the camera every frame
 
@@ -47,6 +48,8 @@ var _land_t := 0.0
 var _has_target := false
 var _target_up := false
 var _target := Vector3.ZERO
+var _edge := Vector3.ZERO  # where the surface she climbs onto begins
+var _climb_edge := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -82,8 +85,27 @@ func carry(f: Food) -> void:
 	f.carried = true
 	var i := carried.size() - 1
 	f.reparent(mouth if mouth else self, false)
-	f.position = Vector3(0, i * 0.015, -i * 0.03)
+	f.position = Vector3(0, -0.006 + i * 0.012, 0.01 - i * 0.025)
 	f.rotation = Vector3.ZERO
+	f.scale = Vector3.ONE * 0.6  # a mouthful
+
+
+## Drop the last thing she carries in front of her (key G). Returns it, or null.
+func drop_one() -> Food:
+	if carried.is_empty() or jumping:
+		return null
+	var f: Food = carried.pop_back()
+	f.carried = false
+	var at := global_position + global_transform.basis.z * 0.1
+	var hit := _ray(at + Vector3.UP * 0.15, at + Vector3.DOWN * 0.3)
+	if not hit.is_empty():
+		at = hit.position
+	f.reparent(Game.I._builder.foods, true)
+	f.global_position = at
+	f.rotation = Vector3.ZERO
+	f.scale = Vector3.ONE
+	f.set_meta("dropped_at", at)  # not picked up again until she walks away from it
+	return f
 
 
 ## Put her somewhere instantly (after being caught).
@@ -139,7 +161,7 @@ func _physics_process(dt: float) -> void:
 	var right := Vector3(-fwd.z, 0, fwd.x)
 	var d := Vector3.ZERO if sniffing else (fwd * mv.y + right * mv.x)
 	var spd := run_speed if running else (sneak_speed if sneaking else walk_speed)
-	spd *= 0.55 if dragging() else (1.0 - 0.13 * carry_weight())
+	spd *= 0.5 if dragging() else maxf(0.45, 1.0 - 0.18 * carry_weight())  # loaded she's clearly slower
 	if d.length() > 0.01:
 		rotation.y = rotate_toward(rotation.y, Nights.yaw_to(d), 10.0 * dt)
 
@@ -202,6 +224,7 @@ func _find_jump_target() -> void:
 				var dy: float = hit.position.y - p0.y
 				if dy > 0.07 and dy <= max_jump_up and hit.normal.y > 0.75 and _clear(hit.position) and _path_clear(p0, hit.position):
 					_target = _inward(hit.position, f)
+					_edge = hit.position
 					_target_up = true
 					_has_target = true
 			dd += 0.04
@@ -254,6 +277,9 @@ func _start_jump(to: Vector3, up: bool) -> void:
 	_to = to
 	_t = 0.0
 	_dur = clampf(0.3 + _from.distance_to(_to) * 0.35, 0.35, 0.8)
+	if up:
+		_climb_edge = _edge
+		_dur = clampf(0.55 + (_to.y - _from.y) * 0.9, 0.6, 1.1)
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	if flat.length() > 0.01:
 		rotation.y = Nights.yaw_to(flat)
@@ -266,18 +292,54 @@ func _tick_jump(dt: float) -> void:
 	var p := _from.lerp(_to, t)
 	var dy := _to.y - _from.y
 	if _jump_up:
-		p.y = _from.y + dy * sin(t * PI * 0.5) + 0.25 * t * (1.0 - t)
+		p = _climb_pos(t)
 	else:
 		p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
 	global_position = p
+	if model:
+		model.rotation.x = -deg_to_rad(_climb_tilt(t)) if _jump_up else 0.0
 	if t < 1.0:
 		return
 	jumping = false
+	if model:
+		model.rotation.x = 0.0
 	velocity = Vector3(0, -0.5, 0)
 	_land_t = 0.2
 	add_noise(0.15 if _jump_up else 0.35)
 	_update_surface()
 	landed.emit(_from.y - _to.y)
+
+
+## Climbing up: she runs to the edge, rears up and grabs it with her front paws (body tipped nose-up, hind legs
+## still on the floor), then pushes off with the hind legs and pulls herself over onto the top.
+func _climb_pos(t: float) -> Vector3:
+	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
+	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
+	var edge_d := clampf(Vector3(_climb_edge.x - _from.x, 0, _climb_edge.z - _from.z).length(), 0.0, flat.length())
+	var base := _from + dirv * maxf(0.0, edge_d - 0.07)  # hind paws under the edge
+	var dy := _to.y - _from.y
+	var reach := minf(dy, 0.13)  # how far up she stretches before the hop
+	if t < 0.35:  # run in and rear up
+		var k := t / 0.35
+		var q := _from.lerp(base, smoothstep(0.0, 1.0, k))
+		q.y = _from.y + reach * 0.4 * smoothstep(0.5, 1.0, k)
+		return q
+	if t < 0.55:  # paws on the edge, gathering
+		var q := base
+		q.y = _from.y + reach * (0.4 + 0.6 * (t - 0.35) / 0.2)
+		return q
+	var k := (t - 0.55) / 0.45  # the hop: up and over
+	var q := base.lerp(_to, smoothstep(0.0, 1.0, k))
+	q.y = _from.y + reach + (dy - reach) * sin(minf(1.0, k * 1.3) * PI * 0.5)
+	return q
+
+
+func _climb_tilt(t: float) -> float:
+	if t < 0.35:
+		return 70.0 * smoothstep(0.4, 1.0, t / 0.35)
+	if t < 0.55:
+		return 70.0
+	return 70.0 * (1.0 - smoothstep(0.0, 1.0, (t - 0.55) / 0.45))
 
 
 # ---------- animation ----------

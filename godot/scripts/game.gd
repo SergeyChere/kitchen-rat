@@ -219,12 +219,28 @@ func _make_rat() -> void:
 	rat.rotation.y = PI  # facing north, toward the mouse hole
 	var model := _builder.spawn("characters/rat_mother", rat.global_position, 0.0, rat)
 	model.rotation = Vector3.ZERO
-	model.position = Vector3.ZERO
+	model.position = Vector3.UP * 0.012  # the paws dip a little in the walk and run clips
 	rat.anim = ClipPlayer.new(model)
+	rat.model = model
 	var b := LevelBuilder.aabb_of(model)
 	rat.mouth = Node3D.new()
-	rat.add_child(rat.mouth)
-	rat.mouth.position = Vector3(0, b.size.y * 0.35, b.end.z - 0.01)
+	var mouth_at := Vector3(0, model.position.y + b.size.y * 0.33, b.end.z - 0.012)  # (a model without a head bone)
+	var sks := model.find_children("*", "Skeleton3D", true, false)
+	var sk: Skeleton3D = sks[0] if not sks.is_empty() else null
+	var hb := sk.find_bone("Head") if sk else -1
+	if hb >= 0:
+		# held in her teeth: the mouth follows the head bone (and keeps a scale of 1, the model is scaled down);
+		# the snout is ~5 cm ahead of the head bone, the mouth a little behind and below its tip
+		var att := BoneAttachment3D.new()
+		att.bone_name = "Head"
+		sk.add_child(att)
+		att.add_child(rat.mouth)
+		var head_rest := sk.global_transform * sk.get_bone_global_rest(hb)
+		var at := head_rest.origin + rat.global_transform.basis.z * 0.04 + Vector3.DOWN * 0.015
+		rat.mouth.transform = head_rest.affine_inverse() * Transform3D(rat.global_transform.basis.orthonormalized(), at)
+	else:
+		rat.add_child(rat.mouth)
+		rat.mouth.position = mouth_at
 	var ring := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.05
@@ -324,7 +340,7 @@ func _make_extras() -> void:
 		pp.name = "Pup " + str(list[i])
 		add_child(pp)
 		var m := _builder.spawn("characters/rat_pup", Vector3.ZERO, 0.0, pp)
-		m.position = Vector3.ZERO
+		m.position = Vector3.UP * 0.008
 		m.scale = Vector3.ONE * (0.75 + age * 0.55)
 		pp.global_position = hole + Vector3(0.2 + i * 0.12, 0, -0.2 - i * 0.1)
 		pp.rotation.y = PI
@@ -472,6 +488,7 @@ func caught(text: String, at: Vector3) -> void:
 		var hit := ray(p, p + Vector3.DOWN * 3.0)
 		f.global_position = hit.position if not hit.is_empty() else Vector3(p.x, 0, p.z)
 		f.rotation = Vector3.ZERO
+		f.scale = Vector3.ONE
 	rat.carried.clear()
 	rat.teleport(hole + Vector3(0.22, 0.02, -0.22), PI * 0.75)
 	cam.snap(PI * 0.75)
@@ -483,8 +500,16 @@ func caught(text: String, at: Vector3) -> void:
 
 
 func knock_landed(k: Knockable, at: Vector3) -> void:
-	noise(at, 4.6, k.sound(), true, -1.0, true)
-	Sfx.play(KNOCK_SND.get(k.kind, "thud"), at)
+	var breaks := k.kind == "cup" and at.y < 0.2  # a mug that hits the floor breaks
+	print_verbose("knock landed ", k.kind, " at ", at)
+	noise(at, 4.6, "Crash!" if breaks else k.sound(), true, -1.0, true)
+	Sfx.play("crash" if breaks else KNOCK_SND.get(k.kind, "thud"), at)
+	if breaks:
+		var shards := _builder.spawn("props/mug_broken", Vector3(k.global_position.x, 0.0, k.global_position.z), randf() * 360.0, _builder.decor)
+		if shards:
+			k.visible = false
+			k.collision_layer = 0
+			k.process_mode = Node.PROCESS_MODE_DISABLED
 	if vacuum and vacuum.on and vacuum.global_position.distance_to(at) < 0.8:
 		vacuum.stun()
 	if dog:
@@ -526,8 +551,9 @@ func _on_landed(drop: float) -> void:
 
 func _unhandled_input(e: InputEvent) -> void:
 	if state == "intro":
+		# Space / Esc / Enter skip (not a mouse click: the first click into the window must not skip the story)
 		var skip := e.is_action_pressed("jump") or e.is_action_pressed("pause") or e.is_action_pressed("ui_accept")
-		if skip or (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):
+		if skip and _cut_t > 0.5:
 			_skip_intro()
 			get_viewport().set_input_as_handled()
 		return
@@ -566,6 +592,12 @@ func _process(dt: float) -> void:
 			noisy_near = z.sound
 			break
 	_tick_rat_noise(dt)
+	if Input.is_action_just_pressed("drop"):
+		var dropped := rat.drop_one()
+		if dropped:
+			if not foods.has(dropped):
+				foods.append(dropped)
+			Sfx.play("pickup", rp, -4.0, 0.8)
 	_pick_up(rp)
 	_tick_zones(rp, dt)
 	_tick_knockables(rp)
@@ -632,6 +664,10 @@ func _pick_up(rp: Vector3) -> void:
 		if f.carried or f.hidden:
 			continue
 		var d := f.global_position - rp
+		if f.has_meta("dropped_at"):  # she just put it down: only once she has stepped away
+			if Vector2(d.x, d.z).length() > 0.3:
+				f.remove_meta("dropped_at")
+			continue
 		if absf(d.y) > 0.12 or Vector2(d.x, d.z).length() > 0.17:
 			continue
 		if f.is_find:
@@ -1597,11 +1633,18 @@ func _draw_trail(mi: MeshInstance3D, from: Vector3, to: Vector3, poison: bool, i
 	var c := Settings.poison_color() if poison else Color(1, 0.85, 0.5)
 	var t0 := Time.get_ticks_msec() / 1000.0
 	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	var eye := get_viewport().get_camera_3d().global_position
+	var pts: Array[Vector3] = []
 	for k in 24:
 		var t := k / 23.0
-		var p := a.lerp(b, t) + Vector3.UP * sin(t * PI) * 0.15 + side * sin(t * 12.0 + t0 * 3.0 + i) * 0.02
+		pts.append(a.lerp(b, t) + Vector3.UP * sin(t * PI) * 0.15 + side * sin(t * 12.0 + t0 * 3.0 + i) * 0.02)
+	for k in 24:
+		var t := k / 23.0
+		var p := pts[k]
+		var tan := (pts[mini(k + 1, 23)] - pts[maxi(k - 1, 0)]).normalized()
+		var off := tan.cross((eye - p).normalized()).normalized() * 0.007  # the ribbon faces the camera: seen from any side
 		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
-		im.surface_add_vertex(p + Vector3.UP * 0.004)
+		im.surface_add_vertex(p + off)
 		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
-		im.surface_add_vertex(p - Vector3.UP * 0.004)
+		im.surface_add_vertex(p - off)
 	im.surface_end()

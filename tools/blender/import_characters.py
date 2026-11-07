@@ -45,13 +45,15 @@ def hold(*keys):
 # ---------- the characters ----------
 RAT_SLEEP = hold(k("Body", down=0.22), k("Head", pitch=25), k("Neck", pitch=15))
 RAT_SNEAK = hold(k("Body", down=0.14))
+# standing up on the hind legs to sniff: the body tips nose-up and rises, the front paws come off the floor
+REAR = hold(k("Body", down=-0.25, fwd=-0.25, pitch=-55), k("Tail1", pitch=50), k("FrontFoot.L", down=-0.75, fwd=-0.55), k("FrontFoot.R", down=-0.75, fwd=-0.55))
 RAT = {
     "idle": ("Idle",), "walk": ("Walk",), "carry_walk": ("Walk", 0.9), "run": ("Run",),
     "sneak": ("Walk", 0.6, None, None, False, RAT_SNEAK),
     "drag": ("Walk", 0.5, None, None, True, hold(k("Body", down=0.08))),
     "eat": ("Attack", 0.45), "gnaw": ("Attack", 1.3), "stuck": ("Attack", 0.4),
-    "sniff": ("Idle", 1.0, 0, 30, False, [k("Head", 0, pitch=0), k("Head", 0.3, pitch=20, yaw=12),
-                                           k("Head", 0.6, pitch=22, yaw=-12), k("Head", 1, pitch=0)]),
+    "sniff": ("Idle", 1.0, 0, 30, False, REAR + [k("Head", 0, pitch=-10), k("Head", 0.3, pitch=-25, yaw=15),
+                                              k("Head", 0.6, pitch=-25, yaw=-15), k("Head", 1, pitch=-10)]),
     "jump_up": ("Jump", 1.0, 0, 9), "jump_down": ("Jump", 1.0, 9, 14), "land": ("Jump", 1.0, 14, 20),
     "sleep": ("Idle", 1.0, 0, 2, False, RAT_SLEEP),
     "wake_up": ("Idle", 1.0, 0, 16, False, [k("Body", 0, down=0.22), k("Head", 0, pitch=25), k("Body", 1), k("Head", 1)]),

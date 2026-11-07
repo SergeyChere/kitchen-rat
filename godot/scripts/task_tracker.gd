@@ -1,7 +1,8 @@
 class_name TaskTracker
 extends RefCounted
-## The night's tasks, ported from the prototype (checkTask / keepBroken / tickTasks): a chain shown one step at a time,
-## side tasks revealed after N steps ("keep" ones fail when broken), secrets shown once found.
+## The night's tasks: the main list (all shown; each step counts the moment it's done, in any order, and the first
+## one not done yet is the current one with its hint), side tasks revealed after N main steps ("keep" ones fail when
+## broken), secrets shown once found.
 ## The game records what happened (picked tags, deliveries, knocks, flags); the tracker polls it every frame.
 
 signal completed(text: String)
@@ -11,7 +12,8 @@ var chain: Array = []
 var side: Array = []
 var secret: Array = []
 var goal_text := "Fill the nest"
-var step := 0
+var step := 0  # how many main steps are done
+var chain_done_at := {}  # index → true
 var picked := {}
 var delivered := {}
 var knocked := {}
@@ -35,7 +37,13 @@ func _init(tasks: Dictionary) -> void:
 
 func has_tasks() -> bool: return not chain.is_empty()
 func chain_done() -> bool: return step >= chain.size()
-func current(): return chain[step] if step < chain.size() else null
+func step_done(i: int) -> bool: return chain_done_at.has(i)
+func current_index() -> int:
+	for i in chain.size():
+		if not chain_done_at.has(i):
+			return i
+	return -1
+func current(): return chain[current_index()] if current_index() >= 0 else null
 func side_visible(i: int) -> bool:
 	var r := int(side[i].get("reveal", -1))
 	return r < 0 or step >= r or side_done.has(i)
@@ -74,9 +82,11 @@ func _check(t: Dictionary) -> bool:
 
 
 func tick() -> void:
-	while current() != null and _check(current()):
-		completed.emit(str(current().text))
-		step += 1
+	for i in chain.size():
+		if not chain_done_at.has(i) and _check(chain[i]):
+			chain_done_at[i] = true
+			step += 1
+			completed.emit(str(chain[i].text))
 	for i in side.size():
 		var t: Dictionary = side[i]
 		if side_done.has(i) or side_failed.has(i) or not side_visible(i):

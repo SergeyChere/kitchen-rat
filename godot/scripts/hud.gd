@@ -334,38 +334,43 @@ func _draw_tasks(g: Game, H: float) -> void:
 	var t := g.tasks
 	var goal := int(g.night.get("goal", 10))
 	var lines := []  # [text, size, color, height]
+	var fit := func(tx: String, size: int, extra := 3.0) -> float: return font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, size).y + extra
 	lines.append(["TONIGHT", 12, HINT, 18.0])
 	lines.append([t.goal_text + "  %d / %d" % [mini(g.fed, goal), goal], 16, Color.WHITE, 24.0])
-	for r in _recent:
-		var a := clampf(float(r[1]), 0.0, 1.0)
-		var col: Color = Color(0.6, 0.88, 0.48, a) if r[2] else Color(0.91, 0.4, 0.29, a)
-		var tx := ("✓  " if r[2] else "✗  ") + str(r[0])
-		lines.append([tx, 14, col, font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 14).y + 4])
-	var cur = t.current()
-	if cur != null:
-		var s1 := "○  " + Keys.text(str(cur.text))
-		lines.append([s1, 15, Color.WHITE, font.get_multiline_string_size(s1, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 15).y + 4])
-		var hint := Keys.text(str(cur.get("hint", "")))
-		if Settings.hints and hint != "":
-			lines.append(["    " + hint, 13, HINT, font.get_multiline_string_size("    " + hint, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 13).y + 4])
-		lines.append(["Step %d of %d" % [t.step + 1, t.chain.size()], 11, HINT, 16.0])
-	elif g.fed < goal:
+	if t.has_tasks():
+		lines.append(["MAIN TASKS  %d / %d" % [t.step, t.chain.size()], 12, HINT, 18.0])
+		var ci := t.current_index()
+		for i in t.chain.size():
+			var tx := Keys.text(str(t.chain[i].text))
+			if t.step_done(i):
+				lines.append(["✓  " + tx, 13, Color(0.6, 0.88, 0.48, 0.85), fit.call("✓  " + tx, 13)])
+			elif i == ci:
+				lines.append(["○  " + tx, 15, Color.WHITE, fit.call("○  " + tx, 15, 4.0)])
+				var hint := Keys.text(str(t.chain[i].get("hint", "")))
+				if Settings.hints and hint != "":
+					lines.append(["    " + hint, 13, HINT, fit.call("    " + hint, 13, 4.0)])
+			else:
+				lines.append(["·  " + tx, 13, Color(0.75, 0.75, 0.8, 0.7), fit.call("·  " + tx, 13)])
+	if t.chain_done() and g.fed < goal:
 		var rescue := false
 		for pp in g.pups:
 			if pp.lost(): rescue = true
 		var m := "Rescue your pup first: walk up to them." if rescue else "Every task is done. Bring %d more food home." % (goal - g.fed)
-		lines.append([m, 14, Color.WHITE, font.get_multiline_string_size(m, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 14).y + 4])
+		lines.append([m, 14, Color.WHITE, fit.call(m, 14, 4.0)])
+	var side_rows := []
 	for i in t.side.size():
 		if not t.side_visible(i):
 			continue
 		var done := t.side_done.has(i)
 		var bad := t.side_failed.has(i)
-		var mark := "✓ " if done else ("✗ " if bad else "◇ ")
-		var tx := mark + "Side: " + Keys.text(str(t.side[i].text))
-		lines.append([tx, 13, Color(0.6, 0.88, 0.48) if done else (Color(0.91, 0.4, 0.29) if bad else Color(0.85, 0.85, 0.9)), font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 13).y + 3])
+		var tx := ("✓  " if done else ("✗  " if bad else "◇  ")) + Keys.text(str(t.side[i].text))
+		side_rows.append([tx, 13, Color(0.6, 0.88, 0.48) if done else (Color(0.91, 0.4, 0.29) if bad else Color(0.85, 0.85, 0.9)), fit.call(tx, 13)])
 	for i in t.secret.size():
 		if t.secret_done.has(i):
-			lines.append(["★ Secret: " + str(t.secret[i].text), 13, Color(0.95, 0.76, 0.3), 20.0])
+			side_rows.append(["★  Secret: " + str(t.secret[i].text), 13, Color(0.95, 0.76, 0.3), 20.0])
+	if not side_rows.is_empty():
+		lines.append(["SIDE TASKS", 12, HINT, 22.0])
+		lines.append_array(side_rows)
 	var total := 14.0
 	for l in lines:
 		total += l[3]

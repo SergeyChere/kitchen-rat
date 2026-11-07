@@ -7,7 +7,7 @@ const ACTIONS := [
 	["forward", "Move forward"], ["back", "Move back"], ["left", "Move left"], ["right", "Move right"],
 	["run", "Run"], ["sneak", "Sneak (hold)"], ["sneak_toggle", "Sneak (toggle)"], ["jump", "Jump"],
 	["sniff", "Sniff"], ["push", "Push / gnaw"], ["pups", "Pups: wait / follow"], ["fetch", "Pup: fetch food"],
-	["pause", "Pause"],
+	["drop", "Drop food"], ["view", "Rat's-eye view"], ["pause", "Pause"],
 ]
 const PAD_NAMES := {
 	JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y",
@@ -18,7 +18,7 @@ const PAD_NAMES := {
 const DEFAULT_KEYS := {
 	"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D, "run": KEY_SHIFT, "sneak": KEY_CTRL,
 	"sneak_toggle": KEY_C, "jump": KEY_SPACE, "sniff": KEY_E, "push": KEY_F, "pups": KEY_Q, "fetch": KEY_R,
-	"pause": KEY_ESCAPE,
+	"drop": KEY_G, "view": KEY_V, "pause": KEY_ESCAPE,
 }
 
 static var pad := false  # the last input came from a gamepad

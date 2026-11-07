@@ -4,7 +4,7 @@
  "name": "The Kitchen",
  "act": 1,
  "goal": 15,
- "seconds": 900,
+ "seconds": 600,
  "prologue": true,
  "finale": false,
  "cat": "away",
@@ -147,7 +147,7 @@
    },
    {
     "text": "Take the cheese from the plate",
-    "hint": "A cheese is worth 5 crumbs. Careful: walk slowly past the mug on the edge.",
+    "hint": "A cheese is worth 5 crumbs.",
     "type": "pick",
     "arg": "plate",
     "n": 0,
@@ -186,8 +186,8 @@
     "reveal": -1
    },
    {
-    "text": "Find the cheese hidden by the bread box",
-    "hint": "The bread box is up on the counter. Climb the stool, jump to the counter and sniff there.",
+    "text": "Sniff out the cheese hidden by the bread box",
+    "hint": "It's hidden: you won't see it until you sniff. Go close to the bread box on the counter and hold E, then climb up (the stool helps) and take it.",
     "type": "pick",
     "arg": "bread",
     "n": 0,
@@ -212,9 +212,9 @@
   ],
   "side": [
    {
-    "text": "Leave the mug on the table",
+    "text": "Push the mug off the table",
     "hint": "",
-    "type": "keep",
+    "type": "knock",
     "arg": "cup",
     "n": 0,
     "reveal": 3
@@ -349,7 +349,7 @@
    "y": 398,
    "toX": 655,
    "toY": 362,
-   "trap": true,
+   "trap": false,
    "group": "",
    "spawn": ""
   },
@@ -443,5 +443,6 @@
     "M"
    ]
   ]
- }
+ },
+ "kitchenUpper": true
 }

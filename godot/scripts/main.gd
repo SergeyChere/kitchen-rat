@@ -44,6 +44,13 @@ func _process(_dt: float) -> void:
 			var p := str(_args.at).split(",")
 			game.rat.teleport(Nights.world(float(p[0]), float(p[1]), 1), deg_to_rad(float(p[2])) if p.size() > 2 else PI)
 			game.cam.snap(game.rat.rotation.y)
+		if _args.has("carry"):  # dev: start with a cheese in her teeth
+			var f := game.spawn_food(str(_args.carry) if str(_args.carry) != "" else "cheese", game.rat.global_position, "", false)
+			game.rat.carry(f)
+		if _args.has("fp"):
+			game.cam.first_person = true
+		if _args.has("hold"):  # dev: keep an action pressed (sniff…)
+			Input.action_press(str(_args.hold))
 		if _args.get("screen", "") == "pause": game._set_paused(true)
 		elif _args.get("screen", "") == "won": game.state = "play"; game._end(true, "", "")
 		elif _args.get("screen", "") == "lost": game._end(false, "You got caught", "The pups got 3 of 12 and are waiting for Mom.")
@@ -275,6 +282,8 @@ static func _setup_input() -> void:
 	_key("menu", [KEY_M], -1, [JOY_BUTTON_BACK])
 	_key("pups", [KEY_Q], -1, [JOY_BUTTON_RIGHT_SHOULDER])
 	_key("fetch", [KEY_R], -1, [JOY_BUTTON_DPAD_UP])
+	_key("drop", [KEY_G], -1, [JOY_BUTTON_B])
+	_key("view", [KEY_V], -1, [JOY_BUTTON_RIGHT_STICK])
 	_key("look_left", [], -1, [], JOY_AXIS_RIGHT_X, -1.0)
 	_key("look_right", [], -1, [], JOY_AXIS_RIGHT_X, 1.0)
 	_key("look_up", [], -1, [], JOY_AXIS_RIGHT_Y, -1.0)
@@ -298,7 +307,7 @@ func _focus() -> void:
 		c.fov = 50.0
 		c.current = true
 		set_meta("focus_cam", c)
-	if f.size() > 1:
+	if f.size() > 1 and f[1] != "":
 		t.process_mode = Node.PROCESS_MODE_DISABLED
 		var ap := t.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		if ap and ap.current_animation != f[1]:
@@ -306,7 +315,8 @@ func _focus() -> void:
 			ap.play(f[1])
 	var fwd := t.global_transform.basis.z
 	var side := t.global_transform.basis.x
-	var to := t.global_position + (fwd * 0.8 + side * 0.6).normalized() * d + Vector3.UP * d * 0.45
+	var low := f.size() > 2 and f[2] == "low"  # at floor level, from the side
+	var to := t.global_position + (side if low else (fwd * 0.8 + side * 0.6).normalized()) * d + Vector3.UP * (0.03 if low else d * 0.45)
 	c.global_position = to
-	c.look_at(t.global_position + Vector3.UP * d * 0.18)
+	c.look_at(t.global_position + Vector3.UP * (0.03 if low else d * 0.18))
 
