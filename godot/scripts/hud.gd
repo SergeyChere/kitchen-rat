@@ -329,54 +329,97 @@ func _house_text(g: Game) -> String:
 	return "The cat is prowling"
 
 
+const CHEESE := Color(0.95, 0.76, 0.31)
+const SAFE := Color(0.61, 0.88, 0.42)
+const INK := Color(0.93, 0.9, 0.85)
+const MUTED := Color(0.6, 0.6, 0.63)
+
+
+## The task panel, as in the prototype: small and quiet. The goal with its bar, tasks just done (yellow ✔, fading),
+## ONE current main task (yellow badge with its number, and its hint), then the side tasks in green.
 func _draw_tasks(g: Game, H: float) -> void:
-	var w := 400.0
+	var w := 330.0
+	var tw := w - 24.0 - 29.0  # text width right of the badge
 	var t := g.tasks
 	var goal := int(g.night.get("goal", 10))
-	var lines := []  # [text, size, color, height]
-	var fit := func(tx: String, size: int, extra := 3.0) -> float: return font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, size).y + extra
-	lines.append(["TONIGHT", 12, HINT, 18.0])
-	lines.append([t.goal_text + "  %d / %d" % [mini(g.fed, goal), goal], 16, Color.WHITE, 24.0])
+	var rows := []  # [badge text, badge fill, badge ring, small label, text, text colour, alpha, kind]
+	var none := Color(0, 0, 0, 0)
+	var gdone := g.fed >= goal
+	rows.append(["✔" if gdone else "", CHEESE if gdone else none, CHEESE, "", t.goal_text + " · %d / %d" % [mini(g.fed, goal), goal], INK, 1.0, "bar"])
+	for r in _recent:
+		if r[2]:
+			rows.append(["✔", CHEESE, CHEESE, "", str(r[0]), CHEESE, clampf(float(r[1]), 0.0, 1.0), ""])
 	if t.has_tasks():
-		lines.append(["MAIN TASKS  %d / %d" % [t.step, t.chain.size()], 12, HINT, 18.0])
 		var ci := t.current_index()
-		for i in t.chain.size():
-			var tx := Keys.text(str(t.chain[i].text))
-			if t.step_done(i):
-				lines.append(["✓  " + tx, 13, Color(0.6, 0.88, 0.48, 0.85), fit.call("✓  " + tx, 13)])
-			elif i == ci:
-				lines.append(["○  " + tx, 15, Color.WHITE, fit.call("○  " + tx, 15, 4.0)])
-				var hint := Keys.text(str(t.chain[i].get("hint", "")))
-				if Settings.hints and hint != "":
-					lines.append(["    " + hint, 13, HINT, fit.call("    " + hint, 13, 4.0)])
-			else:
-				lines.append(["·  " + tx, 13, Color(0.75, 0.75, 0.8, 0.7), fit.call("·  " + tx, 13)])
-	if t.chain_done() and g.fed < goal:
-		var rescue := false
-		for pp in g.pups:
-			if pp.lost(): rescue = true
-		var m := "Rescue your pup first: walk up to them." if rescue else "Every task is done. Bring %d more food home." % (goal - g.fed)
-		lines.append([m, 14, Color.WHITE, fit.call(m, 14, 4.0)])
-	var side_rows := []
+		if ci >= 0:
+			rows.append([str(t.step + 1), CHEESE, CHEESE, "Step %d of %d" % [t.step + 1, t.chain.size()], Keys.text(str(t.chain[ci].text)), INK, 1.0, "cur"])
+			var hint := Keys.text(str(t.chain[ci].get("hint", "")))
+			if Settings.hints and hint != "":
+				rows.append(["", none, none, "", hint, Color(CHEESE.r, CHEESE.g, CHEESE.b, 0.8), 1.0, "hint"])
+		elif not gdone:
+			var rescue := false
+			for pp in g.pups:
+				if pp.lost(): rescue = true
+			var m := "Rescue your pup first: walk up to them." if rescue else "All tasks done. Bring the rest of the food home!"
+			rows.append(["✔", CHEESE, CHEESE, "", m, INK, 1.0, "cur"])
 	for i in t.side.size():
 		if not t.side_visible(i):
 			continue
-		var done := t.side_done.has(i)
-		var bad := t.side_failed.has(i)
-		var tx := ("✓  " if done else ("✗  " if bad else "◇  ")) + Keys.text(str(t.side[i].text))
-		side_rows.append([tx, 13, Color(0.6, 0.88, 0.48) if done else (Color(0.91, 0.4, 0.29) if bad else Color(0.85, 0.85, 0.9)), fit.call(tx, 13)])
+		if t.side_done.has(i):
+			rows.append(["✔", SAFE, SAFE, "Side", Keys.text(str(t.side[i].text)), SAFE, 1.0, ""])
+		elif t.side_failed.has(i):
+			rows.append(["✖", none, BAD, "Side", Keys.text(str(t.side[i].text)), MUTED, 1.0, ""])
+		else:
+			rows.append(["", none, SAFE, "Side", Keys.text(str(t.side[i].text)), Color(0.78, 0.92, 0.7), 1.0, ""])
 	for i in t.secret.size():
 		if t.secret_done.has(i):
-			side_rows.append(["★  Secret: " + str(t.secret[i].text), 13, Color(0.95, 0.76, 0.3), 20.0])
-	if not side_rows.is_empty():
-		lines.append(["SIDE TASKS", 12, HINT, 22.0])
-		lines.append_array(side_rows)
-	var total := 14.0
-	for l in lines:
-		total += l[3]
-	var y := H - 12 - total
-	_canvas.draw_rect(Rect2(12, y, w, total), PANEL)
-	y += 6
-	for l in lines:
-		_canvas.draw_multiline_string(font, Vector2(22, y + l[1]), l[0], HORIZONTAL_ALIGNMENT_LEFT, w - 20, l[1], -1, l[2])
-		y += l[3]
+			rows.append(["★", Color(0.91, 0.72, 0.29), Color(0.91, 0.72, 0.29), "Secret", str(t.secret[i].text), INK, 1.0, ""])
+	var heights := []
+	var total := 30.0 + 6.0
+	for r in rows:
+		var size := 12 if r[7] == "hint" else 14
+		var h := font.get_multiline_string_size(r[4], HORIZONTAL_ALIGNMENT_LEFT, tw, size).y
+		if r[3] != "": h += 13.0
+		if r[7] == "bar": h += 10.0
+		h = maxf(h, 20.0) + 7.0
+		heights.append(h)
+		total += h
+	var x := 12.0
+	var y := H - 14.0 - total
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.063, 0.07, 0.11, 0.8)
+	box.border_color = Color(0.19, 0.21, 0.29)
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(12)
+	_canvas.draw_style_box(box, Rect2(x, y, w, total))
+	_canvas.draw_string(font, Vector2(x + 12, y + 20), "TONIGHT", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, CHEESE)
+	var yy := y + 30.0
+	for k in rows.size():
+		var r: Array = rows[k]
+		var a: float = r[6]
+		var size := 12 if r[7] == "hint" else 14
+		var bc := Vector2(x + 22, yy + 11)
+		if r[7] != "hint":
+			var fill: Color = r[1]
+			var ring: Color = r[2]
+			if fill.a > 0.0:
+				_canvas.draw_circle(bc, 10.0, Color(fill.r, fill.g, fill.b, a))
+			_canvas.draw_arc(bc, 9.5, 0, TAU, 24, Color(ring.r, ring.g, ring.b, a), 1.5, true)
+			if r[0] != "":
+				var tc := Color(0.1, 0.09, 0.07, a) if fill.a > 0.0 else Color(ring.r, ring.g, ring.b, a)
+				_canvas.draw_string(font, bc + Vector2(-10, 4), r[0], HORIZONTAL_ALIGNMENT_CENTER, 20, 11, tc)
+		var tx := x + 41.0
+		var ty := yy
+		if r[3] != "":
+			_canvas.draw_string(font, Vector2(tx, ty + 10), str(r[3]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(MUTED.r, MUTED.g, MUTED.b, a))
+			ty += 13.0
+		var col: Color = r[5]
+		col.a *= a
+		_canvas.draw_multiline_string(font, Vector2(tx, ty + size + 1), r[4], HORIZONTAL_ALIGNMENT_LEFT, tw, size, -1, col)
+		if r[7] == "bar":
+			var by := ty + size + 7
+			_canvas.draw_rect(Rect2(tx, by, tw, 4), Color(1, 1, 1, 0.1))
+			_canvas.draw_rect(Rect2(tx, by, tw * clampf(float(g.fed) / maxf(1.0, goal), 0.0, 1.0), 4), CHEESE)
+		yy += heights[k]
+		if r[7] == "bar":
+			_canvas.draw_line(Vector2(x + 12, yy - 3), Vector2(x + w - 12, yy - 3), Color(0.19, 0.21, 0.29), 1.0)

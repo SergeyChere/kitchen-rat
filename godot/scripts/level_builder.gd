@@ -260,12 +260,13 @@ func _lighting() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = hex(pal.get("fog", 0x0e1220))
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.25, 0.27, 0.42) * float(pal.get("hemi", 0.8))
+	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
+	env.ambient_light_color = Color(0.49, 0.56, 0.77) * 0.75 * float(pal.get("hemi", 0.8)) / 0.8
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
-	env.fog_density = 0.03
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.fog_density = 0.012
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	var we := WorldEnvironment.new()
 	we.environment = env
 	g.env = env
@@ -274,8 +275,10 @@ func _lighting() -> void:
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moonlight"
 	moon.light_color = Color(0.62, 0.7, 1.0)
-	moon.light_energy = 0.5 * float(pal.get("moon", 0.9))
+	moon.light_energy = 0.85 * float(pal.get("moon", 0.9)) / 0.9
 	moon.shadow_enabled = true
+	moon.shadow_opacity = 0.55  # soft shadows: you can still see into them
+	moon.shadow_blur = 2.0
 	moon.shadow_bias = 0.08  # no striped shadow acne on the flat counter tops
 	moon.shadow_normal_bias = 2.5
 	root.add_child(moon)
