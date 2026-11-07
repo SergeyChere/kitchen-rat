@@ -134,7 +134,7 @@ html.desktop .help{display:none}
     <div class="stats" id="stats" hidden>
       <div class="stat"><b id="fed">0 / 10</b><span>Pups fed</span></div>
       <div class="stat"><b id="carry">0 / 3</b><span>Carrying</span></div>
-      <div class="stat"><b id="starsHud" style="color:var(--cheese)">☆☆☆☆☆</b><span>Wanted</span></div>
+      <div class="stat" id="statWanted"><b id="starsHud" style="color:var(--cheese)">☆☆☆☆☆</b><span>Wanted</span></div>
       <div class="stat"><b id="lives">♥♥♥</b><span>Lives</span></div>
       <div class="stat"><b id="clock">11:00 PM</b><span>Dawn at 5 AM</span></div>
     </div>
@@ -171,7 +171,7 @@ html.desktop .help{display:none}
           <button id="mSettings" class="btn-ghost">Settings</button>
           <button id="mQuit" class="btn-ghost" hidden>Quit</button>
         </div>
-        <p class="keys"><kbd>WASD</kbd> move · mouse look · <kbd>Space</kbd> jump · <kbd>E</kbd> sniff · <kbd>F</kbd> knock over · <kbd>Shift</kbd> run · <kbd>Esc</kbd> pause</p>
+        <p class="keys"><kbd>WASD</kbd> move · mouse look · <kbd>Space</kbd> jump · hold <kbd>E</kbd> sniff · <kbd>F</kbd> knock over · <kbd>Shift</kbd> run · <kbd>Esc</kbd> pause</p>
       </section>
 
       <section class="panel" id="pLevels" hidden>
@@ -226,7 +226,7 @@ html.desktop .help{display:none}
     </div>
   </div>
 
-  <p class="help"><kbd>WASD</kbd> move, mouse camera (click the game first), <kbd>Space</kbd> jump when the marker shows, <kbd>E</kbd> or right mouse button sniff, <kbd>F</kbd> knock things over, <kbd>Shift</kbd> run (noisy), <kbd>Esc</kbd> pause. Wanted stars rise from thefts, noise and being seen. Temporary stars fade when you hide and stay out of sight, faster in the nest.</p>
+  <p class="help"><kbd>WASD</kbd> move, mouse camera (click the game first), <kbd>Space</kbd> jump when the marker shows, hold <kbd>E</kbd> or the right mouse button to sniff, <kbd>F</kbd> knock things over, <kbd>Shift</kbd> run (noisy), <kbd>Esc</kbd> pause. Wanted stars rise from thefts, noise and being seen. Temporary stars fade when you hide and stay out of sight, faster in the nest.</p>
 </div>
 
 <script src="vendor/three/three.min.js"></script>
