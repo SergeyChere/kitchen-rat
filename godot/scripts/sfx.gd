@@ -8,6 +8,10 @@ extends Node
 ## Volumes (0…1) live in Settings (user://settings.cfg).
 
 const SND := "res://assets/sounds/"
+const REAL := "res://assets/sounds/real/"  # CC0 recordings (tools/import_sounds.py): used instead of the synth when present
+## Recordings tuned for a rat-sized world.
+const REAL_PITCH := {"step": 1.6, "land": 1.4, "land_big": 1.2, "squeak": 1.15, "scrape": 1.3, "gnaw": 1.2}
+const REAL_DB := {"step": -6.0, "land": -4.0, "click": -6.0, "jump": -4.0}
 const MUS := "res://assets/music/"
 const SETTINGS := "user://settings.cfg"
 
@@ -134,7 +138,24 @@ func _stream(name: String) -> AudioStream:
 
 
 ## "step" → step0, step1, step2 (whichever exist), picked at random.
+## A recording of this sound, if any (picked at random between takes).
+func _real(name: String) -> AudioStream:
+	var key := "real:" + name
+	if not _variants.has(key):
+		var list := []
+		for k in 8:
+			var path := REAL + "%s_%d.ogg" % [name, k]
+			if ResourceLoader.exists(path):
+				list.append(load(path))
+		_variants[key] = list
+	var l: Array = _variants[key]
+	return l.pick_random() if not l.is_empty() else null
+
+
 func _pick(name: String) -> AudioStream:
+	var r := _real(name)
+	if r:
+		return r
 	if not _variants.has(name):
 		var list := []
 		if _stream(name):
@@ -158,8 +179,9 @@ static func play(name: String, at = null, vol_db := 0.0, pitch := 1.0, pitch_jit
 	var s := I._pick(name)
 	if s == null:
 		return
-	var db := level_db(name) + vol_db
-	var ps := pitch * (1.0 + randf_range(-pitch_jitter, pitch_jitter))
+	var real := s is AudioStreamOggVorbis
+	var db := level_db(name) + vol_db + (float(REAL_DB.get(name, 0.0)) if real else 0.0)
+	var ps := pitch * (float(REAL_PITCH.get(name, 1.0)) if real else 1.0) * (1.0 + randf_range(-pitch_jitter, pitch_jitter))
 	if at is Vector3:
 		var p := I._pool3[I._next3]
 		I._next3 = (I._next3 + 1) % I._pool3.size()
@@ -181,7 +203,12 @@ static func play(name: String, at = null, vol_db := 0.0, pitch := 1.0, pitch_jit
 static func loop(name: String, follow: Node3D = null, vol_db := 0.0) -> Node:
 	if I == null:
 		return null
-	var s := I._stream(name)
+	var s: AudioStream = I._real(name)
+	if s:
+		s = s.duplicate()
+		(s as AudioStreamOggVorbis).loop = true
+	else:
+		s = I._stream(name)
 	if s is AudioStreamWAV:
 		s = s.duplicate()
 		var w := s as AudioStreamWAV

@@ -1,0 +1,2390 @@
+{
+ "UltimateHomeInterior": [
+  {
+   "file": "UltimateHomeInterior/BathroomBathtub.glb",
+   "size_blender_units": [
+    1.608,
+    3.9,
+    1.26
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomMirror1.glb",
+   "size_blender_units": [
+    0.648,
+    0.102,
+    0.93
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomMirror2.glb",
+   "size_blender_units": [
+    0.537,
+    0.038,
+    0.774
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomShower1.glb",
+   "size_blender_units": [
+    1.896,
+    1.893,
+    3.548
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomSink.glb",
+   "size_blender_units": [
+    1.389,
+    0.815,
+    1.447
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomToilet.glb",
+   "size_blender_units": [
+    1.197,
+    1.691,
+    1.901
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomToilet2.glb",
+   "size_blender_units": [
+    1.111,
+    1.54,
+    1.008
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomToiletPaper.glb",
+   "size_blender_units": [
+    0.3,
+    0.175,
+    0.344
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomToiletPaperPile.glb",
+   "size_blender_units": [
+    0.334,
+    0.35,
+    0.375
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomTowel.glb",
+   "size_blender_units": [
+    1.185,
+    0.161,
+    0.654
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BathroomWashingMachine.glb",
+   "size_blender_units": [
+    1.292,
+    1.324,
+    1.47
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BedBunk.glb",
+   "size_blender_units": [
+    2.169,
+    3.997,
+    3.031
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BedKing.glb",
+   "size_blender_units": [
+    3.064,
+    3.953,
+    1.215
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/BedSingle.glb",
+   "size_blender_units": [
+    1.979,
+    3.94,
+    1.355
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Bookshelf.glb",
+   "size_blender_units": [
+    2.318,
+    0.756,
+    4.438
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CarpetRound.glb",
+   "size_blender_units": [
+    2.493,
+    2.531,
+    0.016
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Carpet_1.glb",
+   "size_blender_units": [
+    2.131,
+    3.093,
+    0.037
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Carpet_2.glb",
+   "size_blender_units": [
+    3.093,
+    3.181,
+    0.037
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Chair_1.glb",
+   "size_blender_units": [
+    0.762,
+    0.825,
+    1.768
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Chair_2.glb",
+   "size_blender_units": [
+    0.762,
+    0.825,
+    1.689
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Chair_3.glb",
+   "size_blender_units": [
+    0.762,
+    0.838,
+    1.694
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Chair_4.glb",
+   "size_blender_units": [
+    0.762,
+    0.825,
+    1.768
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ColumnRound1.glb",
+   "size_blender_units": [
+    1.4,
+    1.472,
+    1.773
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ColumnRound2.glb",
+   "size_blender_units": [
+    1.4,
+    1.472,
+    4.001
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ColumnRound3.glb",
+   "size_blender_units": [
+    1.4,
+    1.472,
+    5.429
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ColumnSquareBig.glb",
+   "size_blender_units": [
+    0.907,
+    0.907,
+    4.159
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ColumnSquareSmall.glb",
+   "size_blender_units": [
+    0.907,
+    0.907,
+    2.447
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchLarge1.glb",
+   "size_blender_units": [
+    5.475,
+    1.992,
+    2.106
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchLarge2.glb",
+   "size_blender_units": [
+    5.191,
+    1.992,
+    2.108
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchLarge3.glb",
+   "size_blender_units": [
+    7.085,
+    3.022,
+    1.088
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchMedium1.glb",
+   "size_blender_units": [
+    4.688,
+    2.203,
+    1.91
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchMedium2.glb",
+   "size_blender_units": [
+    4.519,
+    1.999,
+    1.959
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchSmall1.glb",
+   "size_blender_units": [
+    2.885,
+    2.203,
+    1.91
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CouchSmall2.glb",
+   "size_blender_units": [
+    2.114,
+    1.992,
+    1.269
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Couch_L.glb",
+   "size_blender_units": [
+    5.614,
+    4.327,
+    2.261
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CurtainsDouble.glb",
+   "size_blender_units": [
+    3.469,
+    0.476,
+    4.344
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/CurtainsSingle.glb",
+   "size_blender_units": [
+    1.632,
+    0.476,
+    4.344
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/DoorDouble.glb",
+   "size_blender_units": [
+    3.483,
+    0.43,
+    4.188
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_1.glb",
+   "size_blender_units": [
+    1.736,
+    0.42,
+    4.188
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_2.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_3.glb",
+   "size_blender_units": [
+    1.736,
+    0.416,
+    4.188
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_4.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_5.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_6.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_7.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_8.glb",
+   "size_blender_units": [
+    1.74,
+    0.442,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Door_9.glb",
+   "size_blender_units": [
+    1.74,
+    0.421,
+    4.198
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Drawer_1.glb",
+   "size_blender_units": [
+    2.794,
+    1.119,
+    1.353
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Drawer_2.glb",
+   "size_blender_units": [
+    4.035,
+    1.119,
+    1.305
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Drawer_3.glb",
+   "size_blender_units": [
+    4.153,
+    1.336,
+    1.577
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Drawer_4.glb",
+   "size_blender_units": [
+    2.794,
+    1.119,
+    2.07
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Drawer_5.glb",
+   "size_blender_units": [
+    2.794,
+    1.153,
+    1.332
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Fireplace.glb",
+   "size_blender_units": [
+    3.25,
+    1.158,
+    2.561
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Fork.glb",
+   "size_blender_units": [
+    0.045,
+    0.403,
+    0.01
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_1.glb",
+   "size_blender_units": [
+    0.769,
+    0.694,
+    0.717
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_2.glb",
+   "size_blender_units": [
+    0.251,
+    0.251,
+    0.385
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_3.glb",
+   "size_blender_units": [
+    0.343,
+    0.338,
+    0.845
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_4.glb",
+   "size_blender_units": [
+    0.338,
+    0.338,
+    0.928
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_5.glb",
+   "size_blender_units": [
+    0.512,
+    0.528,
+    0.424
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_6.glb",
+   "size_blender_units": [
+    1.04,
+    1.05,
+    0.959
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_7.glb",
+   "size_blender_units": [
+    1.166,
+    1.22,
+    0.882
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Houseplant_8.glb",
+   "size_blender_units": [
+    0.517,
+    0.517,
+    1.557
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Kitchen1Drawers.glb",
+   "size_blender_units": [
+    1.011,
+    1.12,
+    1.614
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Kitchen2Drawers.glb",
+   "size_blender_units": [
+    1.011,
+    1.12,
+    1.625
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Kitchen3Drawers.glb",
+   "size_blender_units": [
+    1.011,
+    1.12,
+    1.625
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenCabinet1.glb",
+   "size_blender_units": [
+    1.011,
+    1.071,
+    1.567
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenCabinet2.glb",
+   "size_blender_units": [
+    1.011,
+    1.071,
+    1.567
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenCabinetSmall.glb",
+   "size_blender_units": [
+    0.861,
+    1.071,
+    0.947
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenFridge.glb",
+   "size_blender_units": [
+    1.298,
+    1.302,
+    3.308
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenOven.glb",
+   "size_blender_units": [
+    1.011,
+    1.12,
+    1.617
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenOvenLarge.glb",
+   "size_blender_units": [
+    1.171,
+    1.07,
+    1.593
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/KitchenSink.glb",
+   "size_blender_units": [
+    1.011,
+    1.12,
+    1.924
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Knife.glb",
+   "size_blender_units": [
+    0.035,
+    0.419,
+    0.007
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling1.glb",
+   "size_blender_units": [
+    0.441,
+    0.436,
+    0.822
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling2.glb",
+   "size_blender_units": [
+    0.361,
+    0.357,
+    1.012
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling3.glb",
+   "size_blender_units": [
+    0.537,
+    0.537,
+    0.678
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling4.glb",
+   "size_blender_units": [
+    0.776,
+    0.776,
+    1.297
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling5.glb",
+   "size_blender_units": [
+    0.531,
+    0.558,
+    0.136
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeiling6.glb",
+   "size_blender_units": [
+    0.531,
+    0.558,
+    0.129
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCeilingSingle.glb",
+   "size_blender_units": [
+    0.264,
+    0.278,
+    0.478
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightChandelier.glb",
+   "size_blender_units": [
+    0.813,
+    0.813,
+    0.519
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCube.glb",
+   "size_blender_units": [
+    0.564,
+    0.564,
+    1.035
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightCube2.glb",
+   "size_blender_units": [
+    0.554,
+    0.641,
+    0.922
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightDesk.glb",
+   "size_blender_units": [
+    0.252,
+    0.453,
+    0.573
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightFloor1.glb",
+   "size_blender_units": [
+    0.281,
+    0.295,
+    1.603
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightFloor2.glb",
+   "size_blender_units": [
+    0.313,
+    0.329,
+    0.757
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightFloor3.glb",
+   "size_blender_units": [
+    0.4,
+    0.421,
+    0.894
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightFloor4.glb",
+   "size_blender_units": [
+    0.351,
+    0.351,
+    0.763
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightIcosahedron.glb",
+   "size_blender_units": [
+    0.502,
+    0.479,
+    0.88
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightIcosahedron2.glb",
+   "size_blender_units": [
+    1.626,
+    0.502,
+    0.88
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightSmall.glb",
+   "size_blender_units": [
+    0.155,
+    0.163,
+    0.106
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightStand1.glb",
+   "size_blender_units": [
+    0.773,
+    0.813,
+    2.994
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/LightStand2.glb",
+   "size_blender_units": [
+    0.678,
+    0.678,
+    2.945
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/NightStand_1.glb",
+   "size_blender_units": [
+    0.952,
+    0.952,
+    0.825
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/NightStand_2.glb",
+   "size_blender_units": [
+    0.952,
+    0.952,
+    0.945
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/NightStand_3.glb",
+   "size_blender_units": [
+    0.952,
+    0.952,
+    0.827
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Plate_1.glb",
+   "size_blender_units": [
+    0.374,
+    0.393,
+    0.032
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Plate_2.glb",
+   "size_blender_units": [
+    0.352,
+    0.352,
+    0.025
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Plate_3.glb",
+   "size_blender_units": [
+    0.374,
+    0.393,
+    0.035
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ShelfLarge.glb",
+   "size_blender_units": [
+    3.381,
+    0.756,
+    4.438
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ShelfSmall1.glb",
+   "size_blender_units": [
+    1.944,
+    0.55,
+    0.577
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ShelfSmall2.glb",
+   "size_blender_units": [
+    1.04,
+    0.55,
+    0.39
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/ShelfSmall3.glb",
+   "size_blender_units": [
+    1.04,
+    0.55,
+    0.39
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Shelf_1.glb",
+   "size_blender_units": [
+    0.707,
+    0.652,
+    3.167
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Shelf_2.glb",
+   "size_blender_units": [
+    1.119,
+    0.756,
+    4.438
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Spoon.glb",
+   "size_blender_units": [
+    0.084,
+    0.405,
+    0.018
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/Stool.glb",
+   "size_blender_units": [
+    0.675,
+    0.71,
+    1.372
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TableRoundLarge.glb",
+   "size_blender_units": [
+    3.713,
+    1.941,
+    1.121
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TableRoundSmall.glb",
+   "size_blender_units": [
+    1.941,
+    1.941,
+    1.147
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TableRoundSmall2.glb",
+   "size_blender_units": [
+    1.941,
+    1.941,
+    1.208
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TrashcanCylindric.glb",
+   "size_blender_units": [
+    0.755,
+    0.755,
+    1.074
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TrashcanGreen.glb",
+   "size_blender_units": [
+    1.217,
+    1.591,
+    2.211
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TrashcanLarge.glb",
+   "size_blender_units": [
+    1.223,
+    1.223,
+    1.846
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TrashcanSmall1.glb",
+   "size_blender_units": [
+    0.503,
+    0.306,
+    0.712
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/TrashcanSmall2.glb",
+   "size_blender_units": [
+    0.465,
+    0.428,
+    0.56
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowLarge1.glb",
+   "size_blender_units": [
+    1.832,
+    0.141,
+    1.698
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowLarge2.glb",
+   "size_blender_units": [
+    1.832,
+    0.141,
+    1.698
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowRound1.glb",
+   "size_blender_units": [
+    0.906,
+    0.113,
+    1.55
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowRound2.glb",
+   "size_blender_units": [
+    0.906,
+    0.113,
+    1.55
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowRound3.glb",
+   "size_blender_units": [
+    0.906,
+    0.113,
+    1.55
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowSmall1.glb",
+   "size_blender_units": [
+    0.928,
+    0.141,
+    1.238
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowSmall2.glb",
+   "size_blender_units": [
+    0.928,
+    0.141,
+    1.238
+   ]
+  },
+  {
+   "file": "UltimateHomeInterior/WindowSmall3.glb",
+   "size_blender_units": [
+    0.928,
+    0.141,
+    1.238
+   ]
+  }
+ ],
+ "Furniture": [
+  {
+   "file": "Furniture/Bed.glb",
+   "size_blender_units": [
+    1.43,
+    0.89,
+    0.49
+   ]
+  },
+  {
+   "file": "Furniture/BedKing.glb",
+   "size_blender_units": [
+    1.43,
+    1.354,
+    0.49
+   ]
+  },
+  {
+   "file": "Furniture/BookCase.glb",
+   "size_blender_units": [
+    0.452,
+    0.758,
+    1.534
+   ]
+  },
+  {
+   "file": "Furniture/BookCaseBooks.glb",
+   "size_blender_units": [
+    0.452,
+    0.758,
+    1.534
+   ]
+  },
+  {
+   "file": "Furniture/BookCaseLarge.glb",
+   "size_blender_units": [
+    0.452,
+    1.571,
+    1.534
+   ]
+  },
+  {
+   "file": "Furniture/BookCaseLargeBooks.glb",
+   "size_blender_units": [
+    0.452,
+    1.571,
+    1.534
+   ]
+  },
+  {
+   "file": "Furniture/Chair.glb",
+   "size_blender_units": [
+    0.438,
+    0.433,
+    0.991
+   ]
+  },
+  {
+   "file": "Furniture/ChairCushioned.glb",
+   "size_blender_units": [
+    0.438,
+    0.433,
+    1.054
+   ]
+  },
+  {
+   "file": "Furniture/ChairHandle.glb",
+   "size_blender_units": [
+    0.438,
+    0.433,
+    0.694
+   ]
+  },
+  {
+   "file": "Furniture/Closet.glb",
+   "size_blender_units": [
+    0.353,
+    0.66,
+    1.482
+   ]
+  },
+  {
+   "file": "Furniture/Closet2.glb",
+   "size_blender_units": [
+    0.475,
+    0.69,
+    0.996
+   ]
+  },
+  {
+   "file": "Furniture/CoffeeTable.glb",
+   "size_blender_units": [
+    0.589,
+    1.016,
+    0.28
+   ]
+  },
+  {
+   "file": "Furniture/CoffeeTable2.glb",
+   "size_blender_units": [
+    0.589,
+    1.016,
+    0.335
+   ]
+  },
+  {
+   "file": "Furniture/Lamp.glb",
+   "size_blender_units": [
+    0.231,
+    0.245,
+    1.038
+   ]
+  },
+  {
+   "file": "Furniture/Lamp2.glb",
+   "size_blender_units": [
+    0.231,
+    0.245,
+    1.038
+   ]
+  },
+  {
+   "file": "Furniture/Plant.glb",
+   "size_blender_units": [
+    0.147,
+    0.347,
+    0.303
+   ]
+  },
+  {
+   "file": "Furniture/Sofa.glb",
+   "size_blender_units": [
+    0.737,
+    0.835,
+    0.628
+   ]
+  },
+  {
+   "file": "Furniture/SofaDouble.glb",
+   "size_blender_units": [
+    0.737,
+    1.364,
+    0.628
+   ]
+  },
+  {
+   "file": "Furniture/SofaLong.glb",
+   "size_blender_units": [
+    1.365,
+    1.364,
+    0.628
+   ]
+  },
+  {
+   "file": "Furniture/Stool.glb",
+   "size_blender_units": [
+    0.366,
+    0.361,
+    0.546
+   ]
+  },
+  {
+   "file": "Furniture/Table.glb",
+   "size_blender_units": [
+    1.106,
+    1.016,
+    0.623
+   ]
+  },
+  {
+   "file": "Furniture/Vase.glb",
+   "size_blender_units": [
+    0.229,
+    0.229,
+    0.314
+   ]
+  },
+  {
+   "file": "Furniture/Vase2.glb",
+   "size_blender_units": [
+    0.168,
+    0.168,
+    0.306
+   ]
+  }
+ ],
+ "UltimateFurniture": [
+  {
+   "file": "UltimateFurniture/BedDouble.glb",
+   "size_blender_units": [
+    2.826,
+    4.259,
+    1.558
+   ]
+  },
+  {
+   "file": "UltimateFurniture/BedTwin.glb",
+   "size_blender_units": [
+    2.061,
+    4.259,
+    1.558
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Bookcase.glb",
+   "size_blender_units": [
+    1.842,
+    0.664,
+    3.371
+   ]
+  },
+  {
+   "file": "UltimateFurniture/BookcaseBooks.glb",
+   "size_blender_units": [
+    1.842,
+    0.664,
+    3.371
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Chair.glb",
+   "size_blender_units": [
+    0.507,
+    0.632,
+    1.066
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Closet.glb",
+   "size_blender_units": [
+    1.553,
+    0.87,
+    2.978
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Desk.glb",
+   "size_blender_units": [
+    1.822,
+    0.847,
+    0.922
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Door1.glb",
+   "size_blender_units": [
+    1.594,
+    0.32,
+    3.081
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Door2.glb",
+   "size_blender_units": [
+    1.749,
+    0.32,
+    3.14
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Door3.glb",
+   "size_blender_units": [
+    1.749,
+    0.327,
+    3.14
+   ]
+  },
+  {
+   "file": "UltimateFurniture/NightStand.glb",
+   "size_blender_units": [
+    0.588,
+    0.507,
+    0.512
+   ]
+  },
+  {
+   "file": "UltimateFurniture/OfficeChair.glb",
+   "size_blender_units": [
+    0.722,
+    0.807,
+    1.128
+   ]
+  },
+  {
+   "file": "UltimateFurniture/ShortCloset.glb",
+   "size_blender_units": [
+    1.553,
+    0.907,
+    2.267
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Sofa.glb",
+   "size_blender_units": [
+    4.241,
+    1.784,
+    1.508
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Sofa2.glb",
+   "size_blender_units": [
+    4.003,
+    1.541,
+    1.452
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Sofa3.glb",
+   "size_blender_units": [
+    4.003,
+    2.801,
+    1.452
+   ]
+  },
+  {
+   "file": "UltimateFurniture/SofaIndividual.glb",
+   "size_blender_units": [
+    1.638,
+    1.438,
+    1.36
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Stool.glb",
+   "size_blender_units": [
+    0.507,
+    0.533,
+    0.577
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Table.glb",
+   "size_blender_units": [
+    1.418,
+    2.78,
+    0.824
+   ]
+  },
+  {
+   "file": "UltimateFurniture/Table2.glb",
+   "size_blender_units": [
+    1.418,
+    2.78,
+    0.824
+   ]
+  }
+ ],
+ "UltimateFood": [
+  {
+   "file": "UltimateFood/Apple.glb",
+   "size_blender_units": [
+    0.802,
+    0.799,
+    0.852
+   ]
+  },
+  {
+   "file": "UltimateFood/AppleGreen.glb",
+   "size_blender_units": [
+    0.802,
+    0.799,
+    0.852
+   ]
+  },
+  {
+   "file": "UltimateFood/Avocado.glb",
+   "size_blender_units": [
+    0.753,
+    0.54,
+    1.094
+   ]
+  },
+  {
+   "file": "UltimateFood/AvocadoEmpty.glb",
+   "size_blender_units": [
+    0.738,
+    0.382,
+    1.094
+   ]
+  },
+  {
+   "file": "UltimateFood/BaconBurned.glb",
+   "size_blender_units": [
+    1.157,
+    0.297,
+    0.021
+   ]
+  },
+  {
+   "file": "UltimateFood/BaconCooked.glb",
+   "size_blender_units": [
+    1.157,
+    0.297,
+    0.021
+   ]
+  },
+  {
+   "file": "UltimateFood/BaconUncooked.glb",
+   "size_blender_units": [
+    1.157,
+    0.297,
+    0.021
+   ]
+  },
+  {
+   "file": "UltimateFood/Banana.glb",
+   "size_blender_units": [
+    1.175,
+    0.309,
+    1.404
+   ]
+  },
+  {
+   "file": "UltimateFood/Bottle1.glb",
+   "size_blender_units": [
+    0.452,
+    0.452,
+    1.564
+   ]
+  },
+  {
+   "file": "UltimateFood/Bottle2.glb",
+   "size_blender_units": [
+    0.452,
+    0.452,
+    1.623
+   ]
+  },
+  {
+   "file": "UltimateFood/Bread.glb",
+   "size_blender_units": [
+    0.693,
+    1.199,
+    0.847
+   ]
+  },
+  {
+   "file": "UltimateFood/BreadSlice.glb",
+   "size_blender_units": [
+    0.693,
+    0.108,
+    0.847
+   ]
+  },
+  {
+   "file": "UltimateFood/Broccoli.glb",
+   "size_blender_units": [
+    0.751,
+    0.644,
+    0.9
+   ]
+  },
+  {
+   "file": "UltimateFood/Burger.glb",
+   "size_blender_units": [
+    1.652,
+    1.7,
+    1.065
+   ]
+  },
+  {
+   "file": "UltimateFood/BurgerBread.glb",
+   "size_blender_units": [
+    1.477,
+    1.579,
+    0.405
+   ]
+  },
+  {
+   "file": "UltimateFood/BurgerLarge.glb",
+   "size_blender_units": [
+    1.719,
+    1.666,
+    1.446
+   ]
+  },
+  {
+   "file": "UltimateFood/BurgerPattyBurned.glb",
+   "size_blender_units": [
+    1.425,
+    1.425,
+    0.336
+   ]
+  },
+  {
+   "file": "UltimateFood/BurgerPattyCooked.glb",
+   "size_blender_units": [
+    1.425,
+    1.425,
+    0.336
+   ]
+  },
+  {
+   "file": "UltimateFood/BurgerPattyRaw.glb",
+   "size_blender_units": [
+    1.425,
+    1.425,
+    0.336
+   ]
+  },
+  {
+   "file": "UltimateFood/Carrot.glb",
+   "size_blender_units": [
+    0.947,
+    0.932,
+    2.779
+   ]
+  },
+  {
+   "file": "UltimateFood/CheeseSingles.glb",
+   "size_blender_units": [
+    1.031,
+    0.975,
+    0.028
+   ]
+  },
+  {
+   "file": "UltimateFood/Cheeseburger.glb",
+   "size_blender_units": [
+    1.465,
+    1.541,
+    0.938
+   ]
+  },
+  {
+   "file": "UltimateFood/ChickenLeg.glb",
+   "size_blender_units": [
+    1.399,
+    0.612,
+    0.582
+   ]
+  },
+  {
+   "file": "UltimateFood/ChocolateBar.glb",
+   "size_blender_units": [
+    0.575,
+    0.874,
+    0.068
+   ]
+  },
+  {
+   "file": "UltimateFood/Chopsticks.glb",
+   "size_blender_units": [
+    1.63,
+    0.126,
+    0.053
+   ]
+  },
+  {
+   "file": "UltimateFood/Coconut.glb",
+   "size_blender_units": [
+    0.778,
+    0.783,
+    0.777
+   ]
+  },
+  {
+   "file": "UltimateFood/CoconutHalf.glb",
+   "size_blender_units": [
+    0.784,
+    0.412,
+    0.777
+   ]
+  },
+  {
+   "file": "UltimateFood/CookingPot.glb",
+   "size_blender_units": [
+    2.418,
+    1.992,
+    1.076
+   ]
+  },
+  {
+   "file": "UltimateFood/CookingPot2.glb",
+   "size_blender_units": [
+    2.291,
+    1.992,
+    0.622
+   ]
+  },
+  {
+   "file": "UltimateFood/CookingPot2Soup.glb",
+   "size_blender_units": [
+    2.291,
+    1.992,
+    0.622
+   ]
+  },
+  {
+   "file": "UltimateFood/CookingPotSoup.glb",
+   "size_blender_units": [
+    2.418,
+    1.992,
+    1.076
+   ]
+  },
+  {
+   "file": "UltimateFood/Corndog.glb",
+   "size_blender_units": [
+    0.256,
+    0.256,
+    1.352
+   ]
+  },
+  {
+   "file": "UltimateFood/Croissant.glb",
+   "size_blender_units": [
+    1.304,
+    0.73,
+    0.55
+   ]
+  },
+  {
+   "file": "UltimateFood/Cupcake.glb",
+   "size_blender_units": [
+    0.734,
+    0.726,
+    0.932
+   ]
+  },
+  {
+   "file": "UltimateFood/Donut1.glb",
+   "size_blender_units": [
+    0.859,
+    0.87,
+    0.291
+   ]
+  },
+  {
+   "file": "UltimateFood/Donut2.glb",
+   "size_blender_units": [
+    0.88,
+    0.867,
+    0.291
+   ]
+  },
+  {
+   "file": "UltimateFood/Donut3.glb",
+   "size_blender_units": [
+    0.859,
+    0.857,
+    0.28
+   ]
+  },
+  {
+   "file": "UltimateFood/Donut4.glb",
+   "size_blender_units": [
+    0.881,
+    0.868,
+    0.289
+   ]
+  },
+  {
+   "file": "UltimateFood/DoubleCheeseburger.glb",
+   "size_blender_units": [
+    1.494,
+    1.541,
+    1.197
+   ]
+  },
+  {
+   "file": "UltimateFood/EggBurned.glb",
+   "size_blender_units": [
+    1.192,
+    1.117,
+    0.107
+   ]
+  },
+  {
+   "file": "UltimateFood/EggFried.glb",
+   "size_blender_units": [
+    1.192,
+    1.117,
+    0.107
+   ]
+  },
+  {
+   "file": "UltimateFood/EggWhole.glb",
+   "size_blender_units": [
+    0.363,
+    0.363,
+    0.466
+   ]
+  },
+  {
+   "file": "UltimateFood/EggWholeWhite.glb",
+   "size_blender_units": [
+    0.363,
+    0.363,
+    0.466
+   ]
+  },
+  {
+   "file": "UltimateFood/Eggplant.glb",
+   "size_blender_units": [
+    0.962,
+    0.718,
+    1.752
+   ]
+  },
+  {
+   "file": "UltimateFood/Fish.glb",
+   "size_blender_units": [
+    3.202,
+    1.059,
+    0.303
+   ]
+  },
+  {
+   "file": "UltimateFood/FishBone.glb",
+   "size_blender_units": [
+    1.955,
+    0.83,
+    0.332
+   ]
+  },
+  {
+   "file": "UltimateFood/Fork.glb",
+   "size_blender_units": [
+    0.208,
+    2.018,
+    0.047
+   ]
+  },
+  {
+   "file": "UltimateFood/Fries.glb",
+   "size_blender_units": [
+    0.949,
+    1.326,
+    0.586
+   ]
+  },
+  {
+   "file": "UltimateFood/FryingPan.glb",
+   "size_blender_units": [
+    1.737,
+    2.788,
+    0.253
+   ]
+  },
+  {
+   "file": "UltimateFood/Hotdog.glb",
+   "size_blender_units": [
+    0.785,
+    1.662,
+    0.409
+   ]
+  },
+  {
+   "file": "UltimateFood/HotdogBun.glb",
+   "size_blender_units": [
+    0.785,
+    1.643,
+    0.409
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCreamCone.glb",
+   "size_blender_units": [
+    0.552,
+    0.552,
+    0.81
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCreamCone2.glb",
+   "size_blender_units": [
+    0.467,
+    0.449,
+    0.63
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCream_1.glb",
+   "size_blender_units": [
+    0.701,
+    0.701,
+    1.198
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCream_2.glb",
+   "size_blender_units": [
+    0.73,
+    0.73,
+    1.574
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCream_3.glb",
+   "size_blender_units": [
+    0.516,
+    0.516,
+    0.927
+   ]
+  },
+  {
+   "file": "UltimateFood/IceCream_4.glb",
+   "size_blender_units": [
+    0.516,
+    0.516,
+    1.184
+   ]
+  },
+  {
+   "file": "UltimateFood/JarLarge.glb",
+   "size_blender_units": [
+    0.633,
+    0.602,
+    0.638
+   ]
+  },
+  {
+   "file": "UltimateFood/KetchupBottle.glb",
+   "size_blender_units": [
+    0.5,
+    0.5,
+    1.533
+   ]
+  },
+  {
+   "file": "UltimateFood/KetchupMustard.glb",
+   "size_blender_units": [
+    0.163,
+    1.281,
+    0.106
+   ]
+  },
+  {
+   "file": "UltimateFood/Knife.glb",
+   "size_blender_units": [
+    0.162,
+    2.008,
+    0.033
+   ]
+  },
+  {
+   "file": "UltimateFood/Lettuce.glb",
+   "size_blender_units": [
+    1.788,
+    1.683,
+    0.231
+   ]
+  },
+  {
+   "file": "UltimateFood/LettuceWhole.glb",
+   "size_blender_units": [
+    1.661,
+    1.661,
+    1.368
+   ]
+  },
+  {
+   "file": "UltimateFood/MayoBottle.glb",
+   "size_blender_units": [
+    0.5,
+    0.5,
+    1.533
+   ]
+  },
+  {
+   "file": "UltimateFood/Mushroom.glb",
+   "size_blender_units": [
+    0.358,
+    0.413,
+    0.41
+   ]
+  },
+  {
+   "file": "UltimateFood/MushroomSliced.glb",
+   "size_blender_units": [
+    0.413,
+    0.417,
+    0.176
+   ]
+  },
+  {
+   "file": "UltimateFood/MustardBottle.glb",
+   "size_blender_units": [
+    0.5,
+    0.5,
+    1.533
+   ]
+  },
+  {
+   "file": "UltimateFood/Orange.glb",
+   "size_blender_units": [
+    0.745,
+    0.745,
+    0.742
+   ]
+  },
+  {
+   "file": "UltimateFood/Pancake.glb",
+   "size_blender_units": [
+    1.442,
+    1.442,
+    0.255
+   ]
+  },
+  {
+   "file": "UltimateFood/PancakesStack.glb",
+   "size_blender_units": [
+    1.581,
+    1.621,
+    0.637
+   ]
+  },
+  {
+   "file": "UltimateFood/PeanutButter.glb",
+   "size_blender_units": [
+    0.475,
+    0.451,
+    0.724
+   ]
+  },
+  {
+   "file": "UltimateFood/PeanutButter_2.glb",
+   "size_blender_units": [
+    0.475,
+    0.451,
+    0.724
+   ]
+  },
+  {
+   "file": "UltimateFood/PepperGreen.glb",
+   "size_blender_units": [
+    0.674,
+    0.712,
+    1.117
+   ]
+  },
+  {
+   "file": "UltimateFood/PepperRed.glb",
+   "size_blender_units": [
+    0.674,
+    0.712,
+    1.106
+   ]
+  },
+  {
+   "file": "UltimateFood/Pizza.glb",
+   "size_blender_units": [
+    3.372,
+    3.357,
+    0.161
+   ]
+  },
+  {
+   "file": "UltimateFood/PizzaBurned.glb",
+   "size_blender_units": [
+    1.072,
+    1.164,
+    0.113
+   ]
+  },
+  {
+   "file": "UltimateFood/PizzaSlice.glb",
+   "size_blender_units": [
+    1.072,
+    1.164,
+    0.113
+   ]
+  },
+  {
+   "file": "UltimateFood/Plate.glb",
+   "size_blender_units": [
+    1.737,
+    1.827,
+    0.255
+   ]
+  },
+  {
+   "file": "UltimateFood/Plate2.glb",
+   "size_blender_units": [
+    1.973,
+    2.075,
+    0.22
+   ]
+  },
+  {
+   "file": "UltimateFood/PlateSquare.glb",
+   "size_blender_units": [
+    1.637,
+    1.637,
+    0.132
+   ]
+  },
+  {
+   "file": "UltimateFood/PopsicleChocolate.glb",
+   "size_blender_units": [
+    0.291,
+    0.08,
+    0.99
+   ]
+  },
+  {
+   "file": "UltimateFood/PopsicleMultiple.glb",
+   "size_blender_units": [
+    0.291,
+    0.08,
+    0.99
+   ]
+  },
+  {
+   "file": "UltimateFood/PopsicleStrawberry.glb",
+   "size_blender_units": [
+    0.291,
+    0.08,
+    0.99
+   ]
+  },
+  {
+   "file": "UltimateFood/Pumpkin.glb",
+   "size_blender_units": [
+    1.497,
+    1.512,
+    0.931
+   ]
+  },
+  {
+   "file": "UltimateFood/SashimiSalmon.glb",
+   "size_blender_units": [
+    0.598,
+    0.272,
+    0.152
+   ]
+  },
+  {
+   "file": "UltimateFood/SashimiSalmon2.glb",
+   "size_blender_units": [
+    0.598,
+    0.272,
+    0.152
+   ]
+  },
+  {
+   "file": "UltimateFood/SausageCooked.glb",
+   "size_blender_units": [
+    0.24,
+    1.656,
+    0.241
+   ]
+  },
+  {
+   "file": "UltimateFood/SausageRaw.glb",
+   "size_blender_units": [
+    0.24,
+    1.656,
+    0.241
+   ]
+  },
+  {
+   "file": "UltimateFood/Soda.glb",
+   "size_blender_units": [
+    0.912,
+    0.912,
+    1.923
+   ]
+  },
+  {
+   "file": "UltimateFood/SoySauce.glb",
+   "size_blender_units": [
+    0.596,
+    0.596,
+    0.275
+   ]
+  },
+  {
+   "file": "UltimateFood/Spoon.glb",
+   "size_blender_units": [
+    0.393,
+    1.885,
+    0.084
+   ]
+  },
+  {
+   "file": "UltimateFood/Steak.glb",
+   "size_blender_units": [
+    1.32,
+    1.913,
+    0.34
+   ]
+  },
+  {
+   "file": "UltimateFood/SteakBurned.glb",
+   "size_blender_units": [
+    1.32,
+    1.913,
+    0.34
+   ]
+  },
+  {
+   "file": "UltimateFood/SushiNigiri1.glb",
+   "size_blender_units": [
+    0.598,
+    0.272,
+    0.234
+   ]
+  },
+  {
+   "file": "UltimateFood/SushiNigiri2.glb",
+   "size_blender_units": [
+    0.598,
+    0.272,
+    0.234
+   ]
+  },
+  {
+   "file": "UltimateFood/SushiNigiriOctopus.glb",
+   "size_blender_units": [
+    0.762,
+    0.267,
+    0.35
+   ]
+  },
+  {
+   "file": "UltimateFood/SushiRoll1.glb",
+   "size_blender_units": [
+    0.292,
+    0.292,
+    0.154
+   ]
+  },
+  {
+   "file": "UltimateFood/SushiRoll2.glb",
+   "size_blender_units": [
+    0.293,
+    0.293,
+    0.154
+   ]
+  },
+  {
+   "file": "UltimateFood/Tentacle.glb",
+   "size_blender_units": [
+    0.762,
+    0.267,
+    0.276
+   ]
+  },
+  {
+   "file": "UltimateFood/Tomato.glb",
+   "size_blender_units": [
+    0.752,
+    0.752,
+    0.626
+   ]
+  },
+  {
+   "file": "UltimateFood/TomatoSlice.glb",
+   "size_blender_units": [
+    0.806,
+    0.669,
+    0.076
+   ]
+  },
+  {
+   "file": "UltimateFood/Turnip.glb",
+   "size_blender_units": [
+    1.248,
+    1.234,
+    2.391
+   ]
+  },
+  {
+   "file": "UltimateFood/Waffle.glb",
+   "size_blender_units": [
+    1.134,
+    1.529,
+    0.232
+   ]
+  }
+ ],
+ "JunkFood": [
+  {
+   "file": "JunkFood/Burger.glb",
+   "size_blender_units": [
+    0.665,
+    0.665,
+    0.458
+   ]
+  },
+  {
+   "file": "JunkFood/Cake.glb",
+   "size_blender_units": [
+    1.98,
+    1.959,
+    1.431
+   ]
+  },
+  {
+   "file": "JunkFood/Cookie.glb",
+   "size_blender_units": [
+    1.422,
+    1.422,
+    0.298
+   ]
+  },
+  {
+   "file": "JunkFood/Cupcake.glb",
+   "size_blender_units": [
+    0.636,
+    0.624,
+    0.983
+   ]
+  },
+  {
+   "file": "JunkFood/CupcakeCherry.glb",
+   "size_blender_units": [
+    0.636,
+    0.624,
+    1.264
+   ]
+  },
+  {
+   "file": "JunkFood/CupcakeCherry2.glb",
+   "size_blender_units": [
+    0.636,
+    0.624,
+    1.264
+   ]
+  },
+  {
+   "file": "JunkFood/Donut.glb",
+   "size_blender_units": [
+    0.599,
+    0.602,
+    0.201
+   ]
+  },
+  {
+   "file": "JunkFood/Donut2.glb",
+   "size_blender_units": [
+    0.599,
+    0.602,
+    0.201
+   ]
+  },
+  {
+   "file": "JunkFood/Hotdog.glb",
+   "size_blender_units": [
+    0.397,
+    1.334,
+    0.328
+   ]
+  },
+  {
+   "file": "JunkFood/Icecream.glb",
+   "size_blender_units": [
+    0.854,
+    0.833,
+    1.83
+   ]
+  },
+  {
+   "file": "JunkFood/Icecream2.glb",
+   "size_blender_units": [
+    0.854,
+    0.833,
+    1.83
+   ]
+  },
+  {
+   "file": "JunkFood/Icecream3.glb",
+   "size_blender_units": [
+    0.854,
+    0.833,
+    1.83
+   ]
+  },
+  {
+   "file": "JunkFood/Milkshake.glb",
+   "size_blender_units": [
+    0.705,
+    0.765,
+    1.862
+   ]
+  },
+  {
+   "file": "JunkFood/Pizza.glb",
+   "size_blender_units": [
+    0.707,
+    1.0,
+    0.098
+   ]
+  },
+  {
+   "file": "JunkFood/Soda.glb",
+   "size_blender_units": [
+    1.207,
+    1.413,
+    2.467
+   ]
+  },
+  {
+   "file": "JunkFood/SodaCan.glb",
+   "size_blender_units": [
+    0.619,
+    0.613,
+    0.995
+   ]
+  }
+ ],
+ "UltimateAnimatedAnimals": [
+  {
+   "file": "UltimateAnimatedAnimals/Alpaca.glb",
+   "size_blender_units": [
+    1.265,
+    4.299,
+    5.398
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Bull.glb",
+   "size_blender_units": [
+    2.513,
+    8.067,
+    4.587
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Cow.glb",
+   "size_blender_units": [
+    2.312,
+    8.067,
+    4.587
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Deer.glb",
+   "size_blender_units": [
+    1.459,
+    4.397,
+    4.274
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Donkey.glb",
+   "size_blender_units": [
+    1.166,
+    4.708,
+    3.954
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Fox.glb",
+   "size_blender_units": [
+    1.054,
+    5.6,
+    2.667
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Horse.glb",
+   "size_blender_units": [
+    1.411,
+    5.676,
+    4.824
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/HorseWhite.glb",
+   "size_blender_units": [
+    1.411,
+    5.676,
+    4.824
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Husky.glb",
+   "size_blender_units": [
+    0.99,
+    3.889,
+    3.183
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/ShibaInu.glb",
+   "size_blender_units": [
+    1.071,
+    4.162,
+    3.086
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Stag.glb",
+   "size_blender_units": [
+    2.536,
+    4.837,
+    5.428
+   ]
+  },
+  {
+   "file": "UltimateAnimatedAnimals/Wolf.glb",
+   "size_blender_units": [
+    1.056,
+    5.274,
+    2.674
+   ]
+  }
+ ]
+}

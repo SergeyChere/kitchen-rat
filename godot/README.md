@@ -94,3 +94,7 @@ godot --headless --path godot -- --night=living --auto --test=hides   # every hi
 - The level is built in code at runtime by `scripts/level_builder.gd`.
 - `assets/sounds/*.wav` and `assets/music/*.ogg` are made by `python3 tools/make_audio.py`. It renders the
   prototype's synthesizer recipes from `game/js/audio.js` offline, so there are no third-party sound files to license.
+- `assets/sounds/real/*.ogg` are free CC0 recordings (meows, squeaks, bark, crashes, footsteps, door, rain…), fetched
+  by `tools/fetch_sounds.sh` and cut by `python3 tools/import_sounds.py`; sources in `assets/sounds/real/CREDITS.md`.
+  When a recording exists for a sound the game plays it, otherwise the synthesized one.
+- `art/library/` holds 297 free CC0 Quaternius models (furniture, kitchen, food) as `.glb`, ready to swap in.
