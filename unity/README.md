@@ -13,6 +13,16 @@ Menu **Kitchen Rat → Build Kitchen Nights** rebuilds the scenes from code at a
 **Kitchen Rat → Reimport Art** reapplies the import settings to all models.
 If you opened the first skeleton before, its `Assets/Scenes/Kitchen.unity` is deleted on the next build.
 
+## Building the game
+Unity no longer lets a free license build on GitHub, so build on your computer:
+
+- **Windows**: close the project in Unity and double-click `tools\build_unity.bat`. You get `build\KitchenRat-Unity-Windows.zip`.
+  `tools\build_unity.bat v0.9.0` also uploads it to that GitHub release (needs the `gh` CLI).
+- **Mac**: `sh tools/build_unity.sh` (or `sh tools/build_unity.sh v0.9.0` to upload).
+- Or in Unity: **File → Build Profiles → Build** (open the scenes once with Kitchen Rat → Build Kitchen Nights first).
+
+If a build fails, the log is in `build/unity-build.log`.
+
 ## Controls
 WASD move · mouse look · wheel zoom · Shift run · Ctrl or C sneak · Space jump (face a higher surface until the yellow ring
 appears) · E or right mouse sniff · F push things off · Esc pause · R restart.
