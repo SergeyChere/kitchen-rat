@@ -117,6 +117,9 @@
     caught() { if (!ok()) return; const t = now(); const o = tone('triangle', 420, t, 0.7, 0.2); o.frequency.exponentialRampToValueAtTime(90, t + 0.65); noise(t, 0.3, 0.15, 'lowpass', 700); },
     win() { if (!ok()) return; const t = now(); [523, 659, 784, 1047, 1319].forEach((f, i) => tone('triangle', f, t + i * 0.13, 0.7, 0.12, null, 0.01, 0.45)); },
     lose() { if (!ok()) return; const t = now(); [440, 415, 392, 330].forEach((f, i) => tone('triangle', f, t + i * 0.22, 0.6, 0.12, null, 0.01, 0.4)); },
+    task() { if (!ok()) return; const t = now(); [659, 880, 1319].forEach((f, i) => tone('sine', f, t + i * 0.09, 0.35, 0.09, null, 0.005, 0.3)); },
+    fail() { if (!ok()) return; const t = now(); tone('triangle', 330, t, 0.25, 0.08); tone('triangle', 262, t + 0.12, 0.3, 0.08); },
+    crinkle() { if (!ok()) return; const t = now(); for (let i = 0; i < 6; i++) noise(t + i * 0.035 + Math.random() * 0.02, 0.03, 0.12, 'highpass', 3000 + Math.random() * 3000, 0.8); },
     crackle(vol = 0.05) { if (!ok() || vol < 0.01) return; noise(now(), 0.03, vol, 'highpass', 1800 + Math.random() * 2000); },
   };
 

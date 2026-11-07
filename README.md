@@ -60,11 +60,11 @@ Nights menu as "in development". The plan is in the design doc.
 
 | Night | Room | Food | What's new |
 |---|---|---|---|
-| 1 | The Kitchen | 8 | Nobody is home and food is everywhere. Learn to move, jump, carry and sneak |
+| 1 | The Kitchen | 15 | The full first chapter: nobody is home, 12 tasks that teach everything (jumping, sneaking, hiding, sniffing, knocking things over), traps that make noise (a mug on the table edge, crinkly foil), two side tasks and a secret |
 | 2 | The Sleeping Cat | 12 | Food is scattered around the living room and the cat sleeps by your hole. Noise drains its sleep meter: running, bumping into things and jumping down from tables wake it up |
 | 3 | The Prowling Cat | 12 | Same room, but the cat is awake and walking around. Stay out of its sight cone and hide |
 
-Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
+Tasks for the night show up one at a time in the bottom-left corner. Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
 night unlocks the next one; progress and settings are saved automatically.
 
 ## Settings

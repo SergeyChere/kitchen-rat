@@ -78,19 +78,57 @@
 
   window.LEVELS = [
     {
-      id: 'kitchen', name: 'The Kitchen', act: 1, goal: 8, night: 300,
-      cat: 'away', wanted: false, threats: [], openFood: true, tutorial: true,
-      food: { spots: [], random: { crumb: 12, cheese: 4 }, refill: 10 },
-      goals: ['fed', 'early', 'nocatch'],
-      blurb: 'Everyone is asleep. Food is everywhere.',
+      id: 'kitchen', name: 'The Kitchen', act: 1, goal: 15, night: 900,
+      cat: 'away', wanted: false, threats: [], openFood: true,
+      food: {
+        spots: [
+          ['crumb', 585, 548, { tag: 'first' }],            // the first crumb, by the table
+          ['cheese', 680, 432, { tag: 'plate' }],           // on the plate on the table
+          ['cheese', 116, 30, { tag: 'bread', hidden: true }], // on the counter next to the bread box, only found by sniffing
+          ['cheese', 232, 470],                             // just past the foil
+        ],
+        random: { crumb: 10, cheese: 3 }, refill: 8,
+      },
+      // Tasks: the chain is shown one step at a time in the bottom-left list. check = [type, arg]:
+      //   pick <tag> · deliver [tag] · surf <id prefix> · hide crack · knock <kind> · flag <name> · keep <knock kind>
+      tasks: {
+        goal: 'Fill the nest',
+        chain: [
+          { text: 'Pick up the crumb by the table', hint: 'Walk over food to pick it up. Move with WASD, look around with the mouse.', check: ['pick', 'first'] },
+          { text: 'Take it home to the nest', hint: 'The nest is the glowing hole in the corner. The arrow at the bottom of the screen shows the way.', check: ['deliver'] },
+          { text: 'Jump onto a chair', hint: 'Walk up to a chair and face it. When the yellow ring appears, press Space.', check: ['surf', 'chair'] },
+          { text: 'Climb from the chair onto the table', hint: 'From the chair, face the table and press Space when the ring appears.', check: ['surf', 'table'] },
+          { text: 'Take the cheese from the plate', hint: 'A cheese is worth 5 crumbs. Careful: walk slowly past the mug on the edge.', check: ['pick', 'plate'] },
+          { text: 'Bring the cheese home', hint: 'Walk to the edge of the table and press Space to jump down, then head for the nest.', check: ['deliver', 'plate'] },
+          { text: 'Sneak across the foil without a sound', hint: 'Hold Ctrl or press C to sneak. Walking on foil makes it crinkle loudly.', check: ['flag', 'foilSneak'] },
+          { text: 'Hide in a crack in the wall', hint: 'Cracks are dark gaps at the bottom of the walls. Green outlines mark every hiding spot.', check: ['hide', 'crack'] },
+          { text: 'Stand up and sniff', hint: 'Hold E or the right mouse button. Thin trails of scent lead to the nearest food.', check: ['flag', 'sniffed'] },
+          { text: 'Find the cheese hidden by the bread box', hint: 'The bread box is up on the counter. Climb the stool, jump to the counter and sniff there.', check: ['pick', 'bread'] },
+          { text: 'Climb onto the kitchen island', hint: 'It’s too high to reach from the floor. Use the cardboard box next to it as a step.', check: ['surf', 'island'] },
+          { text: 'Push the apple off the island', hint: 'Walk up to the apple and press F. Falling things make noise, and later you can use that to lure the cat away.', check: ['knock', 'apple'] },
+        ],
+        side: [
+          { text: 'Leave the mug on the table', reveal: 3, check: ['keep', 'cup'] },
+          { text: 'Carry 3 pieces home at once', reveal: 2, check: ['flag', 'full'] },
+        ],
+        secret: [{ text: 'Find the shiny button', check: ['flag', 'button'] }],
+      },
+      secrets: [{ kind: 'button', x: 895, y: 198 }],
+      props: [{ t: 'foil', x: 150, y: 386, w: 160, h: 56 }, { t: 'breadbox', x: 140, y: 10, w: 56, h: 34 }],
       teaser: 'The living room. The cat sleeps there, so you’ll have to be quiet.',
-      intro: { pups: ['Mom, we’re hungry!', 'Squeak!', 'We want cheese!'], mom: 'Everyone is asleep, even the cat is out. Food is everywhere tonight. Let’s grab it.' },
-      start: { title: 'Bring 8 food to the nest', sub: 'Nobody is around tonight. Learn the ropes and grab what you can.' },
+      blurb: 'Your first night out. Nobody is home.',
+      intro: { pups: ['Mom, we’re hungry!', 'Squeak!', 'We want cheese!'], mom: 'Everyone is asleep, even the cat is out. Food is everywhere tonight. A good night to learn the house.' },
+      start: { title: 'Your first night out', sub: 'Nobody is home. Follow the tasks in the bottom-left corner.' },
       pal: { fog: 0x0e1220, sky: 0x7d8fc4, ground: 0x2a2430, hemi: 0.8, moon: 0.9, floor: 'tile', floorA: '#3b4058', floorB: '#4a5070', wall: 'stripes', wallA: '#4b5272', wallB: '#545c80', trim: 0x3a2e30, ceil: 0x22263a },
       lamp: 'shade', window: { x: 410, w: 220 }, door: 320,
       catBed: [470, 545], bowl: [770, 215], dock: [900, 430],
       lights: [{ x: 900, y: 560, h: 60, c: 0xffa860, i: 1.0, r: 520 }],
-      decor: 'kitchen', furn: kitchenFurniture, knocks: kitchenKnocks, cracks: kitchenCracks,
+      decor: 'kitchen', furn: kitchenFurniture, cracks: kitchenCracks,
+      knocks: [
+        { kind: 'cup', x: 655, y: 398, to: [655, 362], trap: true },   // on the edge: walk past it and it falls
+        { kind: 'jar', x: 470, y: 60, to: [470, 102] },
+        { kind: 'apple', x: 520, y: 330, to: [522, 364] },
+      ],
       music: { root: 57, minor: false, bpm: 70, prog: [[0, 'M'], [-5, 'M'], [-3, 'm'], [-7, 'M']] },
     },
     {

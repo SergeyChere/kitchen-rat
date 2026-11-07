@@ -558,6 +558,27 @@ const DECOR = {
     wallArt('e', 480, 160, 64, 84, (g, w, h) => { g.fillStyle = '#1a1a2a'; g.fillRect(0, 0, w, h); g.fillStyle = '#e6c88a'; g.beginPath(); g.ellipse(w / 2, h * 0.42, w * 0.22, h * 0.26, 0, 0, 7); g.fill(); g.fillStyle = '#5a2a2a'; g.fillRect(w * 0.3, h * 0.68, w * 0.4, h * 0.3); });
   },
 };
+let foilTex = null;
+function getFoilTex() {
+  if (foilTex) return foilTex;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#b8bec8'; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 70; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 6 + Math.random() * 16, l = 150 + Math.random() * 100; g.fillStyle = 'rgb(' + l + ',' + (l + 4) + ',' + (l + 12) + ')'; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { const a = k / 4 * 6.28 + Math.random(); g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.fill(); }
+  foilTex = new THREE.CanvasTexture(c); foilTex.wrapS = foilTex.wrapT = THREE.RepeatWrapping; return foilTex;
+}
+const PROPS = {
+  foil(p) {
+    L.foils.push(R(p.x, p.y, p.w, p.h));
+    const tex = getFoilTex().clone(); tex.needsUpdate = true; tex.repeat.set(p.w / 60, p.h / 60);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.h), T(0xffffff, { map: tex, emissive: 0x30343c }));
+    m.rotation.x = -Math.PI / 2; m.position.set(p.x + p.w / 2, 0.7, p.y + p.h / 2); m.receiveShadow = true; add(m);
+  },
+  breadbox(p) {
+    const s = surfaceAt(p.x + p.w / 2, p.y + p.h / 2), h = s ? s.h : 0, cx = p.x + p.w / 2, cz = p.y + p.h / 2;
+    fadeables.push(box(p.w, 22, p.h, TF(0xa8452f), cx, h + 11, cz, { block: false }), box(p.w + 2, 5, p.h + 2, TF(0xd9b27a), cx, h + 24, cz, { block: false }));
+    box(10, 3, 3, T(0xe8e0d0), cx, h + 16, p.y + p.h + 1, { block: false, line: false });
+  },
+};
 const KNOCK_INFO = {
   cup: { word: 'the cup', text: 'Clink!', snd: 'clink' }, glass: { word: 'the glass', text: 'Clink!', snd: 'clink' },
   vase: { word: 'the vase', text: 'Crash!', snd: 'crash' }, jar: { word: 'the jar', text: 'Bang!', snd: 'bang' },
@@ -602,7 +623,11 @@ function buildLevel(i) {
   const cs = (r, op) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(r.w * 1.45 + 20, r.h * 1.45 + 20), new THREE.MeshBasicMaterial({ map: softRect, transparent: true, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(r.x + r.w / 2, 0.55, r.y + r.h / 2); add(m); };
   L.solids.forEach(r => cs(r, 0.5)); L.hides.forEach(r => cs(r, r.kind === 'table' ? 0.35 : 0.3));
   // knockables
-  (d.knocks || []).forEach(k => { const s = surfaceAt(k.x, k.y); if (!s) return; const info = KNOCK_INFO[k.kind]; L.knocks.push({ kind: k.kind, x: k.x, y: k.y, to: k.to, h: s.h, surf: s.id, word: info.word, text: info.text, snd: info.snd, done: false, fall: null, mesh: knockMesh(k.kind) }); });
+  (d.knocks || []).forEach(k => { const s = surfaceAt(k.x, k.y); if (!s) return; const info = KNOCK_INFO[k.kind]; L.knocks.push({ kind: k.kind, x: k.x, y: k.y, to: k.to, h: s.h, surf: s.id, word: info.word, text: info.text, snd: info.snd, trap: !!k.trap, done: false, fall: null, mesh: knockMesh(k.kind) }); });
+  // props: foil (crinkles under the paws unless you sneak), bread box; secrets: hidden collectibles
+  L.foils = []; L.secrets = [];
+  (d.props || []).forEach(p => PROPS[p.t] && PROPS[p.t](p));
+  (d.secrets || []).forEach(sc => { const m = cyl(4.5, 1.6, T(0xe8b84a, { emissive: 0x6a4a10 }), sc.x, 1.2, sc.y, { seg: 16 }); L.secrets.push({ kind: sc.kind, x: sc.x, y: sc.y, mesh: m, found: false }); });
   // cracks: small gaps at the bottom of the walls the rat can squeeze into
   (d.cracks || []).forEach(c => {
     const sz = 28, r = c.wall === 's' ? R(c.x - 20, H - sz, 40, sz) : c.wall === 'w' ? R(0, c.y - 20, sz, 40) : c.wall === 'e' ? R(W - sz, c.y - 20, sz, 40) : R(c.x - 20, 0, 40, sz);
@@ -686,6 +711,7 @@ let lightOn = false, humanSees = false, catSees = false, vacSees = false, ratHid
 let camYaw = -Math.PI / 4, camPitch = 0.38, camDist = 82;
 let jumpCand = null, knockCand = null, smell = 0, smellTarget = null, sniffCd = 0, refillT = 0, sniffTargets = [], mouseR = false, touchSniff = false;
 const tut = { picked: false, delivered: false, cheese: false, sniffed: false, hideT: 0 };
+let Q = null, foilV = { in: false, dist: 0, loud: false }, foilCd = 0, lastRX = 0, lastRY = 0;
 let graceT = 0, run = { catWoke: false, chased: false }, crouchToggle = false, noiseLvl = 0, bumpT = 0, crouchAmt = 0;
 let bannerTimer = 0, lastPauseT = 0, runLevel = 0;
 const hasWanted = () => !!(L.d.wanted || L.d.threats.length);
@@ -716,8 +742,11 @@ function resetRun() {
   human = { mode: 'away', x: DOOR().x, y: DOOR().y, a: Math.PI, path: [], r: 20, t: 0, t2: 0, step: 0, speed: 0, seeT: 0, lostT: 0, lowT: 0, sweep: 0, known: false, lastX: 0, lastY: 0, repath: 0, stepD: 0 };
   vac = { on: false, x: L.d.dock[0], y: L.d.dock[1], a: Math.PI, r: 17, path: [], speed: 0, bumpT: 0 };
   L.knocks.forEach(k => { k.done = false; k.fall = null; });
+  Q = L.d.tasks ? { i: 0, done: new Set(), failed: new Set(), flags: {}, picked: new Set(), deliv: new Set(), delivAny: false, knocked: new Set(), recent: [], key: '', foilMsgT: 0 } : null;
+  foilV = { in: false, dist: 0, loud: false }; foilCd = 0;
+  (L.secrets || []).forEach(sc => { sc.found = false; sc.mesh.visible = false; });
   const fd = foodDef();
-  fd.spots.forEach(([type, x, y]) => placeItem(type, x, y));
+  fd.spots.forEach(([type, x, y, o]) => placeItem(type, x, y, o));
   for (let i = 0; i < fd.random.crumb; i++) spawnItem('crumb');
   for (let i = 0; i < fd.random.cheese; i++) spawnItem('cheese');
   updHud();
@@ -726,9 +755,9 @@ function foodDef() {
   const f = L.d.food || {}, open = !!L.d.openFood;
   return { spots: f.spots || [], random: f.random || { crumb: open ? 12 : 4, cheese: open ? 4 : 3 }, refill: f.refill != null ? f.refill : open ? 10 : 5 };
 }
-function placeItem(type, x, y) {
+function placeItem(type, x, y, o = {}) {
   const s = surfaceAt(x, y), cheese = type === 'cheese';
-  items.push({ x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, poison: false, w: cheese ? 2 : 1, v: cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
+  items.push({ tag: o.tag, hidden: !!o.hidden, x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, poison: false, w: cheese ? 2 : 1, v: cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
 }
 function spawnKitchen() { Object.assign(rat, { x: hole.x + 22, y: hole.y - 22, h: 0, surf: 'floor', a: -Math.PI / 4, inNest: false, jump: null }); camYaw = -Math.PI / 4; camPitch = 0.38; }
 function spawnItem(type) {
@@ -833,7 +862,7 @@ function renderLevels() {
     b.innerHTML = '<span class="n">Night ' + (i + 1) + '</span><span class="t"></span><span class="d"></span>' + (best ? '<span class="b"></span>' : '');
     b.querySelector('.t').textContent = d ? d.name : p[0];
     b.querySelector('.d').textContent = !d ? p[1] + ' In development.' : locked ? 'Finish night ' + i + ' to unlock' : 'Bring ' + d.goal + ' food. ' + (d.blurb || '');
-    if (best) b.querySelector('.b').textContent = 'Goals ' + (best.goals || 1) + ' / ' + (d.goals || ['fed']).length + ' · best ' + best.clock;
+    if (best) b.querySelector('.b').textContent = (d.tasks ? 'Tasks ' : 'Goals ') + (best.goals || 1) + ' / ' + goalCount(d) + ' · best ' + best.clock;
     b.disabled = locked; if (d) b.addEventListener('click', () => { Snd.fx.click(); startLevel(i); });
     list.appendChild(b);
   }
@@ -972,11 +1001,89 @@ function finishNight(won, title, text) {
   $('resGoals').innerHTML = '';
   goals.forEach(g => { const li = document.createElement('li'); li.className = g.ok ? 'ok' : 'no'; li.innerHTML = '<i></i><span></span>'; li.querySelector('i').textContent = g.ok ? '✔' : '✖'; li.querySelector('span').textContent = g.label; $('resGoals').appendChild(li); });
   $('resStats').innerHTML = '';
-  [[won ? fmtClock() : fmtClock(), won ? 'Finished at' : 'Time'], [Math.min(fed, L.d.goal) + ' / ' + L.d.goal, 'Food'], [String(3 - Math.max(lives, 0)), 'Lives lost'], [starStr(maxStars), 'Top wanted']].forEach(([v, k]) => { const dv = document.createElement('div'); dv.innerHTML = '<b></b><span></span>'; dv.querySelector('b').textContent = v; dv.querySelector('span').textContent = k; $('resStats').appendChild(dv); });
+  [[won ? fmtClock() : fmtClock(), won ? 'Finished at' : 'Time'], [Math.min(fed, L.d.goal) + ' / ' + L.d.goal, 'Food'], [String(3 - Math.max(lives, 0)), 'Lives lost'], [starStr(maxStars), 'Top wanted']].filter(r => r[1] !== 'Top wanted' || hasWanted()).forEach(([v, k]) => { const dv = document.createElement('div'); dv.innerHTML = '<b></b><span></span>'; dv.querySelector('b').textContent = v; dv.querySelector('span').textContent = k; $('resStats').appendChild(dv); });
   showPanel('pResult');
 }
 function lose(title, text) { finishNight(false, title, text); }
+function knockOver(k) { k.done = true; k.fall = { t: 0 }; if (Q) Q.knocked.add(k.kind); }
+function updateProps(dt) {
+  const moved = Math.hypot(rat.x - lastRX, rat.y - lastRY); lastRX = rat.x; lastRY = rat.y;
+  foilCd -= dt;
+  if (L.foils.length) {
+    const on = rat.surf === 'floor' && !rat.jump && L.foils.some(r => inRect(rat.x, rat.y, r));
+    if (on) {
+      foilV.in = true;
+      if (noiseLvl >= 1) { foilV.loud = true; if (foilCd <= 0) { foilCd = 0.45; Snd.fx.crinkle(); noise(rat.x, rat.y, 150, 'Crinkle!', false, 0.4); } }
+      else if (rat.crouch) foilV.dist += moved;
+    } else if (foilV.in) {
+      if (!foilV.loud && foilV.dist >= 40) { if (Q) Q.flags.foilSneak = true; }
+      else if (foilV.loud && Q && !Q.flags.foilSneak) Q.foilMsgT = 4;
+      foilV = { in: false, dist: 0, loud: false };
+    }
+  }
+  for (const sc of L.secrets) {
+    if (sc.found || rat.surf !== 'floor' || rat.jump || Math.hypot(sc.x - rat.x, sc.y - rat.y) > 16) continue;
+    sc.found = true; sc.mesh.visible = false; if (Q) Q.flags[sc.kind] = true;
+    bubble('A shiny button! The pups will love it.', rat.x, rat.y, rat.h + 32, 2.4); Snd.fx.cheese();
+  }
+}
+// ---- tasks: a chain shown one step at a time, side tasks and secrets (bottom-left list)
+function checkTask(t) {
+  const [type, arg] = t.check;
+  if (type === 'pick') return Q.picked.has(arg);
+  if (type === 'deliver') return arg ? Q.deliv.has(arg) : Q.delivAny;
+  if (type === 'surf') return !rat.jump && rat.surf.startsWith(arg);
+  if (type === 'hide') return rat.surf === 'floor' && !rat.jump && L.hides.some(h => h.kind === arg && inRect(rat.x, rat.y, h));
+  if (type === 'knock') return Q.knocked.has(arg);
+  if (type === 'flag') return !!Q.flags[arg];
+  return false;
+}
+const keepBroken = t => { const k = L.knocks.find(q => q.kind === t.check[1]); return !!(k && k.done); };
+function completeTask(id, text) { Q.done.add(id); Q.recent.push({ text, t: 2.4 }); Snd.fx.task(); }
+function tickTasks(dt) {
+  const T = L.d.tasks;
+  while (Q.i < T.chain.length && checkTask(T.chain[Q.i])) { completeTask('c' + Q.i, T.chain[Q.i].text); Q.i++; }
+  T.side.forEach((t, k) => {
+    const id = 's' + k; if (Q.done.has(id) || Q.failed.has(id) || (t.reveal != null && Q.i < t.reveal)) return;
+    if (t.check[0] === 'keep') { if (keepBroken(t)) { Q.failed.add(id); Snd.fx.fail(); } return; }
+    if (checkTask(t)) completeTask(id, t.text);
+  });
+  (T.secret || []).forEach((t, k) => { const id = 'x' + k; if (!Q.done.has(id) && checkTask(t)) completeTask(id, 'Secret: ' + t.text); });
+  Q.recent = Q.recent.filter(r => (r.t -= dt) > 0); Q.foilMsgT = Math.max(0, Q.foilMsgT - dt);
+  renderTasks();
+  if (Q.i >= T.chain.length && fed >= L.d.goal) startOutro();
+}
+const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+function renderTasks() {
+  const T = L.d.tasks, n = T.chain.length, rows = [];
+  const gDone = fed >= L.d.goal, pct = Math.min(100, fed / L.d.goal * 100);
+  rows.push('<li class="goal' + (gDone ? ' ok' : '') + '"><i>' + (gDone ? '✔' : '') + '</i><span>' + esc(T.goal) + ' · ' + Math.min(fed, L.d.goal) + ' / ' + L.d.goal + '<em class="bar"><b style="width:' + pct.toFixed(0) + '%"></b></em></span></li>');
+  Q.recent.forEach(r => rows.push('<li class="ok fresh"><i>✔</i><span>' + esc(r.text) + '</span></li>'));
+  if (Q.i < n) rows.push('<li class="cur"><i>' + (Q.i + 1) + '</i><span><small>Step ' + (Q.i + 1) + ' of ' + n + '</small>' + esc(T.chain[Q.i].text) + '</span></li>');
+  else if (!gDone) rows.push('<li class="cur"><i>✔</i><span>All tasks done. Bring the rest of the food home!</span></li>');
+  T.side.forEach((t, k) => {
+    const id = 's' + k; if (t.reveal != null && Q.i < t.reveal && !Q.done.has(id)) return;
+    const st = Q.done.has(id) ? 'ok' : Q.failed.has(id) ? 'no' : 'side';
+    rows.push('<li class="' + st + '"><i>' + (st === 'ok' ? '✔' : st === 'no' ? '✖' : '○') + '</i><span><small>Side</small>' + esc(t.text) + '</span></li>');
+  });
+  (T.secret || []).forEach((t, k) => { if (Q.done.has('x' + k)) rows.push('<li class="ok secret"><i>★</i><span><small>Secret</small>' + esc(t.text) + '</span></li>'); });
+  const html = rows.join('');
+  if (html !== Q.key) { Q.key = html; $('qList').innerHTML = html; }
+}
+function taskHint() {
+  if (Q.foilMsgT > 0 && !Q.flags.foilSneak) return 'Too loud! Hold Ctrl (or press C) and sneak across the foil.';
+  const T = L.d.tasks;
+  if (Q.i < T.chain.length) return T.chain[Q.i].hint || '';
+  return fed < L.d.goal ? 'Every task is done. Bring ' + (L.d.goal - fed) + ' more food home to finish the night.' : '';
+}
+const goalCount = d => d.tasks ? 1 + d.tasks.side.length + (d.tasks.secret || []).length : (d.goals || ['fed']).length;
 function nightGoals(won) {
+  if (Q) {
+    const T = L.d.tasks, out = [{ label: 'Main tasks ' + Math.min(Q.i, T.chain.length) + ' / ' + T.chain.length, ok: won && Q.i >= T.chain.length }];
+    T.side.forEach((t, k) => out.push({ label: 'Side: ' + t.text, ok: won && (t.check[0] === 'keep' ? !Q.failed.has('s' + k) : Q.done.has('s' + k)) }));
+    (T.secret || []).forEach((t, k) => out.push({ label: Q.done.has('x' + k) ? 'Secret: ' + t.text : 'Secret: ???', ok: Q.done.has('x' + k) }));
+    return out;
+  }
   const ids = L.d.goals || ['fed'];
   const check = { fed: won, early: won && nightT / L.d.night * 360 < 120, nocatch: lives === 3, sleep: !run.catWoke, unseen: !run.chased };
   return ids.map(id => ({ id, label: GOALS[id], ok: !!check[id] && (id === 'fed' || won) }));
@@ -1051,6 +1158,7 @@ function updateSniff(dt) {
   if (!rat.sniffing) return;
   rat.sniffHold += dt; rat.sniffMin -= dt; rat.sniffSnd -= dt; rat.retarget -= dt;
   if (rat.sniffSnd <= 0) { rat.sniffSnd = 0.75; Snd.fx.sniff(); }
+  if (rat.sniffHold > 0.6 && Q) Q.flags.sniffed = true;
   if (rat.sniffHold > 0.35 && rat.retarget <= 0) { rat.retarget = 0.5; pickScentTargets(); }
   if (!want && rat.sniffMin <= 0) rat.sniffing = false;
 }
@@ -1141,22 +1249,25 @@ function update(dt) {
   ratHidden = rat.surf === 'floor' && !rat.jump && (L.hides.some(h => inRect(rat.x, rat.y, h)) || Math.hypot(rat.x - hole.x, rat.y - hole.y) < hole.r);
   // --- actions ---
   jumpCand = findJump(); knockCand = null;
-  if (!rat.jump) for (const k of L.knocks) { if (k.done || k.surf !== rat.surf) continue; if (Math.hypot(k.x - rat.x, k.y - rat.y) < 30) { knockCand = k; break; } }
+  if (!rat.jump) for (const k of L.knocks) { if (k.done || k.trap || k.surf !== rat.surf) continue; if (Math.hypot(k.x - rat.x, k.y - rat.y) < 30) { knockCand = k; break; } }
   if (pressed.Space && jumpCand) doJump(jumpCand);
-  if (pressed.KeyF && knockCand) { knockCand.done = true; knockCand.fall = { t: 0 }; bubble('Hee hee', rat.x, rat.y, rat.h + 30, 1); }
+  if (pressed.KeyF && knockCand) { knockOver(knockCand); bubble('Hee hee', rat.x, rat.y, rat.h + 30, 1); }
+  // traps on the edge of a table: walk (don't sneak) past them and they fall
+  if (!rat.jump) for (const k of L.knocks) if (k.trap && !k.done && k.surf === rat.surf && noiseLvl >= 1 && Math.hypot(k.x - rat.x, k.y - rat.y) < 22) { knockOver(k); bubble('Oops!', rat.x, rat.y, rat.h + 30, 1.2); }
   updateSniff(dt);
   // --- food ---
   if (!rat.jump) for (let i = items.length - 1; i >= 0; i--) { const it = items[i];
     if (Math.abs(it.h - rat.h) < 10 && Math.hypot(it.x - rat.x, it.y - rat.y) < 17 && carryW() + it.w <= 3) {
-      rat.carry.push(it); items.splice(i, 1); ratMesh.userData.mouth.add(it.mesh); it.mesh.visible = true; it.mesh.scale.setScalar(1); tut.picked = true; if (it.type === 'cheese') tut.cheese = true; it.wisps && it.wisps.forEach(w => scene.remove(w.s)); it.wisps = null;
+      rat.carry.push(it); items.splice(i, 1); if (Q && it.tag) Q.picked.add(it.tag); ratMesh.userData.mouth.add(it.mesh); it.mesh.visible = true; it.mesh.scale.setScalar(1); tut.picked = true; if (it.type === 'cheese') tut.cheese = true; it.wisps && it.wisps.forEach(w => scene.remove(w.s)); it.wisps = null;
       if (!it.poison) evidence += it.type === 'cheese' ? 9 : 3; updHud();
       if (it.type === 'cheese') { bubble('Cheeese!', rat.x, rat.y, rat.h + 30, 1.2); Snd.fx.cheese(); } else Snd.fx.pickup();
     } }
   if (rat.carry.length && rat.surf === 'floor' && Math.hypot(rat.x - hole.x, rat.y - hole.y) < hole.r + 6) {
     const pz = rat.carry.filter(i => i.poison).length, v = rat.carry.reduce((s, i) => s + (i.poison ? 0 : i.v), 0); fed = Math.max(0, fed + v - pz * 4);
     rat.carry.forEach(it => { ratMesh.userData.mouth.remove(it.mesh); if (!it.poison) addToPile(it.type); });
+    if (Q) { Q.delivAny = true; rat.carry.forEach(i => i.tag && Q.deliv.add(i.tag)); if (carryW() >= 3) Q.flags.full = true; }
     const hadCheese = rat.carry.some(i => i.type === 'cheese' && !i.poison); rat.carry = []; updHud(); tut.delivered = true; if (hadCheese) tut.cheese = true;
-    if (fed >= L.d.goal) { startOutro(); return; }
+    if (!Q && fed >= L.d.goal) { startOutro(); return; }
     { const rf = foodDef().refill; while (rf && items.length < rf + 3) spawnItem(); }
     if (pz) { say('Poison! −' + pz * 4, hole.x, hole.y, 32, '#9be06a'); bubble('Ew! Tummy ache…', hole.x, hole.y + 8, 22, 2); Snd.fx.poison(); }
     else { say('+' + v, hole.x, hole.y, 32, '#f2c14e'); const left = L.d.goal - fed; bubble(hadCheese ? 'Cheese! Yay!' : left > 8 ? 'Squeak! More!' : left > 3 ? 'Almost full!' : 'Just a little more!', hole.x, hole.y + 8, 22, 1.8); Snd.fx.deliver(); }
@@ -1173,6 +1284,8 @@ function update(dt) {
   updateVacuum(dt);
   if (!rat.jump && rat.surf === 'floor') for (const t of traps) { if (t.sprung) continue; if (Math.hypot(t.x - rat.x, t.y - rat.y) < 12) { t.sprung = true; t.bait.visible = false; t.wisps && t.wisps.forEach(w => scene.remove(w.s)); t.wisps = null; caught('SNAP!', t.x, t.y, 26, 'snap'); break; } }
   if (state !== 'play') return;
+  updateProps(dt);
+  if (Q) { tickTasks(dt); if (state !== 'play') return; }
   for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noise(k.to[0], k.to[1], 460, k.text, true); } }
   if (L.crackle && Math.random() < dt * 7) Snd.fx.crackle(0.06 * clamp01(1 - Math.hypot(rat.x - L.crackle.x, rat.y - L.crackle.y) / 500));
   // --- wanted level ---
@@ -1353,7 +1466,7 @@ function sync(dt) {
   const openFood = !L || !!L.d.openFood || state === 'menu';
   items.forEach(it => { const base = it.h + (it.type === 'cheese' ? 4 : 3.5);
     it.reveal = Math.max(0, (it.reveal || 0) - dt);
-    const vis = openFood || it.reveal > 0 || Math.hypot(it.x - rat.x, it.y - rat.y) + Math.abs(it.h - rat.h) < 80;
+    const vis = (openFood && !it.hidden) || it.reveal > 0 || Math.hypot(it.x - rat.x, it.y - rat.y) + Math.abs(it.h - rat.h) < (it.hidden ? 36 : 80);
     it.vis = lerp(it.vis == null ? (vis ? 1 : 0) : it.vis, vis ? 1 : 0, Math.min(1, dt * 6));
     it.mesh.visible = it.vis > 0.03; it.mesh.scale.setScalar(Math.max(0.001, it.vis));
     it.mesh.position.set(it.x, base + Math.sin(clock * 3 + it.rot) * 1.5, it.y); it.mesh.rotation.y = it.rot + clock * 0.8;
@@ -1423,6 +1536,7 @@ function sync(dt) {
     const inside = d === 0 && rat.surf === 'floor' && !rat.jump;
     const target = !inRun ? 0 : inside ? 0.9 : 0.6 * clamp01(1 - (d - 15) / 230);
     mk.m.material.opacity = lerp(mk.m.material.opacity, target * (0.85 + Math.sin(clock * 3 + r.x) * 0.15), Math.min(1, dt * 6)); mk.m.visible = mk.m.material.opacity > 0.01; }
+  if (L.secrets) for (const sc of L.secrets) { sc.mesh.visible = inRun && !sc.found && Math.hypot(sc.x - rat.x, sc.y - rat.y) < 75; sc.mesh.rotation.y = clock * 2; }
   holeLight.intensity = 0.65 + Math.sin(clock * 3) * 0.15; nestLight.intensity = 1.25 + Math.sin(clock * 1.7) * 0.08;
   // camera
   if (inRun || (state === 'result' && !rat.inNest)) followCam(dt, camYaw, camPitch);
@@ -1451,7 +1565,7 @@ function sync(dt) {
   for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].t <= 0) { msgs[i].el.remove(); msgs.splice(i, 1); }
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('banner').style.opacity = 0; }
   // HUD
-  $('chips').hidden = !playing; $('wanted').hidden = !playing || !hasWanted();
+  $('chips').hidden = !playing; $('quests').hidden = !playing || !Q; $('wanted').hidden = !playing || !hasWanted();
   if (playing) {
     if (stars !== lastStarsShown) { lastStarsShown = stars; $('wStars').innerHTML = '★'.repeat(stars) + '<span class="off">' + '★'.repeat(5 - stars) + '</span>'; }
     let evS = 0; for (const t of STAR_AT) if (evidence >= t) evS++;
@@ -1464,15 +1578,16 @@ function sync(dt) {
     else if (humanSees) { chip.textContent = 'The owner sees you!'; chip.className = 'chip seen'; }
     else if (catSees && cat.mode === 'watch') { chip.textContent = 'The cat is waiting below'; chip.className = 'chip seen'; }
     else if (catSees) { chip.textContent = 'The cat sees you!'; chip.className = 'chip seen'; }
-    else if (rat.h >= 30) { chip.textContent = hm !== 'away' && hm !== 'coming' ? 'Up high, but the owner can still reach you' : 'Up high: the cat can’t reach you'; chip.className = 'chip'; }
+    else if (rat.h >= 30) { chip.textContent = hm !== 'away' && hm !== 'coming' ? 'Up high, but the owner can still reach you' : cat.mode === 'away' ? 'Up high' : 'Up high: the cat can’t reach you'; chip.className = 'chip'; }
     else { chip.textContent = 'Unseen'; chip.className = 'chip'; }
-    { const nc = $('noiseChip'); nc.hidden = cat.mode === 'away';
+    { const nc = $('noiseChip'); nc.hidden = false;
       const lvl = rat.jump ? 1 : noiseLvl, sneaking = rat.crouch && lvl === 0 && !rat.jump;
       nc.className = 'chip noise-' + lvl; $('noiseTxt').textContent = lvl === 3 ? 'Loud: running' : lvl === 1 ? 'Quiet: walking' : sneaking ? 'Silent: sneaking' : 'Silent';
       [...$('nMeter').children].forEach((el, i) => el.classList.toggle('on', i < lvl)); }
     const bars5 = Math.ceil(smell * 5); [...$('meter').children].forEach((el, i) => el.classList.toggle('on', i < bars5));
     let hint = '';
-    if (L.d.tutorial) hint = tutorialHint(dt);
+    if (Q) hint = settings.hints ? taskHint() : '';
+    else if (L.d.tutorial) hint = tutorialHint(dt);
     else if (settings.hints) {
       if (cat.mode === 'chase' && !ratHidden) hint = 'Run to a green outline: under furniture or into a crack in the wall.';
       else if (rat.carry.length === 0 && smellTarget && smell > 0.45 && smellTarget.h > rat.h + 20) hint = 'Something smells good up high. Look for a place to jump: a yellow ring will appear.';
@@ -1528,6 +1643,9 @@ window.__kr = {
   cat: () => ({ mode: cat.mode, sleep: +cat.sleep.toFixed(3), stage: cat.stage, x: Math.round(cat.x), y: Math.round(cat.y), woke: run.catWoke, chased: run.chased }),
   items: () => items.map(it => [it.type, Math.round(it.x), Math.round(it.y), it.h, it.surf]),
   noiseLvl: () => noiseLvl, goals: () => nightGoals(true),
+  knocks: () => L.knocks.map(k => [k.kind, k.x, k.y, k.surf, k.done, !!k.trap]),
+  tasks: () => Q && { i: Q.i, done: [...Q.done], failed: [...Q.failed], flags: Q.flags, picked: [...Q.picked] },
+  onSurf: (prefix, x, y) => { const s = L.surfaces.find(q => q.id.startsWith(prefix)); const r = s.rects[0]; Object.assign(rat, { x: x != null ? x : r.x + r.w / 2, y: y != null ? y : r.y + r.h / 2, h: s.h, surf: s.id, jump: null }); return s.id; },
   feed: n => { fed = n; }, unlockAll: () => { progress.unlocked = LEVELS.length + 1; saveProgress(); },
 };
 })();
