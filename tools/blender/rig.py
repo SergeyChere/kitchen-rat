@@ -1,7 +1,7 @@
 """Skeletons and keyframed animations for the characters.
 
 Every part of a character is rigidly bound to one bone (weight 1.0), so the low-poly look stays crisp.
-Animations are Blender Actions; the FBX exporter writes each one as a separate take (clip) for Unity.
+Animations are Blender Actions; the glTF exporter writes each one as a separate animation for Godot.
 Rotations are Euler XYZ in degrees in the bone's local space:
   legs (vertical bones): X swings the leg forward/back
   spine/head/tail (horizontal bones along -Y): X pitches up/down, Z turns left/right

@@ -25,7 +25,7 @@ These links always point to the newest release. All versions: [Releases](https:/
 ## For developers
 
 > **The game is being ported to Godot 4.** This is now the main version. See [godot/README.md](godot/README.md).
-> Test builds are under **Actions → Build Godot game → Artifacts**. The Unity port in `unity/` is frozen.
+> Test builds are under **Actions → Build Godot game → Artifacts**.
 
 ### Run from source
 
@@ -58,7 +58,7 @@ Open `game/index.html` directly. Everything it needs is in `game/vendor/`, so it
 
 ## The nights
 
-All 20 nights in four acts are playable. Graphics are still placeholders; real models come with the Unity version.
+All 20 nights in four acts are playable. Graphics are still placeholders; real models come with the Godot version.
 
 | Night | Room | Food | What's new |
 |---|---|---|---|
@@ -119,15 +119,16 @@ game/            The game itself (three.js r128), runs offline
   vendor/        three.js and fonts
 electron/        Desktop shell: window, fullscreen, quit button bridge
 build/icon.png   App icon (used by the window and the installers)
-unity/           Unity project (Unity 6, C#): night 1 playable with the generated models, see unity/README.md
-tools/blender/   Scripts that generate every model into unity/Assets/Art (Blender as a Python module)
+godot/           The Godot 4 game: all 20 nights, menus, sound and music, see godot/README.md
+tools/blender/   Scripts that generate every model into godot/assets/models (Blender as a Python module)
+tools/make_audio.py  Renders the sound effects and music for Godot
 art/             Model previews and the list of models
 docs/            Game design notes and roadmap
 .github/         CI that builds the desktop app for Windows, macOS and Linux
 ```
 
 The HTML version is where new gameplay ideas get tried first. Features that stick get ported to
-Unity, which is the long-term engine for the Steam release.
+Godot, which is the engine for the Steam release.
 
 ## Credits
 

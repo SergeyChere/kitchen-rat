@@ -1,8 +1,8 @@
 """Shared helpers for generating Kitchen Rat models in Blender.
 
 Units: every size passed to the helpers is in centimetres; the scene is in metres (1 unit = 1 m).
-Axes: Blender is Z-up. Models face -Y (Blender's front view), which becomes +Z (forward) in Unity
-with the export settings below. Every model's origin is at the bottom centre.
+Axes: Blender is Z-up. Models face -Y (Blender's front view), which becomes +Z (forward) in Godot
+with the glTF export below. Every model's origin is at the bottom centre.
 """
 import math
 import os
@@ -13,9 +13,9 @@ from mathutils import Vector
 
 CM = 0.01
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-ROOT = os.path.join(REPO, 'unity', 'Assets', 'Art')   # models go straight into the Unity project
+GODOT = os.path.join(REPO, 'godot', 'assets', 'models')  # models go straight into the Godot project as .glb
+ROOT = GODOT
 DOCS = os.path.join(REPO, 'art')                      # previews and MODELS.md
-GODOT = os.path.join(REPO, 'godot', 'assets', 'models')  # the same models as glTF for Godot
 _mats = {}
 
 
@@ -186,9 +186,7 @@ def flat(o):
 
 
 def save(category, name, objs, anim=False):
-    """Export the given objects (and their children) to art/<category>/<name>.fbx."""
-    out = os.path.join(ROOT, category)
-    os.makedirs(out, exist_ok=True)
+    """Export the given objects (and their children) to godot/assets/models/<category>/<name>.glb."""
     for ob in bpy.context.selected_objects:
         ob.select_set(False)
     allo = []
@@ -200,18 +198,12 @@ def save(category, name, objs, anim=False):
         if o.type == 'MESH':
             flat(o)
     bpy.context.view_layer.objects.active = objs[0]
-    path = os.path.join(out, name + '.fbx')
-    bpy.ops.export_scene.fbx(
-        filepath=path, use_selection=True, object_types={'MESH', 'ARMATURE', 'EMPTY'},
-        apply_unit_scale=True, apply_scale_options='FBX_SCALE_ALL', axis_forward='-Z', axis_up='Y',
-        mesh_smooth_type='FACE', add_leaf_bones=False, use_armature_deform_only=True,
-        bake_anim=anim, bake_anim_use_all_actions=anim, bake_anim_use_nla_strips=False,
-        bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0, path_mode='COPY')
     tris = sum(len(p.vertices) - 2 for o in allo if o.type == 'MESH' for p in o.data.polygons)
     gout = os.path.join(GODOT, category)
     os.makedirs(gout, exist_ok=True)
+    path = os.path.join(gout, name + '.glb')
     bpy.ops.export_scene.gltf(
-        filepath=os.path.join(gout, name + '.glb'), export_format='GLB', use_selection=True, export_yup=True,
+        filepath=path, export_format='GLB', use_selection=True, export_yup=True,
         export_apply=False, export_animations=anim, export_animation_mode='ACTIONS', export_force_sampling=True,
         export_frame_range=False, export_def_bones=False, export_skins=True, export_lights=False, export_cameras=False)
     return path, tris

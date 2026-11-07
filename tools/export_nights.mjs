@@ -1,5 +1,5 @@
-// Export the 20 nights from game/js/levels.js to JSON files the Unity version reads
-// (godot/data/nights/NN_id.json, and unity/Assets/Resources/Nights for the Unity version). Run after changing levels.js:  node tools/export_nights.mjs
+// Export the 20 nights from game/js/levels.js to JSON files the Godot version reads
+// (godot/data/nights/NN_id.json). Run after changing levels.js:  node tools/export_nights.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -10,7 +10,7 @@ const ctx = { window: {}, Math };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(root, 'game/js/levels.js'), 'utf8'), ctx);
 const LEVELS = ctx.window.LEVELS;
-const outs = [path.join(root, 'godot/data/nights'), path.join(root, 'unity/Assets/Resources/Nights')];
+const outs = [path.join(root, 'godot/data/nights')];
 for (const out of outs) {
   fs.mkdirSync(out, { recursive: true });
   for (const f of fs.readdirSync(out)) if (f.endsWith('.json')) fs.rmSync(path.join(out, f));

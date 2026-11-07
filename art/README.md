@@ -1,10 +1,10 @@
 # Art
 
-Placeholder low-poly models for the Unity version, generated from code with Blender (`tools/blender/`).
-The FBX files live inside the Unity project, in **`unity/Assets/Art/`**; this folder keeps the previews and the list.
+Placeholder low-poly models for the Godot version, generated from code with Blender (`tools/blender/`).
+The .glb files live inside the Godot project, in **`godot/assets/models/`**; this folder keeps the previews and the list.
 Replace any of them with hand-made models of the same name, size and origin — the game will pick them up.
 
-| Folder in `unity/Assets/Art/` | What |
+| Folder in `godot/assets/models/` | What |
 |---|---|
 | `food/` | Food the rat carries home (crumb, cheese, sausage, pizza…) |
 | `finds/` | Nest finds and secrets (button, thimble, sock, photo…) |
@@ -18,8 +18,8 @@ Replace any of them with hand-made models of the same name, size and origin — 
 Full list with triangle counts: [MODELS.md](MODELS.md).
 
 ## Conventions
-- FBX, metres (1 unit = 1 m), origin at the bottom centre, facing +Z in Unity (Blender −Y).
-- Characters: one armature, every part rigidly bound to a bone; each Blender Action is a separate clip in Unity
+- glTF (.glb), metres (1 unit = 1 m), origin at the bottom centre, facing +Z in Godot (Blender −Y).
+- Characters: one armature, every part rigidly bound to a bone; each Blender Action is a separate animation in Godot
   (`walk`, `run`, `sneak`, `sleep`…). Hand props (flashlight, glass, slipper, spray) are children of the hand bones.
 - Rooms are 960 × 600 cm, 250 cm high; wall sections are 120 cm wide and snap side by side.
 

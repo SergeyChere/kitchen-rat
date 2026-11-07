@@ -1,7 +1,7 @@
 # Kitchen Rat: Godot 4 version
 
 This is the main version of the game from now on. The three.js prototype in `game/` is the design
-reference. The Unity port in `unity/` is frozen.
+reference.
 
 ## Get a build without installing anything
 

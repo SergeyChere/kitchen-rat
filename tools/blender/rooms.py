@@ -1,5 +1,5 @@
 """Room pieces: walls (plain, with the mouse hole, a crack, a window, a door), lamps, the nest, rugs, wall art,
-kitchen clutter, and floor/wall textures. Rooms are 960 × 600 cm with a 250 cm ceiling, assembled in Unity."""
+kitchen clutter, and floor/wall textures. Rooms are 960 × 600 cm with a 250 cm ceiling, assembled in Godot."""
 import math
 import os
 import random

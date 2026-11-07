@@ -110,10 +110,7 @@ See the main README.
 - [ ] Gamepad support
 - [ ] More owner behaviour: sets traps where you were last seen, calls for help at 5 stars
 
-### Unity port
-- [ ] Port jumping and surfaces
-- [ ] Port scent, sniff and items
-- [ ] Port wanted level, traps, owner, poison
-- [ ] Toon shader with outlines, bloom, color grading (URP)
-- [ ] Steamworks.NET: achievements, cloud saves
+### Godot version
+- [x] Port every mechanic, all 20 nights, menus, sound and music
+- [ ] Steamworks (GodotSteam): achievements, cloud saves
 - [ ] Steam page and Next Fest demo

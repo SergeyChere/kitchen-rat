@@ -7,29 +7,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Unity (if you open unity/ as a project)
-unity/[Ll]ibrary/
-unity/[Tt]emp/
-unity/[Oo]bj/
-unity/[Bb]uild/
-unity/[Bb]uilds/
-unity/[Ll]ogs/
-unity/[Uu]ser[Ss]ettings/
-unity/*.csproj
-unity/*.sln
-unity/*.user
-unity/.vs/
 
 # Python
 __pycache__/
 art/previews/_tmp/
-unity/[Mm]emoryCaptures/
-unity/[Rr]ecordings/
-unity/*.pidb.meta
-unity/*.pdb.meta
-unity/crashlytics-build.properties
 
-# Local Unity builds
-build/unity-*/
-build/KitchenRat-Unity-*.zip
-build/unity-build.log
