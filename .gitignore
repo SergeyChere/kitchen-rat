@@ -28,3 +28,8 @@ unity/[Rr]ecordings/
 unity/*.pidb.meta
 unity/*.pdb.meta
 unity/crashlytics-build.properties
+
+# Local Unity builds
+build/unity-*/
+build/KitchenRat-Unity-*.zip
+build/unity-build.log
