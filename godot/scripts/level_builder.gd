@@ -49,22 +49,24 @@ func spawn(path: String, pos: Vector3, rot_deg := 0.0, parent: Node3D = null) ->
 	return n
 
 
-## Flat banded shading with dark outlines, like the prototype's MeshToonMaterial.
+## Flat banded shading with dark outlines, like the prototype's MeshToonMaterial. The outline grows in the mesh's
+## own units, so models scaled on a root node (the imported characters) get it sized back to ~4 mm.
 func toonify(n: Node) -> void:
 	if _outline == null:
-		_outline = StandardMaterial3D.new()
-		_outline.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_outline.albedo_color = Color(0.08, 0.07, 0.09)
-		_outline.cull_mode = BaseMaterial3D.CULL_FRONT
-		_outline.grow = true
-		_outline.grow_amount = 0.004
+		_outline = _outline_mat(0.004)
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
+		var ref: Node3D = m
+		var sk := m.get_node_or_null(m.skeleton) as Skeleton3D if m.skin else null
+		if sk:
+			ref = sk
+		var sc := ref.global_transform.basis.get_scale().x
+		var grow := snappedf(0.004 / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else 0.004
 		for i in m.mesh.get_surface_count():
 			var mat := m.mesh.surface_get_material(i)
 			if not (mat is BaseMaterial3D):
 				continue
-			var key := mat.get_instance_id()
+			var key := str(mat.get_instance_id()) + ":" + str(grow)
 			if not _toon.has(key):
 				var t := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
 				t.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
@@ -72,9 +74,19 @@ func toonify(n: Node) -> void:
 				t.metallic = 0.0
 				t.roughness = 0.9
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
-					t.next_pass = _outline
+					t.next_pass = _outline if grow == 0.004 else _outline_mat(grow)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
+
+
+static func _outline_mat(grow: float) -> StandardMaterial3D:
+	var o := StandardMaterial3D.new()
+	o.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	o.albedo_color = Color(0.08, 0.07, 0.09)
+	o.cull_mode = BaseMaterial3D.CULL_FRONT
+	o.grow = true
+	o.grow_amount = grow
+	return o
 
 
 static func aabb_of(n: Node3D) -> AABB:

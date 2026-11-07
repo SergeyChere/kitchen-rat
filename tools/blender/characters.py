@@ -481,4 +481,6 @@ def robot_vacuum():
     return model(C, 'robot_vacuum', body, movable={'brush_l': brush_l, 'brush_r': brush_r, 'light': light})
 
 
-ALL = [rat_mother, rat_pup, cat, dog, owner, kid, guest, exterminator, robot_vacuum]
+# rat_mother, rat_pup, cat, dog, owner, kid and guest now come from free animated models: tools/blender/import_characters.py.
+# Add them back here to regenerate the old blocky versions.
+ALL = [exterminator, robot_vacuum]

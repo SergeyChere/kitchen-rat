@@ -25,6 +25,8 @@ model to the sizes in the plan's model tables before using it).
 ## Animated characters (`characters/`)
 
 Rigged and animated, made by `tools/blender/convert_characters.py` from the downloads of `tools/fetch_models.sh`.
+The game's rat, pups, cat, dog, owner, kid and guest are built from these by `tools/blender/import_characters.py`
+(sized, recoloured, with the game's animation clips made from theirs).
 [Preview](characters/preview.png). All CC0.
 
 | File | What | Animations |

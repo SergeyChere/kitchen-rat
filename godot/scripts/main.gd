@@ -59,6 +59,8 @@ func _process(_dt: float) -> void:
 		c.look_at(Nights.world(float(v[3]), float(v[4]), float(v[5])))
 		c.fov = 70.0
 		c.current = true
+	if _args.has("focus") and game and game.grid != null and game.state != "intro":
+		_focus()
 	if _args.has("shot") and _frames == int(_args.get("frames", "90")):
 		get_viewport().get_texture().get_image().save_png(_args.shot)
 		print("saved ", _args.shot)
@@ -277,3 +279,34 @@ static func _setup_input() -> void:
 	_key("look_right", [], -1, [], JOY_AXIS_RIGHT_X, 1.0)
 	_key("look_up", [], -1, [], JOY_AXIS_RIGHT_Y, -1.0)
 	_key("look_down", [], -1, [], JOY_AXIS_RIGHT_Y, 1.0)
+
+
+## --focus=cat|owner|dog|rat|pup|sleeper[,anim]: a close-up camera that follows one character (screenshots of the models);
+## with an anim name that character plays only that clip.
+func _focus() -> void:
+	var f := str(_args.focus).split(",")
+	var t: Node3D = {"cat": game.cat, "owner": game.owner_ai, "dog": game.dog, "rat": game.rat,
+		"pup": game.pups[0] if not game.pups.is_empty() else null,
+		"sleeper": game.sleepers[0] if not game.sleepers.is_empty() else null}.get(f[0])
+	if t == null:
+		return
+	var d: float = {"cat": 1.1, "owner": 2.8, "dog": 1.5, "rat": 0.55, "pup": 0.4, "sleeper": 2.2}[f[0]]
+	var c := get_meta("focus_cam") as Camera3D if has_meta("focus_cam") else null
+	if c == null:
+		c = Camera3D.new()
+		game.add_child(c)
+		c.fov = 50.0
+		c.current = true
+		set_meta("focus_cam", c)
+	if f.size() > 1:
+		t.process_mode = Node.PROCESS_MODE_DISABLED
+		var ap := t.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if ap and ap.current_animation != f[1]:
+			ap.process_mode = Node.PROCESS_MODE_ALWAYS
+			ap.play(f[1])
+	var fwd := t.global_transform.basis.z
+	var side := t.global_transform.basis.x
+	var to := t.global_position + (fwd * 0.8 + side * 0.6).normalized() * d + Vector3.UP * d * 0.45
+	c.global_position = to
+	c.look_at(t.global_position + Vector3.UP * d * 0.18)
+
