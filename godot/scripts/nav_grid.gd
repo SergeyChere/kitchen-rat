@@ -10,7 +10,8 @@ var astar := AStarGrid2D.new()
 var origin := Vector3.ZERO
 
 
-func _init(game: Game, no_go: Array, inflate := 0.07) -> void:
+## probe_y / half_h: the height band checked for furniture (the vacuum is low enough to go under tables and sofas).
+func _init(game: Game, no_go: Array, inflate := 0.07, probe_y := 0.24, half_h := 0.18) -> void:
 	gw = roundi(Nights.ROOM_W / 100.0 / CELL)
 	gh = roundi(Nights.ROOM_D / 100.0 / CELL)
 	origin = Nights.world(0, 0)
@@ -20,13 +21,13 @@ func _init(game: Game, no_go: Array, inflate := 0.07) -> void:
 	astar.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	astar.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	astar.update()
-	var half := Vector3(CELL / 2.0 + inflate, 0.18, CELL / 2.0 + inflate)
+	var half := Vector3(CELL / 2.0 + inflate, half_h, CELL / 2.0 + inflate)
 	for y in gh:
 		for x in gw:
 			var c := cell_center(x, y)
 			var b := x == 0 or y == 0 or x == gw - 1 or y == gh - 1
 			if not b:
-				b = not game.box_free(c + Vector3.UP * 0.24, half)
+				b = not game.box_free(c + Vector3.UP * probe_y, half)
 			if not b:
 				for z in no_go:
 					if (z as Zone).contains_xz(c, inflate + 0.05):

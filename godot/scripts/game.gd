@@ -19,7 +19,23 @@ var cam: FollowCamera
 var hud: Hud
 var room_light: Light3D
 var hole := Vector3.ZERO
-var run := {"catWoke": false, "chased": false, "seenOwner": false, "poisonDelivered": false, "caught": false}
+var run := {"catWoke": false, "chased": false, "seenOwner": false, "poisonDelivered": false, "caught": false,
+	"dogWoke": false, "dogChased": false, "pupCaught": false, "stuck": false, "caged": false, "sleeperWoke": false}
+var env: Environment
+var moon: DirectionalLight3D
+var flickers: Array = []  # [light, base energy, "fire" | "tv" | "steady"]
+var tv_light: OmniLight3D
+var tv_on := false
+var cracks: Array[Vector3] = []
+var noisy: Array = []
+var gnaws: Array = []
+var exit_point := Vector3.ZERO
+var dog: DogAI
+var vacuum: VacuumAI
+var pups: Array[Pup] = []
+var sleepers: Array[Sleeper] = []
+var pup_warn_t := 0.0
+var prompt := ""
 var fed := 0
 var lives := 3
 var stars := 0
@@ -49,6 +65,24 @@ var _sniff_hold := 0.0
 var _scent: Array[Food] = []
 var _trails: Array[MeshInstance3D] = []
 var _builder: LevelBuilder
+var _stuck_imm := 0.0
+var _stuck_snd := 0.0
+var _mom_trail: Array = []
+var _idle_t := 0.0
+var _last_rp := Vector3.ZERO
+var _wash_t := 0.0
+var _wash_zone: Zone
+var _light_t := 0.0
+var _bell_t := 0.0
+var _next_bolt := 8.0
+var _flash_t := 0.0
+var _thunder_t := 0.0
+var _storm_mask := 0.0
+var _blackout := false
+var _mud := 0.0
+var _light_mul := 1.0
+var _ambient := 1.0
+var _moon_e := 0.5
 
 
 func _init(id := "kitchen") -> void:
@@ -89,6 +123,7 @@ func _ready() -> void:
 	cat.setup(night)
 	var door := float(night.get("door", 300))
 	owner_ai.setup(night, Nights.world(935, door if door > 0 else 300))
+	_make_extras()
 	var fd: Dictionary = night.get("food", {})
 	for i in int(fd.get("randomCrumb", 4)): spawn_random("crumb")
 	for i in int(fd.get("randomCheese", 3)): spawn_random("cheese")
@@ -101,6 +136,9 @@ func _ready() -> void:
 	for i in 3:
 		_trails.append(_make_trail())
 	rat.landed.connect(_on_landed)
+	_ambient = env.ambient_light_energy if env else 1.0
+	_moon_e = moon.light_energy if moon else 0.5
+	_last_rp = rat.global_position
 	print_verbose("night ready: ", foods.size(), " food, ", zones.size(), " zones")
 	rat.frozen = true
 
@@ -173,6 +211,63 @@ func _make_agents() -> void:
 	owner_ai.room_light = room_light
 
 
+## The dog, the robot vacuum, sleepers and the pups that come along: only in the nights that have them.
+func _make_extras() -> void:
+	var dd: Array = night.get("dog", [])
+	if dd.size() >= 2:
+		dog = DogAI.new()
+		dog.name = "Dog"
+		add_child(dog)
+		var dm := _builder.spawn("characters/dog", Vector3.ZERO, 0.0, dog)
+		dm.position = Vector3.ZERO
+		dog.anim = ClipPlayer.new(dm)
+		dog.setup(Nights.pos(dd))
+	var dock: Array = night.get("dock", [])
+	if dock.size() >= 2 and (bool(night.get("vacuumStart", false)) or (night.get("threats", []) as Array).has("vacuum")):
+		vacuum = VacuumAI.new()
+		vacuum.name = "Robot vacuum"
+		add_child(vacuum)
+		var vm := _builder.spawn("characters/robot_vacuum", Vector3.ZERO, 0.0, vacuum)
+		vm.position = Vector3.ZERO
+		vacuum.dock = Nights.pos(dock) + Vector3(-0.3, 0, 0)
+		vacuum.global_position = vacuum.dock
+		vacuum.grid = NavGrid.new(self, [], 0.04, 0.075, 0.05)
+		vacuum.visible = false
+		if bool(night.get("vacuumStart", false)):
+			vacuum.start()
+	for sd in night.get("sleepers", []):
+		var z := Sleeper.new()
+		z.name = "Sleeper"
+		add_child(z)
+		var kid := str(sd.get("kind", "")) == "kid"
+		var at := Nights.world(float(sd.x), float(sd.y), float(sd.get("bedH", 0)))
+		if kid:
+			var hit := ray(at + Vector3.UP * 1.5, at + Vector3.DOWN * 0.5)
+			if not hit.is_empty(): at.y = hit.position.y
+		else:
+			_builder.spawn("props/sleeping_bag", Nights.world(float(sd.x), float(sd.y)), rad_to_deg(Nights.yaw_to(Nights.dir(float(sd.get("face", 0))))) + 90.0, _builder.decor)
+		z.global_position = at
+		z.rotation.y = Nights.yaw_to(Nights.dir(float(sd.get("face", 0))))
+		var m := _builder.spawn("characters/kid" if kid else "characters/guest", at, 0.0, z)
+		m.position = Vector3.ZERO
+		m.rotation = Vector3.ZERO
+		z.setup(sd, m)
+		sleepers.append(z)
+	var age := float(night.get("pupAge", 0.62))
+	var list: Array = night.get("pups", [])
+	for i in list.size():
+		var pp := Pup.new()
+		pp.name = "Pup " + str(list[i])
+		add_child(pp)
+		var m := _builder.spawn("characters/rat_pup", Vector3.ZERO, 0.0, pp)
+		m.position = Vector3.ZERO
+		m.scale = Vector3.ONE * (0.75 + age * 0.55)
+		pp.global_position = hole + Vector3(0.2 + i * 0.12, 0, -0.2 - i * 0.1)
+		pp.rotation.y = PI
+		pp.setup(str(list[i]), i, m)
+		pups.append(pp)
+
+
 # ---------- queries ----------
 
 func ray(a: Vector3, b: Vector3) -> Dictionary:
@@ -217,13 +312,31 @@ func _keep_broken(a: String) -> bool:
 		"caught": return lives < 3
 		"seenOwner": return run.seenOwner
 		"poison": return run.poisonDelivered
+		"dogChase": return run.dogChased
+		"dogWoke": return run.dogWoke
+		"pup": return run.pupCaught
+		"sticky": return run.stuck
+		"cage": return run.caged
+		"sleeper": return run.sleeperWoke
+		"tv": return tv_on
+		"balloon":
+			for z in noisy:
+				if z.kind == "balloon" and z.used: return true
+			return false
 	return tasks.knocked.has(a)
 
 
 # ---------- events ----------
 
 ## A noise heard within radius (m). amt: how much it disturbs a sleeping cat at point-blank range (1 wakes it).
-func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, from_knock := false) -> void:
+func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, from_knock := false, src := "") -> void:
+	if _storm_mask > 0.0 and not from_knock:
+		return  # the thunder drowns it out
+	if big:
+		for pp in pups:
+			if pp.kind == "shy" and not pp.lost() and pp.global_position.distance_to(at) < 3.5:
+				pp.freeze_t = 3.0
+				pp.force_say("Eek! I can’t move!", 1.8)
 	if amt < 0.0:
 		amt = 0.9 if big else (0.3 if radius > 1.5 else 0.4)
 	_alarm += 7.0 if big else (0.5 if radius > 1.5 else (2.0 if radius > 1.0 else 0.0))
@@ -231,6 +344,10 @@ func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, fr
 		bubble_at(label, at + Vector3.UP * 0.24, 1.4, Color(0.95, 0.76, 0.3))
 	owner_ai.hear(at, radius, big)
 	cat.hear(at, radius, big, amt, from_knock)
+	for z in sleepers:
+		z.hear(at, radius, amt)
+	if dog and src != "dog":
+		dog.hear(at, radius, amt)
 
 
 func add_alarm(a: float) -> void:
@@ -274,6 +391,7 @@ func caught(text: String, at: Vector3) -> void:
 		return
 	lives -= 1
 	run.caught = true
+	rat.carrier = null
 	bubble_at(text, at, 1.6, Color(0.91, 0.4, 0.29))
 	for f in rat.carried:
 		f.carried = false
@@ -294,6 +412,10 @@ func caught(text: String, at: Vector3) -> void:
 
 func knock_landed(k: Knockable, at: Vector3) -> void:
 	noise(at, 4.6, k.sound(), true, -1.0, true)
+	if vacuum and vacuum.on and vacuum.global_position.distance_to(at) < 0.8:
+		vacuum.stun()
+	if dog:
+		dog.distract(at, k.kind)
 	if k.spawn != "":
 		spawn_food(k.spawn, at + Vector3(0.14, 0, 0), "", false)
 	for t in traps:
@@ -338,11 +460,16 @@ func _process(dt: float) -> void:
 		return
 	grace_t = maxf(0.0, grace_t - dt)
 	var rp := rat.global_position
+	prompt = ""
 	_tick_rat_noise(dt)
 	_pick_up(rp)
 	_tick_zones(rp, dt)
 	_tick_knockables(rp)
 	_tick_sniff(dt)
+	_tick_gnaw(dt)
+	_tick_sticky(dt)
+	_tick_world(dt)
+	_tick_pups(dt)
 	_tick_food_visibility(rp)
 	for t in traps:
 		if t.sprung or rp.y > 0.05 or rat.jumping or Vector2(t.global_position.x - rp.x, t.global_position.z - rp.z).length() > 0.12:
@@ -362,7 +489,10 @@ func _process(dt: float) -> void:
 	tasks.tick()
 	_tick_wanted(dt)
 	if fed >= int(night.goal) and (not tasks.has_tasks() or tasks.chain_done()):
-		_end(true, "The nest is full!", "The pups are fed. Next night: " + str(night.get("teaser", "")))
+		if bool(night.get("finale", false)):
+			_end(true, "The End", "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom.")
+		else:
+			_end(true, "The nest is full!", "The pups are fed. Next night: " + str(night.get("teaser", "")))
 
 
 func _tick_rat_noise(dt: float) -> void:
@@ -490,6 +620,9 @@ func _pick_scent(first: bool) -> void:
 		var f: Food = cand[i][1]
 		_scent.append(f)
 		f.reveal_t = 7.0
+		if f.poison and not f.has_meta("seen"):
+			f.set_meta("seen", true)
+			tasks.flag("poisonSeen")
 		if f.hidden and f.global_position.distance_to(rp) < 1.6:
 			f.hidden = false
 			bubble_at("Something hidden here!", f.global_position + Vector3.UP * 0.2, 1.6)
@@ -527,10 +660,25 @@ func _tick_flags() -> void:
 	if owner_ai.in_room():
 		if rat.hidden(): tasks.set_flag("hidFromOwner")
 		if owner_ai.mode == OwnerAI.Mode.DRINK: tasks.set_flag("ownerDrinking")
+	for z in sleepers:
+		if z.awake_t <= 0.0 and z.global_position.distance_to(rp) < 1.3: tasks.set_flag("passSleeper")
+	if not pups.is_empty():
+		var home := true
+		for pp in pups:
+			if pp.global_position.distance_to(hole) > 0.6: home = false
+			if not gnaws.is_empty() and pp.global_position.distance_to(gnaws[0].global_position) < 0.7: tasks.set_flag("pupAtBag")
+		if home: tasks.set_flag("pupHome")
+	for zd in night.get("zones", []):
+		var a := Nights.world(float(zd.x), float(zd.y))
+		var b := Nights.world(float(zd.x) + float(zd.w), float(zd.y) + float(zd.h))
+		if rp.x >= a.x and rp.x <= b.x and rp.z >= a.z and rp.z <= b.z:
+			tasks.set_flag("zone_" + str(zd.id))
 
 
 func _tick_wanted(dt: float) -> void:
-	var seen := cat.sees or owner_ai.sees
+	var seen := cat.sees or owner_ai.sees or (dog != null and dog.sees)
+	for z in sleepers:
+		if z.sees_rat(): seen = true
 	_unseen = 0.0 if seen else _unseen + dt
 	if rat.in_nest and _unseen > 1.0: _alarm -= dt * 14.0
 	elif _unseen > 4.0: _alarm -= dt * 5.0
@@ -571,12 +719,258 @@ func _on_stars(ns: int, os: int) -> void:
 
 
 func _trigger_threat(t: String) -> void:
+	if t == "vacuum" and vacuum: vacuum.start()
 	if t == "cat": cat.wake_up()
 	elif t == "traps": place_traps(3)
 	elif t == "poison":
 		var c := foods.filter(func(f): return f.is_cheese() and not f.poison and not f.carried)
 		if not c.is_empty(): c.pick_random().make_poison()
 		spawn_random("cheese")
+
+
+# ---------- room mechanics: bags, sticky traps, tunnels, the storm, the washer, the exit, pups ----------
+
+func _tick_gnaw(dt: float) -> void:
+	for gs in gnaws:
+		if gs.near(rat):
+			prompt = "Hold F — gnaw it open" if not gs.done else ""
+			if Input.is_action_pressed("push"):
+				gs.gnaw(dt)
+			return
+
+
+func _tick_sticky(dt: float) -> void:
+	if rat.stuck_t > 0.0:
+		rat.stuck_t -= dt
+		_stuck_snd -= dt
+		prompt = "Stuck! Wait it out…"
+		if _stuck_snd <= 0.0:
+			_stuck_snd = 0.6
+			noise(rat.global_position, 2.0, "Gnaw gnaw" if rat.stuck_t > 2.5 else "Squeak! Stuck!", false, 0.4)
+		if rat.stuck_t <= 0.0:
+			_stuck_imm = 1.6
+		return
+	_stuck_imm = maxf(0.0, _stuck_imm - dt)
+	if _stuck_imm > 0.0 or rat.jumping or rat.carrier:
+		return
+	for z in zones:
+		if z is StickyZone and absf(rat.global_position.y - z.global_position.y) < 0.06 and z.contains_xz(rat.global_position, 0.0):
+			rat.stuck_t = z.time
+			run.stuck = true
+			if z.kind == "cage":
+				run.caged = true
+			tasks.flag("stuck")
+			bubble_at(z.label, rat.global_position + Vector3.UP * 0.3, 1.6)
+			return
+
+
+## The crack the rat stands in, if it leads somewhere through the wall (night tunnels). -1 if none.
+func _tunnel_from() -> int:
+	var tl: Array = night.get("tunnels", [])
+	if tl.is_empty() or rat.jumping or rat.global_position.y > 0.05:
+		return -1
+	for i in cracks.size():
+		if Vector2(cracks[i].x - rat.global_position.x, cracks[i].z - rat.global_position.z).length() < 0.3:
+			for t in tl:
+				if int(t.a) == i: return int(t.b)
+				if int(t.b) == i: return int(t.a)
+	return -1
+
+
+## Called by the rat when Space is pressed: crawl through the wall if she's in a linked crack.
+func use_tunnel() -> bool:
+	var to := _tunnel_from()
+	if to < 0 or to >= cracks.size():
+		return false
+	rat.teleport(cracks[to], rat.rotation.y + PI)
+	tasks.flag("tunnel")
+	bubble_at("…through the wall", cracks[to] + Vector3.UP * 0.25, 1.4, Color(0.62, 0.82, 0.48))
+	return true
+
+
+## Effects of noisy things (NoisyZone calls this): the TV, the washing machine, the night light.
+func noisy_effect(kind: String, z: Zone) -> void:
+	tasks.flag("mistakes")
+	match kind:
+		"remote":
+			if tv_light:
+				tv_on = true
+				tv_light.visible = true
+				if cat.mode == CatAI.Mode.SLEEP:
+					cat.wake_up(rat.global_position)
+		"washer":
+			_wash_t = 45.0
+			tasks.set_flag("washer")
+			bubble_at("Rumble rumble…", z.global_position + Vector3.UP * 0.6, 2.0)
+			_wash_zone = _builder.add_zone(HumZone, "Washer hum", z.global_position, Vector3(6.0, 1.5, 6.0))
+			zones.append(_wash_zone)
+		"nightlight":
+			if room_light and not owner_ai.in_room():
+				room_light.visible = true
+				_light_t = 6.0
+		"puddle", "litter":
+			if dog: dog.wash_trail()
+
+
+func _tick_world(dt: float) -> void:
+	var rp := rat.global_position
+	if prompt.begins_with("Space"):
+		prompt = ""
+	if _tunnel_from() >= 0:
+		prompt = "Space — crawl through the wall"
+	if _wash_t > 0.0:
+		_wash_t -= dt
+		if _wash_t <= 0.0 and _wash_zone:
+			if _wash_zone.inside: _wash_zone.exit(rat)
+			zones.erase(_wash_zone)
+			_wash_zone.queue_free()
+			_wash_zone = null
+	if _light_t > 0.0:
+		_light_t -= dt
+		if _light_t <= 0.0 and not owner_ai.in_room() and room_light:
+			room_light.visible = false
+	if bool(night.get("catBell", false)) and cat.awake() and cat.speed > 0.2:
+		_bell_t -= dt
+		if _bell_t <= 0.0:
+			_bell_t = 1.6
+			if cat.global_position.distance_to(rp) < 6.0:
+				bubble_on("♪ ding", cat, 0.42, 0.8)
+	if bool(night.get("storm", false)):
+		_tick_storm(dt, rp)
+	if exit_point != Vector3.ZERO and Vector2(rp.x - exit_point.x, rp.z - exit_point.z).length() < 0.45:
+		tasks.set_flag("exitMom")
+		if not pups.is_empty():
+			var all := true
+			for pp in pups:
+				if pp.lost() or pp.global_position.distance_to(exit_point) > 0.75: all = false
+			if all: tasks.set_flag("allOut")
+	_tick_lights(dt)
+	_last_rp = rp
+
+
+func _tick_storm(dt: float, rp: Vector3) -> void:
+	_next_bolt -= dt
+	_flash_t = maxf(0.0, _flash_t - dt)
+	_storm_mask = maxf(0.0, _storm_mask - dt)
+	if _next_bolt <= 0.0:
+		_next_bolt = 11.0 + randf() * 9.0
+		_flash_t = 0.35
+		_thunder_t = 1.1
+		if rat.hidden():
+			tasks.set_flag("hidLightning")
+		else:
+			# the flash shows her to anyone looking
+			if cat.awake() and cat.global_position.distance_to(rp) < 4.2:
+				cat.hear(rp, 6.0, true, 0.0, false)
+			owner_ai.hear(rp, 5.0, true)
+	if _thunder_t > 0.0:
+		_thunder_t -= dt
+		if _thunder_t <= 0.0:
+			_storm_mask = 2.6
+			bubble_at("BOOM", rp + Vector3.UP * 0.9, 1.2, Color(0.81, 0.85, 1.0))
+	if _storm_mask > 0.0:
+		_mud += Vector2(rp.x - _last_rp.x, rp.z - _last_rp.z).length()
+		if _mud > 0.6:
+			tasks.set_flag("thunderMove")
+	else:
+		_mud = 0.0
+	if env:
+		env.ambient_light_energy = _ambient * (0.55 if _blackout else 1.0) + _flash_t * 4.0
+	if moon:
+		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) + _flash_t * 5.0
+	var bo := float(night.get("blackout", 0))
+	if bo > 0.0 and not _blackout and night_time > float(night.get("seconds", 900)) * bo:
+		_blackout = true
+		_light_mul = 0.25
+		tv_on = false
+		if tv_light: tv_light.visible = false
+		if room_light: room_light.visible = false
+		owner_ai.room_light = null
+		banner("The power went out!", "It’s pitch dark. Thunder still hides your steps.", 3.5)
+		if rat.in_nest or rp.distance_to(hole) < 0.6:
+			tasks.set_flag("homeAtBlackout")
+
+
+func _tick_lights(dt: float) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
+	for i in flickers.size():
+		var f: Array = flickers[i]
+		var l: OmniLight3D = f[0]
+		if not is_instance_valid(l):
+			continue
+		match str(f[2]):
+			"fire": l.light_energy = float(f[1]) * _light_mul * (0.82 + 0.12 * sin(t * 7.3 + i) + 0.08 * sin(t * 13.1 + i * 2.0))
+			"tv":
+				l.light_energy = float(f[1]) * (1.9 if tv_on else 1.0) * (0.8 + 0.2 * sin(t * 3.0) * sin(t * 5.7 + 1.0))
+			_: l.light_energy = float(f[1]) * _light_mul
+
+
+func nearest_floor_food(from: Vector3, r: float, allow_poison: bool) -> Food:
+	var best: Food = null
+	var bd := r
+	for f in foods:
+		if f.carried or f.is_find or f.big() or f.global_position.y > 0.03 or (f.poison and not allow_poison):
+			continue
+		var near_trap := false
+		for t in traps:
+			if t.found and not t.sprung and t.global_position.distance_to(f.global_position) < 0.3: near_trap = true
+		if near_trap:
+			continue
+		var d := f.global_position.distance_to(from)
+		if d < bd:
+			bd = d
+			best = f
+	return best
+
+
+func _tick_pups(dt: float) -> void:
+	if pups.is_empty():
+		return
+	pup_warn_t -= dt
+	var rp := rat.global_position
+	if rat.surface_id == "floor" and not rat.jumping and rp.y < 0.05:
+		if _mom_trail.is_empty() or (_mom_trail[-1] as Vector3).distance_to(rp) > 0.08:
+			_mom_trail.append(rp)
+			if _mom_trail.size() > 80: _mom_trail.pop_front()
+	_idle_t = 0.0 if rat.moving() else _idle_t + dt
+	if Input.is_action_just_pressed("pups"):
+		var any_follow := false
+		for pp in pups:
+			if pp.mode == Pup.Mode.FOLLOW or pp.mode == Pup.Mode.FETCH: any_follow = true
+		for pp in pups:
+			if pp.lost() or pp.mode == Pup.Mode.CARRY:
+				continue
+			if any_follow:
+				pp.mode = Pup.Mode.STAY
+				var best: Vector3 = pp.global_position
+				var bd := 1.4
+				var found := false
+				for z in zones:
+					if z is HideSpot:
+						var d: float = z.global_position.distance_to(pp.global_position)
+						if d < bd:
+							bd = d
+							best = Vector3(z.global_position.x, 0, z.global_position.z)
+							found = true
+				pp.target = best
+				pp.force_say("I’ll hide here!" if found else "I’ll wait!")
+				tasks.set_flag("pupStay")
+			else:
+				pp.mode = Pup.Mode.FOLLOW
+				pp.force_say("Coming, Mom!")
+	if Input.is_action_just_pressed("fetch"):
+		for pp in pups:
+			if pp.mode == Pup.Mode.FOLLOW or pp.mode == Pup.Mode.STAY:
+				var f := nearest_floor_food(rp, 2.0, false)
+				if f:
+					pp.mode = Pup.Mode.FETCH
+					pp.target = f
+					pp.force_say("I’ll get it!")
+				else:
+					pp.force_say("I don’t see any food nearby")
+				break
+	for pp in pups:
+		pp.tick(dt, _mom_trail, _idle_t)
 
 
 # ---------- spawning ----------

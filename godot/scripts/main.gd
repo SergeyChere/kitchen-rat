@@ -169,6 +169,8 @@ static func _setup_input() -> void:
 	_key("pause", [KEY_ESCAPE], -1, [JOY_BUTTON_START])
 	_key("restart", [KEY_R])
 	_key("menu", [KEY_M], -1, [JOY_BUTTON_BACK])
+	_key("pups", [KEY_Q], -1, [JOY_BUTTON_RIGHT_SHOULDER])
+	_key("fetch", [KEY_R], -1, [JOY_BUTTON_DPAD_UP])
 	_key("look_left", [], -1, [], JOY_AXIS_RIGHT_X, -1.0)
 	_key("look_right", [], -1, [], JOY_AXIS_RIGHT_X, 1.0)
 	_key("look_up", [], -1, [], JOY_AXIS_RIGHT_Y, -1.0)

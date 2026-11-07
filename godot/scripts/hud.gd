@@ -122,7 +122,10 @@ func _draw_hud() -> void:
 		var mom := str(n.get("introMom", ""))
 		if mom != "":
 			_wrap(Vector2(W / 2 - 320, H * 0.3 + 140), "Mom: “" + mom + "”", 640, 15, HINT, HORIZONTAL_ALIGNMENT_CENTER)
-		_wrap(Vector2(W / 2 - 400, H * 0.66), "WASD move · Mouse look · Shift run · Ctrl or C sneak · Space jump (aim at the yellow ring) · E or right mouse sniff · F push · Esc pause", 800, 15, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+		var keys := "WASD move · Mouse look · Shift run · Ctrl or C sneak · Space jump (aim at the yellow ring) · E or right mouse sniff · F push / hold to gnaw · Esc pause"
+		if not g.pups.is_empty():
+			keys += " · Q pups wait / follow · R pup fetches food"
+		_wrap(Vector2(W / 2 - 400, H * 0.66), keys, 800, 15, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		_text(Vector2(0, H * 0.8), "Loading…" if g.grid == null else "Click to start", 30, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
 		return
 
@@ -135,6 +138,25 @@ func _draw_hud() -> void:
 			_text(sp + Vector2(-40, -10), "Zzz", 14, Color.WHITE, 80, HORIZONTAL_ALIGNMENT_CENTER)
 			_canvas.draw_rect(Rect2(sp.x - 30, sp.y - 4, 60, 6), BAR_BG)
 			_canvas.draw_rect(Rect2(sp.x - 30, sp.y - 4, 60 * g.cat.sleep, 6), SLEEP)
+
+	# the dog's and sleepers' Zzz bars
+	if cam:
+		var sl := []
+		if g.dog and g.dog.mode == DogAI.Mode.SLEEP: sl.append([g.dog, g.dog.sleep, "Dog · Zzz", 0.8])
+		for z in g.sleepers:
+			sl.append([z, 0.0 if z.awake_t > 0.0 else z.sleep, "AWAKE!" if z.awake_t > 0.0 else ("Kid · Zzz" if z.kind == "kid" else "Guest · Zzz"), 1.0])
+		for e in sl:
+			var nd: Node3D = e[0]
+			if nd.global_position.distance_to(g.rat.global_position) > 5.0:
+				continue
+			var wp: Vector3 = nd.global_position + Vector3.UP * float(e[3])
+			if cam.is_position_behind(wp):
+				continue
+			var sp := cam.unproject_position(wp) / s
+			var col := Color(0.91, 0.4, 0.29) if str(e[2]) == "AWAKE!" else Color.WHITE
+			_text(sp + Vector2(-50, -10), str(e[2]), 14, col, 100, HORIZONTAL_ALIGNMENT_CENTER)
+			_canvas.draw_rect(Rect2(sp.x - 30, sp.y - 4, 60, 6), BAR_BG)
+			_canvas.draw_rect(Rect2(sp.x - 30, sp.y - 4, 60 * float(e[1]), 6), SLEEP)
 
 	# top-left: night, clock, lives, wanted
 	_canvas.draw_rect(Rect2(12, 12, 270, 80), PANEL)
@@ -166,8 +188,20 @@ func _draw_hud() -> void:
 	for i in _toasts.size():
 		_text(Vector2(0, 190 + i * 26), _toasts[i][0], 16, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
 
+	# the pups that came along
+	if not g.pups.is_empty():
+		var py := 70.0
+		_canvas.draw_rect(Rect2(W - 222, py, 210, 26 + 20 * g.pups.size()), PANEL)
+		_text(Vector2(W - 212, py + 18), "Pups  ·  Q wait/follow  ·  R fetch", 12, HINT)
+		for i in g.pups.size():
+			var pp: Pup = g.pups[i]
+			var st: String = ["following", "waiting", "fetching", "bringing food", "CAUGHT!", "STUCK!"][pp.mode]
+			_text(Vector2(W - 212, py + 40 + 20 * i), "%s · %s" % [pp.title, st], 14, Color(0.91, 0.4, 0.29) if pp.lost() else Color.WHITE)
+
 	_draw_tasks(g, H)
-	if g.rat.has_jump_target() and g.state == "play":
+	if g.state == "play" and g.prompt != "":
+		_text(Vector2(0, H - 50), g.prompt, 16, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
+	elif g.rat.has_jump_target() and g.state == "play":
 		_text(Vector2(0, H - 50), "Space — jump", 16, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
 
 	if g.state == "pause":

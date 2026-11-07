@@ -31,6 +31,25 @@ func _run(host: Node) -> void:
 	if name == "owner":
 		await _owner(host)
 		return
+	if name == "hides":
+		await _hides(host)
+		return
+	if name == "probe":
+		await _wait(host, 0.3)
+		for zi in range(0, 14):
+			var z := 3.35 - zi * 0.05
+			var row := "z %.2f:" % z
+			for yi in [0.02, 0.05, 0.08, 0.11, 0.14]:
+				row += " y%.2f=%s" % [yi, "." if g.sphere_free(Vector3(-3.0, yi, z), 0.02) else "#"]
+			print(row)
+		print("hole ", g.hole)
+		host.get_tree().quit()
+		return
+	if name == "mech":
+		await _mech(host)
+		print("DONE")
+		host.get_tree().quit()
+		return
 	var rat := g.rat
 	print("TEST ", name, " night ", g.night_id, " foods ", g.foods.size(), " zones ", g.zones.size(), " knock ", g.knockables.size())
 	await _wait(host, 0.5)
@@ -123,3 +142,221 @@ func _owner(host: Node) -> void:
 	_check("task flag: the owner left", g.tasks.flag_value("ownerLeft") > 0)
 	print("DONE")
 	host.get_tree().quit()
+
+
+## Every hiding spot must have room for the rat, and she must be able to walk in from outside it.
+func _hides(host: Node) -> void:
+	await _wait(host, 0.5)
+	var rat := g.rat
+	print("TEST hides night ", g.night_id)
+	rat.frozen = true
+	for z in g.zones:
+		if not (z is HideSpot) or (z as HideSpot).id == "crack":
+			continue
+		var c: Vector3 = Vector3(z.global_position.x, 0.0, z.global_position.z)
+		var room := g.box_free(c + Vector3.UP * 0.066, Vector3(0.045, 0.05, 0.045))
+		# walk in: from any side that's free outside it
+		var got_in := false
+		if room:
+			for d in [Vector3.FORWARD, Vector3.BACK, Vector3.LEFT, Vector3.RIGHT]:
+				if got_in:
+					break
+				var half: float = (z.size.z if d.z != 0.0 else z.size.x) / 2.0 + 0.2
+				var p: Vector3 = c + (z.global_transform.basis * d) * half
+				if not g.sphere_free(p + Vector3.UP * 0.08, 0.06) or absf(p.x) > 4.7 or absf(p.z) > 2.9:
+					continue
+				rat.teleport(p + Vector3.UP * 0.02, 0)
+				await host.get_tree().physics_frame
+				for i in 80:
+					var to: Vector3 = c - rat.global_position
+					to.y = 0
+					rat.velocity = to.normalized() * 0.9 + Vector3.DOWN * 0.5
+					rat.move_and_slide()
+					await host.get_tree().physics_frame
+					if rat.hidden() and rat.hide_spot == z:
+						got_in = true
+						break
+		_check("%s at %s: room %s, walked in %s" % [(z as HideSpot).id, str(c), room, got_in], room and got_in)
+	print("DONE")
+	host.get_tree().quit()
+
+
+## Press in the physics step, so the game's _process in the same frame sees it as just pressed (like real input).
+func _press(host: Node, action: String) -> void:
+	await host.get_tree().physics_frame
+	Input.action_press(action)
+	await host.get_tree().process_frame
+	await host.get_tree().process_frame
+	Input.action_release(action)
+
+
+## The mechanics of whichever night is loaded.
+func _mech(host: Node) -> void:
+	var rat := g.rat
+	var id := g.night_id
+	print("TEST mech night ", id)
+	await _wait(host, 0.3)
+	if not (g.night.get("tunnels", []) as Array).is_empty():
+		var t: Dictionary = g.night.tunnels[0]
+		rat.teleport(g.cracks[int(t.a)], 0)
+		await _wait(host, 0.2)
+		_check("standing in a linked crack shows the prompt", g.prompt.begins_with("Space"), g.prompt)
+		var ok := g.use_tunnel()
+		await _wait(host, 0.2)
+		_check("crawled through the wall to the other crack", ok and rat.global_position.distance_to(g.cracks[int(t.b)]) < 0.2, str(rat.global_position))
+		_check("task flag: tunnel", g.tasks.flag_value("tunnel") > 0)
+	for z in g.zones:
+		if z is StickyZone:
+			rat.teleport(z.global_position + Vector3.UP * 0.02, 0)
+			await _wait(host, 0.3)
+			_check("stuck in the %s" % z.kind, rat.stuck_t > 0.0 and g.run.stuck, "stuck %.1f" % rat.stuck_t)
+			await _wait(host, z.time + 0.5)
+			_check("free again after a while", rat.stuck_t <= 0.0)
+			break
+	if not g.gnaws.is_empty():
+		var gs: GnawSpot = g.gnaws[0]
+		var n0 := g.foods.size()
+		rat.teleport(gs.global_position + Vector3(0.22, 0.02, 0), 0)
+		await _wait(host, 0.3)
+		_check("next to the bag: gnaw prompt", gs.near(rat) and g.prompt.contains("gnaw"), g.prompt)
+		for i in 160:
+			gs.gnaw(1.0 / 60.0)
+			await host.get_tree().process_frame
+		_check("gnawed open: food spilled", gs.done and g.foods.size() > n0, "%d → %d" % [n0, g.foods.size()])
+		_check("task flag: " + ("backpack" if gs.cookies else "gnaw"), g.tasks.flag_value("backpack" if gs.cookies else "gnaw") > 0)
+	for z in g.noisy:
+		if z.kind == "washer":
+			rat.teleport(z.global_position + Vector3.UP * 0.02, 0)
+			await _wait(host, 0.2)
+			rat.global_position += Vector3(0.02, 0, 0)
+			z._trigger(rat)
+			await _wait(host, 0.3)
+			_check("the washer started and hums", g.tasks.flag_value("washer") > 0 and g._wash_t > 40.0)
+		if z.kind == "remote" and g.tv_light:
+			z._trigger(rat)
+			await _wait(host, 0.2)
+			_check("the remote turned the TV on", g.tv_on and g.tv_light.visible)
+	if g.dog:
+		var dg := g.dog
+		_check("the dog sleeps at first", dg.mode == DogAI.Mode.SLEEP)
+		rat.teleport(Nights.world(500, 380, 1), 0)
+		await _wait(host, 1.0)
+		g.noise(dg.global_position + Vector3(0.3, 0, 0), 3.0, "Bang", true, 1.5)
+		await _wait(host, 0.5)
+		_check("a loud noise woke the dog", dg.mode != DogAI.Mode.SLEEP, str(dg.mode))
+		dg.global_position = Nights.world(700, 540)
+		dg.rotation.y = Nights.yaw_to(Vector3.LEFT)
+		dg.path.clear()
+		rat.teleport(Nights.world(580, 540, 1), 0)
+		var lives := g.lives
+		await _wait(host, 4.0)
+		_check("the dog chased and caught her", g.run.dogChased and g.lives < lives, "lives %d mode %d" % [g.lives, dg.mode])
+		for z in g.noisy:
+			if z.kind == "puddle" or z.kind == "litter":
+				dg.trail.append([rat.global_position, g.night_time])
+				g.noisy_effect(z.kind, z)
+				_check("the %s washed off the scent" % z.kind, dg.trail.is_empty() and g.tasks.flag_value("trailBroken") > 0)
+				break
+		for k in g.knockables:
+			if not k.knocked:
+				dg.mode = DogAI.Mode.TRACK
+				g.knock_landed(k, dg.global_position + Vector3(1.0, 0, 0))
+				_check("a knocked-over %s distracts the dog" % k.kind, dg.mode == DogAI.Mode.PLAY)
+				break
+	if g.vacuum:
+		var v := g.vacuum
+		if not v.on: v.start()
+		var p0 := v.global_position
+		await _wait(host, 3.0)
+		_check("the robot vacuum is driving around", v.global_position.distance_to(p0) > 0.3, str(v.global_position))
+		g.rat.teleport(v.global_position + Vector3(0.22, 0.01, 0), 0)
+		var star0 := g._alarm
+		await _wait(host, 0.6)
+		_check("bumped into her: BEEP BEEP (alarm)", g._alarm > star0, "%.1f → %.1f" % [star0, g._alarm])
+		await _wait(host, 2.6)
+		Input.action_press("sneak")
+		await _wait(host, 0.2)
+		await host.get_tree().physics_frame
+		rat.teleport(v.global_position + Vector3(0.05, 0.01, 0), 0)
+		await _wait(host, 3.6)
+		_check("sneaking onto it: riding the vacuum", rat.carrier == v and g.tasks.flag_value("ride") > 0, str(rat.carrier))
+		Input.action_release("sneak")
+		await _wait(host, 0.3)
+		_check("stops sneaking: hops off", rat.carrier == null)
+		v.stun()
+		var p1 := v.global_position
+		await _wait(host, 1.0)
+		_check("stunned by a fallen thing", v.global_position.distance_to(p1) < 0.01 and g.tasks.flag_value("vacBlock") > 0)
+	if not g.sleepers.is_empty():
+		var z: Sleeper = g.sleepers[0]
+		rat.teleport(Nights.world(300, 300, 1), 0)
+		await _wait(host, 0.3)
+		_check("the %s is asleep" % z.kind, z.awake_t <= 0.0 and z.sleep > 0.9)
+		var a0 := g._alarm
+		g.noise(z.global_position + Vector3(0.4, 0, 0.4), 3.0, "BANG", true, 1.5)
+		await _wait(host, 0.3)
+		_check("a loud noise woke the %s (alarm up)" % z.kind, z.awake_t > 0.0 and g.run.sleeperWoke and g._alarm > a0 + 15.0, "%.1f → %.1f" % [a0, g._alarm])
+		if z.kind == "kid":
+			_check("the kid's scream woke the cat", g.cat.awake() or str(g.night.get("cat", "")) == "away")
+	if not g.pups.is_empty():
+		var pp: Pup = g.pups[0]
+		if g.vacuum: g.vacuum.on = false
+		for t in g.traps: t.spring()
+		for z in g.zones.duplicate():
+			if z is StickyZone: g.zones.erase(z)
+		g.owner_ai.mode = OwnerAI.Mode.AWAY
+		g.cat.mode = CatAI.Mode.AWAY
+		g.cat.visible = false
+		g._alarm = 0.0
+		rat.teleport(Nights.world(260, 520, 1), 0)
+		for q in g.pups:
+			q.mode = Pup.Mode.FOLLOW
+			q.freeze_t = 0.0
+			q.global_position = Nights.world(240, 540)
+		rat.frozen = true
+		var start := pp.global_position
+		for i in 120:
+			rat.global_position += Vector3(0.012, 0, -0.004)
+			await host.get_tree().physics_frame
+		rat.frozen = false
+		await _wait(host, 1.0)
+		_check("%s follows Mom" % pp.title, pp.global_position.distance_to(rat.global_position) < 0.9, "%.2f m from Mom" % pp.global_position.distance_to(rat.global_position))
+		for i in 30:
+			if pp.mode != Pup.Mode.CARRY and pp.mode != Pup.Mode.FETCH: break
+			await _wait(host, 0.2)
+		await _press(host, "pups")
+		await _wait(host, 0.2)
+		_check("Q: the pups wait", pp.mode == Pup.Mode.STAY and g.tasks.flag_value("pupStay") > 0, str(pp.mode))
+		await _press(host, "pups")
+		await _wait(host, 0.2)
+		_check("Q again: they follow", pp.mode == Pup.Mode.FOLLOW)
+		g.spawn_food("crumb", rat.global_position + Vector3(0.6, 0, 0.1), "", false)
+		await _press(host, "fetch")
+		await _wait(host, 5.0)
+		_check("R: a pup fetches food and brings it home", g.tasks.flag_value("pupFetch") > 0 or pp.mode == Pup.Mode.CARRY, "mode %d fetched %d" % [pp.mode, g.tasks.flag_value("pupFetch")])
+		g.cat.visible = true
+		pp.capture("cat")
+		_check("caught by the cat: dropped by the cat bed", pp.mode == Pup.Mode.CAPTURED and g.run.pupCaught)
+		rat.teleport(pp.global_position + Vector3(0.12, 0.01, 0), 0)
+		await _wait(host, 0.3)
+		_check("Mom rescues the pup", not pp.lost() and g.tasks.flag_value("pupRescued") > 0, "mode %d surf %s d %.2f rat %s pup %s carrier %s" % [pp.mode, rat.surface_id, rat.global_position.distance_to(pp.global_position), str(rat.global_position), str(pp.global_position), str(rat.carrier)])
+	if bool(g.night.get("storm", false)):
+		g._next_bolt = 0.01
+		rat.teleport(Nights.world(150, 470, 1), 0)
+		await _wait(host, 1.4)
+		_check("lightning then thunder: noise masked", g._storm_mask > 0.0)
+		var a0 := g._alarm
+		g.noise(rat.global_position, 2.0, "Thud", false)
+		_check("thunder hides her noise", g._alarm == a0)
+		g.night_time = float(g.night.seconds) * float(g.night.blackout) + 0.1
+		await _wait(host, 0.3)
+		_check("the power goes out", g._blackout and not g.room_light.visible)
+	if g.exit_point != Vector3.ZERO:
+		rat.teleport(g.exit_point + Vector3.UP * 0.02, 0)
+		for pp in g.pups:
+			pp.global_position = g.exit_point + Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.2, 0.0))
+			pp.mode = Pup.Mode.STAY
+			pp.target = pp.global_position
+		await _wait(host, 0.3)
+		_check("Mom at the exit", g.tasks.flag_value("exitMom") > 0)
+		_check("the whole family is out", g.tasks.flag_value("allOut") > 0)

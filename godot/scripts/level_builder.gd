@@ -1,7 +1,8 @@
 class_name LevelBuilder
 extends RefCounted
 ## Builds a night's room at run time from the generated models (res://assets/models, made by tools/blender) and the
-## night data. So far: the kitchen layout, used by nights 1, 5, 6, 14 and 16. Positions use the prototype's room
+## night data. The kitchen (decor "kitchen") is laid out by hand like levels.js kitchenFurniture; every other room is
+## built from the night's furn list, the way the prototype's builder B[t] does it. Positions use the prototype's room
 ## coordinates in cm (x east, y south). Models face +Z; walls face into the room.
 
 const MODELS := "res://assets/models/"
@@ -111,6 +112,8 @@ func collide(n: Node3D, surface := "") -> void:
 		return
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
+		if _soft(m.name):
+			continue
 		var body := StaticBody3D.new()
 		body.collision_layer = 1
 		body.collision_mask = 0
@@ -120,6 +123,12 @@ func collide(n: Node3D, surface := "") -> void:
 		m.add_child(body)
 		if surface != "":
 			body.set_meta("surface", surface)
+
+
+## Cloth, blankets and screens: no collision, and they don't count for sizing.
+static func _soft(n: String) -> bool:
+	var l := n.to_lower()
+	return l.contains("cloth") or l.contains("blanket") or l.contains("pillow") or l.contains("teddy") or l.contains("screen")
 
 
 func furn_piece(path: String, x: float, y: float, rot: float, surface: String, w := 0.0, d := 0.0, h := 0.0) -> Node3D:
@@ -195,11 +204,15 @@ func build() -> void:
 	foods = group("Food")
 	_lighting()
 	_room()
-	_furniture()
+	if str(night.get("decor", "kitchen")) == "kitchen":
+		_furniture()
+	else:
+		RoomFurniture.new(self).build(night.get("furn", []))
 
 
 ## The second half runs after the physics engine knows the furniture (things are placed on top of it).
 func build_contents() -> void:
+	RoomFurniture.new(self).decor(str(night.get("decor", "kitchen")))
 	_decor()
 	_nest()
 	_knockables()
@@ -221,6 +234,7 @@ func _lighting() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	var we := WorldEnvironment.new()
 	we.environment = env
+	g.env = env
 	root.add_child(we)
 
 	var moon := DirectionalLight3D.new()
@@ -229,6 +243,7 @@ func _lighting() -> void:
 	moon.light_energy = 0.5 * float(pal.get("moon", 0.9))
 	moon.shadow_enabled = true
 	root.add_child(moon)
+	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
 
 	for l in night.get("lights", []):
@@ -239,6 +254,7 @@ func _lighting() -> void:
 		pl.shadow_enabled = true
 		root.add_child(pl)
 		pl.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)))
+		g.flickers.append([pl, pl.light_energy, "steady"])
 
 	var room := OmniLight3D.new()  # the ceiling light: off at night, the owner switches it on
 	room.name = "Ceiling light"
@@ -283,6 +299,11 @@ func _room() -> void:
 	for c in night.get("cracks", []):
 		var cx := float(c.get("x", 0)); var cy := float(c.get("y", 0))
 		match str(c.wall):
+			"s": g.cracks.append(W(cx, 588))
+			"n": g.cracks.append(W(cx, 12))
+			"w": g.cracks.append(W(12, cy))
+			_: g.cracks.append(W(948, cy))
+		match str(c.wall):
 			"s":
 				if south[_section(cx)] == null: south[_section(cx)] = "wall_crack"
 				_hide("crack", cx, 590, 44, 18)
@@ -305,7 +326,8 @@ func _room() -> void:
 	for p in [Vector2(-5, -5), Vector2(965, -5), Vector2(-5, 605), Vector2(965, 605)]:
 		box("Corner", W(p.x, p.y, 125), Vector3(0.1, 2.5, 0.1), trim, walls)
 
-	var shade := spawn("rooms/chandelier" if str(night.get("lamp", "")) == "chandelier" else "rooms/lamp_shade", W(480, 300), 0.0, decor)
+	var lamp := str(night.get("lamp", ""))
+	var shade := spawn("rooms/chandelier" if lamp == "chandelier" else ("rooms/lamp_bulb" if lamp == "bulb" else "rooms/lamp_shade"), W(480, 300), 0.0, decor)
 	if shade:
 		shade.global_position.y = 2.5 - world_aabb(shade).size.y
 
@@ -370,11 +392,19 @@ func _decor() -> void:
 				collide(spawn("props/bread_box", on_top(float(p.x) + float(p.w) / 2.0, float(p.y) + float(p.h) / 2.0), 0.0, decor))
 			"noisy":
 				_noisy(p)
-			_:
-				pass  # other props (TV, washer, sticky traps…) come with their rooms
+			"hum":
+				var hz := add_zone(HumZone, "Hum", on_top(float(p.x), float(p.y)), Vector3(float(p.get("r", 120)) / 50.0, 1.2, float(p.get("r", 120)) / 50.0))
+				hz.size.y = 1.2
+			"gnaw", "backpack":
+				_gnaw(p, str(p.t) == "backpack")
+			"sticky", "cage", "spray":
+				_sticky(p, str(p.t))
 	for f in night.get("furn", []):
 		if bool(f.get("plate", false)):
 			collide(spawn("food/plate", on_top(680, 432), 0.0, decor))
+	var ex: Array = night.get("exit", [])
+	if ex.size() >= 2:
+		_exit(Nights.pos(ex))
 	spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # no collision: the cat lies in it
 	if (night.get("bowl", []) as Array).size() >= 2:
 		collide(spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor))
@@ -423,6 +453,84 @@ func _noisy(p: Dictionary) -> void:
 	z.configure(kind)
 	if kind == "balloon" and n:
 		z.hide_when_used = n
+	g.noisy.append(z)
+
+
+## A bag (or the kid's backpack) the rat gnaws open by holding F: spills food.
+func _gnaw(p: Dictionary, cookies: bool) -> void:
+	var at := W(float(p.x), float(p.y)) if bool(p.get("floor", false)) else on_top(float(p.x), float(p.y))
+	var gs := GnawSpot.new()
+	gs.name = "Backpack" if cookies else "Bag"
+	decor.add_child(gs)
+	gs.global_position = at
+	gs.cookies = cookies
+	gs.spawn_n = int(p.get("spawn", 4))
+	gs.tag = str(p.get("tag", ""))
+	gs.model = spawn("props/backpack" if cookies else "props/grain_sack", at, randf_range(-30, 30), gs)
+	collide(gs.model)
+	g.gnaws.append(gs)
+
+
+## Sticky tape, a cage trap or a cloud of poison spray: the rat is stuck for a while.
+func _sticky(p: Dictionary, kind: String) -> void:
+	var w := float(p.get("w", 40 if kind == "cage" else 70))
+	var h := float(p.get("h", 40 if kind == "cage" else 70))
+	var c := Vector2(float(p.x) + w / 2.0, float(p.y) + h / 2.0)
+	var at := W(c.x, c.y) if (kind != "sticky" or bool(p.get("floor", false))) else on_top(c.x, c.y)
+	var z := add_zone(StickyZone, "Sticky: " + kind, at, Vector3(w / 100.0, 0.25, h / 100.0)) as StickyZone
+	z.kind = kind
+	match kind:
+		"sticky":
+			fit(spawn("props/sticky_tape", at + Vector3.UP * 0.002, 0.0, decor), w, h)
+		"cage":
+			z.time = 4.0
+			z.label = "A cage trap! Gnaw your way out!"
+			fit(spawn("props/cage_trap", at + Vector3.UP * 0.13, 0.0, decor), w, h)
+		"spray":
+			z.time = 1.4
+			z.label = "Cough! Cough! Poison spray!"
+			spawn("props/spray_can", at + Vector3(w / 250.0, 0, h / 250.0), 0.0, decor)
+			var cloud := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.5
+			sm.height = 1.0
+			cloud.mesh = sm
+			var cm := StandardMaterial3D.new()
+			cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			cm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			cm.albedo_color = Color(0.6, 0.91, 0.42, 0.22)
+			cm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			cloud.material_override = cm
+			cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			decor.add_child(cloud)
+			cloud.global_position = at + Vector3.UP * 0.08
+			cloud.scale = Vector3(w / 100.0, 0.36, h / 100.0)
+
+
+## The finale: a glowing ring by the front door where the family slips out.
+func _exit(at: Vector3) -> void:
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.26
+	tm.outer_radius = 0.32
+	tm.rings = 32
+	ring.mesh = tm
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0.62, 0.91, 0.48, 0.75)
+	ring.material_override = m
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.scale = Vector3(1, 0.05, 1)
+	decor.add_child(ring)
+	ring.global_position = at + Vector3.UP * 0.01
+	var l := OmniLight3D.new()
+	l.light_color = Color(0.72, 1.0, 0.6)
+	l.light_energy = 1.2
+	l.omni_range = 2.0
+	decor.add_child(l)
+	l.global_position = at + Vector3.UP * 0.3
+	g.exit_point = at
 
 
 static func _knock_model(kind: String) -> String:

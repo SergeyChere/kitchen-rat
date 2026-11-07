@@ -5,8 +5,9 @@ class_name Nights
 
 const ROOM_W := 960.0
 const ROOM_D := 600.0
-## Nights whose room is built so far (they all take place in the kitchen).
-const BUILT := ["kitchen", "kitchen2", "water", "party", "vacuum"]
+## Every night is built (the menu still checks this list).
+const BUILT := ["kitchen", "living", "living2", "pantry", "kitchen2", "water", "flashlight", "dining", "laundry", "storm",
+	"traps", "sticky", "kids", "party", "poison", "vacuum", "dog", "basement", "floor", "moving"]
 
 
 static func world(x: float, y: float, h: float = 0.0) -> Vector3:

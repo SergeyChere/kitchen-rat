@@ -33,6 +33,8 @@ var noise_level := 0.0
 var surface_id := "floor"
 var blocked := false
 var carried: Array[Food] = []
+var carrier: Node3D  # riding the robot vacuum
+var stuck_t := 0.0  # caught in sticky tape, a cage or spray
 
 var _sneak_toggle := false
 var _jump_up := false
@@ -86,6 +88,8 @@ func carry(f: Food) -> void:
 ## Put her somewhere instantly (after being caught).
 func teleport(p: Vector3, yaw: float) -> void:
 	jumping = false
+	carrier = null
+	stuck_t = 0.0
 	global_position = p
 	rotation.y = yaw
 	velocity = Vector3.ZERO
@@ -105,8 +109,20 @@ func _physics_process(dt: float) -> void:
 		_tick_jump(dt)
 		_play_anim()
 		return
+	if carrier:
+		move_speed = 0.0
+		velocity = Vector3.ZERO
+		sneaking = Input.is_action_pressed("sneak") or _sneak_toggle
+		if Input.is_action_just_pressed("sneak_toggle"):
+			_sneak_toggle = not _sneak_toggle
+			sneaking = _sneak_toggle
+		_show_marker(false)
+		if anim: anim.play("sneak")
+		return
 
 	var mv := Input.get_vector("left", "right", "back", "forward")
+	if stuck_t > 0.0:
+		mv = Vector2.ZERO
 	if Input.is_action_just_pressed("sneak_toggle"):
 		_sneak_toggle = not _sneak_toggle
 	sniffing = Input.is_action_pressed("sniff") and is_on_floor()
@@ -142,7 +158,11 @@ func _physics_process(dt: float) -> void:
 	_update_surface()
 	_find_jump_target()
 	if Input.is_action_just_pressed("jump"):
-		if _has_target and not (_target_up and dragging()):
+		if stuck_t > 0.0:
+			pass
+		elif Game.I.use_tunnel():
+			pass
+		elif _has_target and not (_target_up and dragging()):
 			_start_jump(_target, _target_up)
 		elif is_on_floor():
 			velocity.y = 2.2

@@ -56,6 +56,7 @@ func _trigger(rat: Rat) -> void:
 	_cd = cooldown
 	used = true
 	Game.I.noise(rat.global_position, radius, sound, big, amount)
+	Game.I.noisy_effect(kind, self)
 	if hide_when_used:
 		hide_when_used.visible = false
 	if sneak_flag != "" and _hint <= 0.0 and Game.I.tasks.flag_value(sneak_flag) == 0:
