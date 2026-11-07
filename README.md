@@ -116,7 +116,9 @@ game/            The game itself (three.js r128), runs offline
   vendor/        three.js and fonts
 electron/        Desktop shell: window, fullscreen, quit button bridge
 build/icon.png   App icon (used by the window and the installers)
-unity/           Unity port in progress (C#). Behind the HTML version, see unity/README.md
+unity/           Unity project (Unity 6, C#): night 1 playable with the generated models, see unity/README.md
+tools/blender/   Scripts that generate every model into unity/Assets/Art (Blender as a Python module)
+art/             Model previews and the list of models
 docs/            Game design notes and roadmap
 .github/         CI that builds the desktop app for Windows, macOS and Linux
 ```

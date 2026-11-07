@@ -30,11 +30,11 @@ def wall(name, extra=None, cut=None):
 
 
 def wall_mousehole():
+    """A real 22 × 22 cm opening at the bottom, with an arched trim: the rat walks through it to the nest."""
     def ex(parts, mov):
-        parts += [cyl(10, 12, 0, -5, 10, mat(0x120a08), verts=16, rot=(90, 0, 0)), box(20, 12, 10, 0, -5, 0, mat(0x120a08)),
-                  torus(10.5, 1.2, 0, -7, 10, mat(TRIM), seg=16, rseg=4, rot=(90, 0, 0))]
-        mov['glow'] = [cyl(8, 0.5, 0, 0, 9, mat(0xffb060, 0.5, 0, 1, 3), verts=14, rot=(90, 0, 0))]
-    return wall('wall_mousehole', ex)
+        T = mat(TRIM)
+        parts += [torus(11.5, 1.4, 0, -6, 11, T, seg=16, rseg=4, rot=(90, 0, 0)), box(3, 2.4, 11, -12.5, -6, 0, T), box(3, 2.4, 11, 12.5, -6, 0, T)]
+    return wall('wall_mousehole', ex, cut=(-11, 11, 0, 22))
 
 
 def wall_crack():

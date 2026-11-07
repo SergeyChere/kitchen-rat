@@ -43,7 +43,7 @@ def setup_cam(objs):
 
 def main():
     from PIL import Image, ImageDraw
-    tmp = os.path.join(lib.ROOT, 'previews', '_tmp')
+    tmp = os.path.join(lib.DOCS, 'previews', '_tmp')
     os.makedirs(tmp, exist_ok=True)
     tiles = []
     for name, shots in SHOTS.items():
@@ -79,7 +79,7 @@ def main():
         img.paste(Image.open(p).convert('RGB'), (x, y))
         dr.text((x + 6, y + TILE + 3), label, fill=(230, 226, 214))
         os.remove(p)
-    img.save(os.path.join(lib.ROOT, 'previews', 'characters_poses.png'))
+    img.save(os.path.join(lib.DOCS, 'previews', 'characters_poses.png'))
 
 
 main()

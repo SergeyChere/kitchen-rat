@@ -12,7 +12,9 @@ import bmesh
 from mathutils import Vector
 
 CM = 0.01
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'art'))
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+ROOT = os.path.join(REPO, 'unity', 'Assets', 'Art')   # models go straight into the Unity project
+DOCS = os.path.join(REPO, 'art')                      # previews and MODELS.md
 _mats = {}
 
 

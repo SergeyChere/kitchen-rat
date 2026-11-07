@@ -54,7 +54,7 @@ def sheet(cat):
     from PIL import Image, ImageDraw
     src = os.path.join(lib.ROOT, cat)
     files = sorted(f for f in os.listdir(src) if f.endswith('.fbx'))
-    tmp = os.path.join(lib.ROOT, 'previews', '_tmp')
+    tmp = os.path.join(lib.DOCS, 'previews', '_tmp')
     os.makedirs(tmp, exist_ok=True)
     tiles = []
     for f in files:
@@ -69,7 +69,7 @@ def sheet(cat):
         x, y = (i % cols) * TILE, (i // cols) * (TILE + 18)
         img.paste(Image.open(p).convert('RGB'), (x, y))
         dr.text((x + 6, y + TILE + 3), name, fill=(230, 226, 214))
-    path = os.path.join(lib.ROOT, 'previews', cat + '.png')
+    path = os.path.join(lib.DOCS, 'previews', cat + '.png')
     img.save(path)
     for _, p in tiles:
         os.remove(p)

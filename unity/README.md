@@ -1,66 +1,45 @@
-# Kitchen Rat — Unity port (в работе)
+# Kitchen Rat — Unity project
 
-> Эта версия отстаёт от HTML-версии в папке `game/`: здесь пока нет прыжков, запаха, розыска, хозяина и новой графики.
-> План переноса описан в `docs/GAME_DESIGN.md`.
+The Unity version of the game. The three.js prototype in `game/` is the reference for how everything should feel.
 
-Стелс-игра: крыса-мама ночью таскает еду из кухни голодным крысятам и прячется от кота.
-Это перенос браузерного прототипа в Unity. Вся графика пока собрана из простых фигур (шары, коробки, цилиндры),
-их потом можно заменить на настоящие модели.
+## Open it
+1. Install **Unity 6 LTS** (6000.0.x) with Unity Hub. Any 6000.0 version works; the Hub may offer to convert, say yes.
+2. Unity Hub → **Add → Add project from disk** → choose this `unity/` folder.
+3. The first import takes a few minutes (154 models). When it is done the kitchen scene is **built automatically** and opened:
+   `Assets/Scenes/Kitchen.unity`. If Unity asks to enable the new Input System backends, either answer works.
+4. Press **Play**, click the game view.
 
-## Как запустить
+Menu **Kitchen Rat → Build Kitchen Scene** rebuilds the scene from code at any time (after you change models or the layout).
+**Kitchen Rat → Reimport Art** reapplies the import settings to all models.
 
-1. Установи **Unity Hub** и **Unity 6** (подойдёт и Unity 2022.3 LTS).
-2. В Unity Hub: **New project → Universal 3D** (или **3D (Built-In Render Pipeline)**). HDRP не подойдёт.
-3. Скопируй папку `Assets/RatKitchen` из архива в папку `Assets` своего проекта.
-   Unity сам заметит новые файлы и скомпилирует скрипты.
-4. В верхнем меню редактора появится пункт **Rat Kitchen → Build Scene**. Нажми его.
-   Скрипт построит кухню, нору, крысу, кота, свет и сохранит сцену в `Assets/RatKitchen/Scenes/RatKitchen.unity`.
-5. Нажми **Play**.
+## Controls
+WASD move · mouse look · wheel zoom · Shift run · Ctrl or C sneak · Space jump (face a higher surface until the yellow ring
+appears) · E or right mouse sniff · F push things off · Esc pause · R restart.
 
-Если в проекте включена только новая система ввода (Input System) или только старая, код работает с обеими.
+## What is in the skeleton (night 1, "The Kitchen")
+- The kitchen from the prototype: counters, sink, fridge, island, table with chairs, stool, box, shelf, foil, bread box,
+  the mouse hole in the south wall and the nest behind it with four pups.
+- The rat: walk / run / sneak, aimed jumps onto chairs → table → counter, jumping down, sniffing with a scent trail, carrying
+  up to 3 pieces, delivering them in the nest. Animations play from the clips in the FBX.
+- Food: the night's fixed spots (the crumb by the table, the cheese on the plate, the hidden cheese by the bread box…) plus
+  random crumbs and cheese. A cheese is worth 5, a crumb 1, the goal is 15.
+- Noise: running is loud, foil crinkles unless you sneak, the mug on the table edge falls if you walk past it, F pushes the apple.
+- Cracks in the walls to hide in.
+- All 12 chain tasks of night 1, the 2 side tasks and the secret (the shiny button), shown bottom-left like in the prototype.
+- Clock 23:00 → 06:00 (15 minutes), a win screen when the nest is full and "Dawn came" when time runs out.
 
-## Управление
+Not yet: the cat and the owner, sound, menus and saving, nights 2–20.
 
-| Действие | Клавиша |
+## Layout
+| Path | What |
 |---|---|
-| Движение | WASD или стрелки |
-| Камера | мышь (курсор захватывается при клике по игре) |
-| Бег (шумный) | Shift |
-| Пауза, вернуть курсор | Esc или P |
-| Пропустить кат-сцену | Пробел или Enter |
+| `Assets/Art/` | Generated models (`tools/blender/run.py` writes here) and room textures |
+| `Assets/Scripts/Runtime/` | The game: `RatController`, `FollowCamera`, `GameManager` (rules + HUD), `TaskTracker`, `Nights` (night data), zones, food, knockables |
+| `Assets/Scripts/Editor/` | `ArtImport` (import settings, toon materials), `KitchenBuilder` (builds the scene) |
+| `Assets/Shaders/Toon.shader` | Flat banded shading like the prototype |
+| `Legacy/RatKitchen/` | The first, primitive-shapes port (cat with a vision cone, hide zones). Outside `Assets`, so Unity ignores it; kept as a reference for porting the cat |
 
-## Как собрать игру для Windows
+Night data is ported from `game/js/levels.js`: positions use the prototype's room coordinates in cm (x to the east,
+y to the south, origin at the north-west corner) and `Nights.World()` converts them to Unity metres.
 
-**File → Build Profiles** (в Unity 2022: **Build Settings**) → платформа **Windows** → **Build**.
-Сцена уже добавлена в список сцен сборки. На выходе получится папка с `.exe`.
-
-## Что где лежит
-
-| Файл | Что делает |
-|---|---|
-| `Scripts/GameManager.cs` | Правила ночи (цель 15 еды, 4 минуты, 3 жизни), появление еды, кат-сцены пробуждения и финала, весь интерфейс |
-| `Scripts/RatController.cs` | Движение крысы относительно камеры, бег, перенос еды, анимация сна и ходьбы |
-| `Scripts/CatAI.cs` | Кот: патруль по точкам, зрение конусом, слух, погоня, поиск |
-| `Scripts/ThirdPersonCamera.cs` | Камера от третьего лица на мыши, не залезает в мебель |
-| `Scripts/VisionCone.cs` | Конус зрения кота на полу |
-| `Scripts/HideZone.cs` | Укрытия (под столом, стульями, полкой) |
-| `Scripts/CatBlocker.cs` | Невидимые стенки, чтобы кот не залезал под стол |
-| `Scripts/FoodItem.cs` | Крошка (1 еда, 1 место) и сыр (5 еды, 2 места) |
-| `Scripts/Pup.cs` | Крысята: прыгают от голода, едят в финале |
-| `Scripts/GameInput.cs` | Весь ввод в одном месте |
-| `Scripts/Sight.cs` | Лучи видимости для кота и камеры |
-| `Editor/KitchenBuilder.cs` | Строит сцену по команде из меню |
-
-Почти все числа (скорости, дальность зрения кота, длина ночи, цель) вынесены в поля компонентов,
-их можно крутить прямо в Inspector, не трогая код.
-
-## Что делать дальше
-
-- **Модели вместо фигур.** Бесплатные крысы, коты и кухонная мебель есть в Unity Asset Store, либо можно сделать свои в Blender.
-  Удобнее всего заменить дочерние объекты-фигуры у `Rat`, `Cat` и мебели, оставив скрипты на корневых объектах.
-- **Анимации.** Сейчас движение сделано кодом. С настоящими моделями лучше перейти на Animator.
-- **Интерфейс.** Он нарисован через `OnGUI`, чтобы не тянуть лишних пакетов. Для релиза замени на Canvas + TextMeshPro или UI Toolkit.
-- **Путь кота.** Сейчас кот ходит по точкам и обходит препятствия «на ощупь». Для сложных уровней стоит подключить
-  пакет AI Navigation (NavMesh).
-- **Звук.** Писк крысят, шаги кота, тревожная музыка во время погони.
-- **Steam.** Для достижений и облачных сохранений подключается Steamworks.NET.
+Commit the `.meta` files Unity creates next to the assets: they keep scene references stable between computers.

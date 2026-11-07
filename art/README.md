@@ -1,9 +1,10 @@
 # Art
 
 Placeholder low-poly models for the Unity version, generated from code with Blender (`tools/blender/`).
+The FBX files live inside the Unity project, in **`unity/Assets/Art/`**; this folder keeps the previews and the list.
 Replace any of them with hand-made models of the same name, size and origin — the game will pick them up.
 
-| Folder | What |
+| Folder in `unity/Assets/Art/` | What |
 |---|---|
 | `food/` | Food the rat carries home (crumb, cheese, sausage, pizza…) |
 | `finds/` | Nest finds and secrets (button, thimble, sock, photo…) |
@@ -11,7 +12,7 @@ Replace any of them with hand-made models of the same name, size and origin — 
 | `characters/` | Rat mother, pup, cat, dog, owner, kid, guest, exterminator, robot vacuum — rigged, with animation clips |
 | `furniture/` | Counters, fridge, tables, sofa, shelves, washer, beds… (doors/lids are separate children) |
 | `rooms/` | Wall sections (plain, mouse hole, crack, window, door), lamps, rugs, nest, wall art, kitchen clutter; `rooms/textures/` — floor and wall textures |
-| `previews/` | Contact sheets of every group and `characters_poses.png` with animation frames |
+| `art/previews/` (here) | Contact sheets of every group and `characters_poses.png` with animation frames |
 
 Full list with triangle counts: [MODELS.md](MODELS.md).
 

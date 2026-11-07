@@ -23,3 +23,8 @@ unity/.vs/
 # Python
 __pycache__/
 art/previews/_tmp/
+unity/[Mm]emoryCaptures/
+unity/[Rr]ecordings/
+unity/*.pidb.meta
+unity/*.pdb.meta
+unity/crashlytics-build.properties
