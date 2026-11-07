@@ -3,7 +3,7 @@
 The Unity version of the game. The three.js prototype in `game/` is the reference for how everything should feel.
 
 ## Open it
-1. Install **Unity 6 LTS** (6000.0.x) with Unity Hub. Any 6000.0 version works; the Hub may offer to convert, say yes.
+1. Install **Unity 6000.3.28f1** with Unity Hub (another Unity 6 version works too; the Hub may offer to convert, say yes).
 2. Unity Hub → **Add → Add project from disk** → choose this `unity/` folder.
 3. The first import takes a few minutes (154 models). When it is done the scenes are **built automatically** and the first
    one opens: `Assets/Scenes/01_kitchen.unity`. If Unity asks to enable the new Input System backends, either answer works.
@@ -14,7 +14,11 @@ Menu **Kitchen Rat → Build Kitchen Nights** rebuilds the scenes from code at a
 If you opened the first skeleton before, its `Assets/Scenes/Kitchen.unity` is deleted on the next build.
 
 ## Building the game
-Unity no longer lets a free license build on GitHub, so build on your computer:
+Unity's free license can't build on GitHub's own runners. Two ways:
+
+- **GitHub with your own runner**: `.github/workflows/unity.yml` runs on a self-hosted Windows runner with Unity 6000.3.28f1;
+  it builds on releases, on changes in `unity/` and by hand, and attaches `KitchenRat-Unity-Windows.zip` to releases.
+- **On your computer without a runner**:
 
 - **Windows**: close the project in Unity and double-click `tools\build_unity.bat`. You get `build\KitchenRat-Unity-Windows.zip`.
   `tools\build_unity.bat v0.9.0` also uploads it to that GitHub release (needs the `gh` CLI).
