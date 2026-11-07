@@ -10,14 +10,14 @@ import lib  # noqa: E402
 
 TILE = 240
 SHOTS = {
-    'rat_mother': [('idle', 0), ('walk', 4), ('run', 2), ('sneak', 6), ('sniff', 8), ('sleep', 0), ('drag', 5), ('stuck', 3)],
-    'rat_pup': [('walk', 4), ('sniff', 8), ('freeze', 0), ('squeak', 8)],
-    'cat': [('idle_sit', 0), ('walk', 6), ('run', 3), ('sleep', 0), ('head_up', 8), ('pounce', 13), ('eat', 0)],
-    'dog': [('idle', 0), ('walk', 6), ('run', 3), ('sniff_ground', 4), ('sleep', 0), ('play', 4)],
+    'rat_mother': [('idle', 0), ('walk', 4), ('run', 2), ('sneak', 6), ('sniff', 8), ('drag', 5), ('stuck', 3), ('sleep', 0)],
+    'rat_pup': [('walk', 4), ('sniff', 8), ('squeak', 8), ('freeze', 0), ('play', 5), ('rear', 9), ('eat', 6), ('sleep', 0)],
+    'cat': [('idle_sit', 0), ('walk', 6), ('run', 3), ('pounce', 13), ('eat', 0), ('head_up', 8), ('groom', 10), ('sleep', 0)],
+    'dog': [('idle', 0), ('walk', 6), ('run', 3), ('sniff_ground', 4), ('play', 4), ('bark', 4), ('sit', 0), ('sleep', 0)],
     'owner': [('idle', 0), ('walk', 7), ('run', 4), ('drink', 24), ('flashlight_sweep', 15), ('crouch_look', 24), ('swat', 8), ('yawn', 24)],
-    'kid': [('idle', 0), ('sleep_bed', 0), ('sit_up_scream', 30)],
-    'guest': [('walk', 7), ('sleep_floor', 0), ('sit_up', 30)],
-    'exterminator': [('walk', 7), ('spray', 10)],
+    'kid': [('idle', 0), ('walk', 7), ('run', 4), ('excited', 5), ('sit_bed', 0), ('sleep_bed', 0), ('scream', 3), ('climb', 7)],
+    'guest': [('walk', 7), ('look_around', 18), ('sit_up', 30), ('sleep_floor', 0), ('use_phone', 0), ('crouch', 0), ('react_scared', 8), ('idle', 0)],
+    'exterminator': [('walk', 7), ('spray', 10), ('inspect', 15), ('set_trap', 20), ('check_trap', 10), ('note', 0), ('stand_ready', 0), ('leave', 7)],
 }
 
 
@@ -39,6 +39,25 @@ def setup_cam(objs):
     sc.display.shading.show_object_outline = True
     sc.render.resolution_x = sc.render.resolution_y = TILE
     sc.world = bpy.data.worlds.new('w')
+
+
+def frame_pose(meshes):
+    """Point the camera at the evaluated (posed) meshes."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    pts = []
+    for o in meshes:
+        ev = o.evaluated_get(dg)
+        me = ev.to_mesh()
+        pts += [ev.matrix_world @ v.co for v in me.vertices]
+        ev.to_mesh_clear()
+    if not pts:
+        return
+    mn = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+    mx = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    c, r = (mn + mx) / 2, max((mx - mn).length / 2, 0.05)
+    cam = bpy.context.scene.camera
+    cam.location = c + Vector((0.9, -1.3, 0.5)).normalized() * r * 3.0
+    cam.rotation_euler = (c - cam.location).to_track_quat('-Z', 'Y').to_euler()
 
 
 def main():
@@ -66,6 +85,7 @@ def main():
             except Exception:
                 pass
             bpy.context.scene.frame_set(int(act.frame_range[0]) + fr)
+            frame_pose(meshes)
             out = os.path.join(tmp, '%s_%s.png' % (name, clipname))
             bpy.context.scene.render.filepath = out
             bpy.ops.render.render(write_still=True)

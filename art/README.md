@@ -12,6 +12,7 @@ Replace any of them with hand-made models of the same name, size and origin — 
 | `characters/` | Rat mother, pup, cat, dog, owner, kid, guest, exterminator, robot vacuum — rigged, with animation clips |
 | `furniture/` | Counters, fridge, tables, sofa, shelves, washer, beds… (doors/lids are separate children) |
 | `rooms/` | Wall sections (plain, mouse hole, crack, window, door), lamps, rugs, nest, wall art, kitchen clutter; `rooms/textures/` — floor and wall textures |
+| `art/reference/` (here) | Concept art the generated models follow (`characters_concept.png`) |
 | `art/previews/` (here) | Contact sheets of every group and `characters_poses.png` with animation frames |
 
 Full list with triangle counts: [MODELS.md](MODELS.md).

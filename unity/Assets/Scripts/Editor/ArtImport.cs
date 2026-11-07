@@ -17,6 +17,7 @@ namespace KitchenRat.EditorTools
         {
             "jump_up", "jump_down", "land", "wake_up", "pounce", "swat", "place_trap", "toss",
             "sit_up_scream", "sit_up", "yawn", "drink", "head_up", "meow", "bark", "squeak",
+            "stand_up", "react_scared", "set_trap", "crouch_look",
         };
         static readonly Regex HexName = new Regex("^c([0-9a-fA-F]{6})");
 
