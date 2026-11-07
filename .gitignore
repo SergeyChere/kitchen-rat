@@ -19,3 +19,7 @@ unity/*.csproj
 unity/*.sln
 unity/*.user
 unity/.vs/
+
+# Python
+__pycache__/
+art/previews/_tmp/
