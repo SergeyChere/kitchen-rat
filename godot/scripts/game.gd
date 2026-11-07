@@ -230,13 +230,13 @@ func _make_rat() -> void:
 	var hb := sk.find_bone("Head") if sk else -1
 	if hb >= 0:
 		# held in her teeth: the mouth follows the head bone (and keeps a scale of 1, the model is scaled down);
-		# the snout is ~5 cm ahead of the head bone, the mouth a little behind and below its tip
+		# the snout is ~4 cm ahead of the head bone, the mouth a little behind and below its tip
 		var att := BoneAttachment3D.new()
 		att.bone_name = "Head"
 		sk.add_child(att)
 		att.add_child(rat.mouth)
 		var head_rest := sk.global_transform * sk.get_bone_global_rest(hb)
-		var at := head_rest.origin + rat.global_transform.basis.z * 0.04 + Vector3.DOWN * 0.015
+		var at := head_rest.origin + rat.global_transform.basis.z * 0.028 + Vector3.DOWN * 0.015
 		rat.mouth.transform = head_rest.affine_inverse() * Transform3D(rat.global_transform.basis.orthonormalized(), at)
 	else:
 		rat.add_child(rat.mouth)

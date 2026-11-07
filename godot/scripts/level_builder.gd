@@ -73,7 +73,8 @@ func toonify(n: Node) -> void:
 				t.specular_mode = BaseMaterial3D.SPECULAR_TOON
 				t.metallic = 0.0
 				t.roughness = 0.9
-				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
+				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
+				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
 					t.next_pass = _outline if grow == 0.004 else _outline_mat(grow)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])

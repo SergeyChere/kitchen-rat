@@ -14,11 +14,11 @@ import os
 import sys
 
 import bpy
-from mathutils import Quaternion, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 src_dir = sys.argv[-1]
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(REPO, "godot", "assets", "models", "characters")
+OUT = os.environ.get("OUTDIR") or os.path.join(REPO, "godot", "assets", "models", "characters")
 QS = "trebeljahr_quaternius-showcase/public/glb/"
 QP = "beep2bleep_FreeAssetsByKenneyNLandQuaternius/FreeModels by Quaternius[Patreon]/Characters and Animals/"
 
@@ -127,10 +127,20 @@ SLEEPER = {
     "stand_up": ("Death", 1.5, None, None, True), "excited": ("Clapping",), "climb": ("Jump",),
 }
 
+# How the rat looks: small black bead eyes, a shorter snout, a pink nose and whiskers; her own small ears; fur colour.
+# (RATSTYLE picks a variant to compare; "main" is the game's.)
+RAT_STYLES = {
+    "main": {"eye": 0.055, "shine": False, "ear": 0.0, "nose": 0.07, "snout": 0.7, "head": 1.0,
+             "fur": (0.2, 0.13, 0.09), "pup_fur": (0.3, 0.21, 0.15)},
+    "shine": {"eye": 0.055, "shine": True, "ear": 0.0, "nose": 0.07, "snout": 0.7, "head": 1.0,
+              "fur": (0.2, 0.13, 0.09), "pup_fur": (0.3, 0.21, 0.15)},
+}
+RAT_STYLE = RAT_STYLES[os.environ.get("RATSTYLE", "main")]
+
 CHARS = [
     # out, source, turn (deg about up), height (m, of the source model's bounding box), clips, new colours (linear)
-    ("rat_mother", QS + "easy_enemies_pack/Rat.glb", 0, 0.165, RAT, {"Grey": (0.2, 0.13, 0.09)}),
-    ("rat_pup", QS + "easy_enemies_pack/Rat.glb", 0, 0.095, PUP, {"Grey": (0.3, 0.21, 0.15)}),
+    ("rat_mother", QS + "easy_enemies_pack/Rat.glb", 0, 0.165, RAT, {"Grey": RAT_STYLE["fur"]}, RAT_STYLE),
+    ("rat_pup", QS + "easy_enemies_pack/Rat.glb", 0, 0.095, PUP, {"Grey": RAT_STYLE["pup_fur"]}, RAT_STYLE),
     ("cat", QP + "Animal Pack Vol.2 - Jul 2017/Blends/Cat.blend", -90, 0.53, CAT, {"Grey": (0.7, 0.28, 0.06)}),
     ("dog", QS + "animals_pack/ShibaInu.glb", 0, 0.70, DOG, {}),
     ("owner", QP + "Animated Men Characters - Feb 2019/Blends/Male_Casual.blend", 0, 1.78, OWNER,
@@ -203,14 +213,21 @@ def to_local(arm, bone, v):
     return m @ v
 
 
-def pose_action(arm, keys, length, height, turn):
-    """An action with the pose offsets (keyed location / rotation per bone), blended on top with COMBINE."""
+def pose_action(arm, keys, length, height, turn, scales=None):
+    """An action with the pose offsets (keyed location / rotation per bone), blended on top with COMBINE;
+    scales: {bone: factor} held over the whole clip (a bigger head)."""
     act = bpy.data.actions.new("pose_tmp")
     arm.animation_data.action = act
+    for bone, f in (scales or {}).items():
+        pb = arm.pose.bones[bone]
+        pb.scale = (f, f, f)
+        pb.keyframe_insert("scale", frame=1)
+        pb.keyframe_insert("scale", frame=length)
+        pb.scale = (1, 1, 1)
     rot = Quaternion(UP, math.radians(turn))  # the source model's own axes (before the turn on the root)
     fwd = rot.inverted() @ FWD
     side = rot.inverted() @ SIDE
-    for bone, t, down, fw, pitch, yaw, roll in keys:
+    for bone, t, down, fw, pitch, yaw, roll in keys or []:
         pb = arm.pose.bones[bone]
         pb.rotation_mode = "QUATERNION"
         frame = 1 + t * (length - 1)
@@ -230,7 +247,7 @@ def pose_action(arm, keys, length, height, turn):
     return act
 
 
-def make_clip(arm, name, spec, height, turn):
+def make_clip(arm, name, spec, height, turn, scales=None):
     src, speed, a, b, rev, keys = tuple(spec) + (1.0, None, None, False, None)[len(spec) - 1:]
     sa = find_action(src)
     fa, fb = sa.frame_range
@@ -250,8 +267,8 @@ def make_clip(arm, name, spec, height, turn):
     st.use_reverse = rev
     st.extrapolation = "HOLD"
     length = max(2, int(round((b - a) / speed)) + 1)
-    if keys:
-        pa = pose_action(arm, keys, length, height, turn)
+    if keys or scales:
+        pa = pose_action(arm, keys, length, height, turn, scales)
         tr2 = ad.nla_tracks.new()
         st2 = tr2.strips.new("pose", 1, pa)
         st2.blend_type = "COMBINE"
@@ -270,7 +287,87 @@ def make_clip(arm, name, spec, height, turn):
     return act
 
 
-def build(out, path, turn, height, clips, recolor):
+def _mat(name, col, rough=0.6):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    b = m.node_tree.nodes.get("Principled BSDF")
+    b.inputs["Base Color"].default_value = tuple(col) + (1.0,)
+    b.inputs["Roughness"].default_value = rough
+    return m
+
+
+def _add(kind, loc, scale, mat, parts, rot=(0, 0, 0)):
+    if kind == "sphere":
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, location=loc)
+    else:
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16, location=loc)
+    o = bpy.context.active_object
+    o.scale = scale
+    o.rotation_euler = rot
+    bpy.ops.object.shade_smooth()
+    o.data.materials.append(mat)
+    parts.append(o)
+    return o
+
+
+def add_face(arm, f):
+    """A friendlier rat: big shiny eyes, round pink ears, a pink nose and whiskers. They are joined into the rat's
+    mesh and skinned 100% to the head bone, so they move exactly like her snout.
+    Positions are in the source model's units (Quaternius rat: snout toward -Y, nose tip at y -2.07)."""
+    body = next(o for o in bpy.context.scene.objects if o.type == "MESH" and o.parent is not None and o.find_armature() == arm)
+    eye = _mat("Eye", (0.01, 0.01, 0.012), 0.15)
+    shine = _mat("EyeShine", (1, 1, 1), 0.2)
+    pink = _mat("NosePink", (0.85, 0.36, 0.42), 0.5)
+    inner = _mat("EarPink", (0.9, 0.55, 0.58), 0.7)
+    fur = bpy.data.materials.get("Grey")
+    wh = _mat("Whisker", (0.35, 0.33, 0.32), 0.6)
+    parts = []
+    # a shorter snout: everything ahead of the eyes is pulled back toward them
+    k = f.get("snout", 1.0)
+    y0 = -1.5
+    mw = body.matrix_world
+    inv = mw.inverted()
+    for v in body.data.vertices:
+        w = mw @ v.co
+        if w.y < y0:
+            w.y = y0 + (w.y - y0) * k
+            v.co = inv @ w
+    tip = y0 + (-2.07 - y0) * k  # where the nose tip is now
+    er = f.get("eye", 0.12)
+    for sx in (-1, 1):
+        # eyes: small black beads on the sides of the head
+        ey = y0 + (-1.58 - y0) * k
+        c = Vector((sx * (0.22 + er * 0.3), ey, 1.47))
+        _add("sphere", c, (er, er * 0.9, er), eye, parts)
+        if f.get("shine", True):
+            _add("sphere", c + Vector((sx * er * 0.45, -er * 0.55, er * 0.5)), (er * 0.32,) * 3, shine, parts)
+        ear_r = f.get("ear", 0.0)
+        if ear_r > 0.0:
+            ec = Vector((sx * 0.3, -1.12, 1.6 + ear_r * 0.75))
+            rot = (math.radians(80), 0.0, math.radians(sx * -25))
+            _add("cyl", ec, (ear_r, ear_r, 0.03), fur, parts, rot)
+            fwd = Matrix.Rotation(rot[2], 3, "Z") @ Vector((0, -0.035, 0))
+            _add("cyl", ec + fwd, (ear_r * 0.72, ear_r * 0.72, 0.02), inner, parts, rot)
+        for dz in (-0.12, 0.0, 0.12):  # whiskers fanning out from the snout
+            a = Vector((sx * 0.1, tip + 0.17, 1.3))
+            d = Vector((sx * 1.0, -0.15, dz)).normalized()
+            L = f.get("whisker", 0.55)
+            q = d.to_track_quat("Z", "Y")
+            _add("cyl", a + d * L * 0.5, (0.006, 0.006, L * 0.5), wh, parts, q.to_euler())
+    nr = f.get("nose", 0.075)
+    _add("sphere", Vector((0, tip + 0.01, 1.34)), (nr, nr * 0.85, nr * 0.8), pink, parts)
+    for o in parts:
+        vg = o.vertex_groups.new(name="Head")
+        vg.add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in parts:
+        o.select_set(True)
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+
+
+def build(out, path, turn, height, clips, recolor, face=None):
     load(os.path.join(src_dir, path))
     fix_materials(recolor)
     arm = next(o for o in bpy.context.scene.objects if o.type == "ARMATURE")
@@ -278,8 +375,11 @@ def build(out, path, turn, height, clips, recolor):
         arm.animation_data.action = None
     lo, hi = bounds()
     h = hi.z - lo.z
+    if face:
+        add_face(arm, face)
+    scales = {"Head": face["head"]} if face and face.get("head", 1.0) != 1.0 else None
     source = set(bpy.data.actions)
-    made = [make_clip(arm, n, spec, h, turn) for n, spec in clips.items()]
+    made = [make_clip(arm, n, spec, h, turn, scales) for n, spec in clips.items()]
     for a in source:
         bpy.data.actions.remove(a)
     for a in list(bpy.data.actions):
@@ -299,6 +399,10 @@ def build(out, path, turn, height, clips, recolor):
     bpy.context.view_layer.update()
     for o in bpy.context.scene.objects:
         o.select_set(True)
+    if os.environ.get("BLENDDIR"):  # also keep an editable .blend (rig, mesh, every game clip as an action)
+        for a in bpy.data.actions:
+            a.use_fake_user = True
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(os.environ["BLENDDIR"], out + ".blend"), copy=True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, out + ".glb"), export_format="GLB", use_selection=True,
                               export_animations=True, export_animation_mode="ACTIONS", export_apply=False,
                               export_force_sampling=True, export_yup=True)
