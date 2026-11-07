@@ -29,7 +29,7 @@ func make_poison() -> void:
 			var mat := m.get_active_material(i)
 			if mat is BaseMaterial3D:
 				var c := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
-				c.albedo_color = c.albedo_color.lerp(Color(0.45, 0.9, 0.3), 0.65)
+				c.albedo_color = c.albedo_color.lerp(Settings.poison_color(), 0.65)
 				m.set_surface_override_material(i, c)
 
 

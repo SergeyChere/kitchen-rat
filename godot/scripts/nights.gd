@@ -10,6 +10,15 @@ const BUILT := ["kitchen", "living", "living2", "pantry", "kitchen2", "water", "
 	"traps", "sticky", "kids", "party", "poison", "vacuum", "dog", "basement", "floor", "moving"]
 
 
+## The demo build (export feature "demo") has Act 1 only.
+static func demo() -> bool:
+	return OS.has_feature("demo") or "--demo" in OS.get_cmdline_user_args()
+
+
+static func last_playable() -> int:
+	return 5 if demo() else files().size()
+
+
 static func world(x: float, y: float, h: float = 0.0) -> Vector3:
 	return Vector3((x - ROOM_W / 2.0) / 100.0, h / 100.0, (y - ROOM_D / 2.0) / 100.0)
 

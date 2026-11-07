@@ -36,6 +36,7 @@ var pups: Array[Pup] = []
 var sleepers: Array[Sleeper] = []
 var pup_warn_t := 0.0
 var prompt := ""
+var noisy_near := ""  # the noisy thing right by her paws (the HUD noise chip turns orange)
 var fx: WorldFx
 var nest_pups: Array = []
 var cut_bars := false
@@ -172,9 +173,35 @@ func _ready() -> void:
 	Sfx.music_duck(false)
 	if bool(night.get("storm", false)):
 		_rain = Sfx.loop("rain_loop")
+	_ambience()
 	rat.frozen = true
 	if state == "intro" and not Main.I._args.has("auto"):
 		_start_intro()
+
+
+## Each room's background sounds: the fridge hums in the kitchen, the boiler in the pantry and the basement,
+## water drips there, and a clock ticks in the living rooms. They come from where the thing is.
+func _ambience() -> void:
+	var decor := str(night.get("decor", "kitchen"))
+	var spots := []
+	if decor == "kitchen":
+		spots.append(["fridge_loop", Nights.world(895, 60, 90)])
+		spots.append(["clock_loop", Nights.world(955, 470, 188)])
+	elif decor == "pantry":
+		spots.append(["drip_loop", Nights.world(600, 560, 200)])
+	else:
+		spots.append(["clock_loop", Nights.world(480, 4, 180)])
+	for f in night.get("furn", []):
+		if str(f.t) == "boiler":
+			spots.append(["boiler_loop", Nights.world(float(f.x) + float(f.w) / 2.0, float(f.y) + float(f.h) / 2.0, 100)])
+		elif str(f.t) == "fridge" and decor != "kitchen":
+			spots.append(["fridge_loop", Nights.world(float(f.x) + float(f.w) / 2.0, float(f.y) + float(f.h) / 2.0, 90)])
+	for sp in spots:
+		var n := Node3D.new()
+		n.name = "Ambience " + str(sp[0])
+		add_child(n)
+		n.global_position = sp[1]
+		Sfx.loop(sp[0], n)
 
 
 func _make_rat() -> void:
@@ -412,6 +439,8 @@ func deliver() -> void:
 	fed = maxi(0, fed + value - poison * 4)
 	var top := hole + Vector3.UP * 0.32
 	Sfx.play("poison" if poison > 0 else "deliver")
+	if cheese:
+		Achievements.unlock("FIRST_CHEESE")
 	if poison > 0:
 		run.poisonDelivered = true
 		bubble_at("Poison! −%d" % (poison * 4), top, 1.6, Color(0.6, 0.88, 0.4))
@@ -468,6 +497,7 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 		t.spring()
 		spawn_food("cheese", t.global_position + Vector3(0.1, 0, 0.08), "bait", false)
 		tasks.flag("disarm")
+		Achievements.add("TRAP_BREAKER", 1, 5)
 		bubble_at("Snap! Disarmed", t.global_position + Vector3.UP * 0.3, 1.4, Color(0.62, 0.82, 0.48))
 
 
@@ -483,6 +513,8 @@ func knock_group(k: Knockable) -> void:
 
 func _on_landed(drop: float) -> void:
 	Sfx.play("land_big" if drop > 0.5 else "land", rat.global_position)
+	if fx and drop > 0.15:
+		fx.dust(rat.global_position, drop > 0.5)
 	if drop > 0.5 and rat.surface_id == "floor":
 		noise(rat.global_position, 1.6, "Thud", false, 0.55)
 	for z in zones:
@@ -526,6 +558,13 @@ func _process(dt: float) -> void:
 	grace_t = maxf(0.0, grace_t - dt)
 	var rp := rat.global_position
 	prompt = ""
+	noisy_near = ""
+	for z in noisy:
+		if z.once and z.used:
+			continue
+		if absf(z.global_position.y - rp.y) < 0.12 and z.contains_xz(rp, 0.35):
+			noisy_near = z.sound
+			break
 	_tick_rat_noise(dt)
 	_pick_up(rp)
 	_tick_zones(rp, dt)
@@ -605,6 +644,8 @@ func _pick_up(rp: Vector3) -> void:
 			continue
 		if rat.carry_weight() + f.weight() > rat.capacity:
 			continue
+		if fx:
+			fx.sparkle(f.global_position, f.is_cheese())
 		rat.carry(f)
 		Sfx.play("cheese" if f.is_cheese() else "pickup", rp)
 		if f.id != "":
@@ -807,7 +848,7 @@ func _trigger_threat(t: String) -> void:
 func _tick_gnaw(dt: float) -> void:
 	for gs in gnaws:
 		if gs.near(rat):
-			prompt = "Hold F — gnaw it open" if not gs.done else ""
+			prompt = ("Hold %s — gnaw it open" % Keys.label("push")) if not gs.done else ""
 			if Input.is_action_pressed("push"):
 				gs.gnaw(dt)
 			return
@@ -861,6 +902,7 @@ func use_tunnel() -> bool:
 	rat.teleport(cracks[to], rat.rotation.y + PI)
 	tasks.flag("tunnel")
 	Sfx.play("scrape")
+	Achievements.add("TUNNELER", 1, 10)
 	bubble_at("…through the wall", cracks[to] + Vector3.UP * 0.25, 1.4, Color(0.62, 0.82, 0.48))
 	return true
 
@@ -891,10 +933,8 @@ func noisy_effect(kind: String, z: Zone) -> void:
 
 func _tick_world(dt: float) -> void:
 	var rp := rat.global_position
-	if prompt.begins_with("Space"):
-		prompt = ""
 	if _tunnel_from() >= 0:
-		prompt = "Space — crawl through the wall"
+		prompt = "%s — crawl through the wall" % Keys.label("jump")
 	if _wash_t > 0.0:
 		_wash_t -= dt
 		if _wash_zone and randf() < dt * 3.0:
@@ -1188,7 +1228,7 @@ func begin() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	var st := str(night.get("startTitle", ""))
 	if st != "":
-		banner(st, str(night.get("startSub", "")), 5.5)
+		banner(Keys.text(st), Keys.text(str(night.get("startSub", ""))), 5.5)
 	else:
 		banner("Bring %d food before dawn" % int(night.goal), "", 4.5)
 
@@ -1449,9 +1489,10 @@ func _show_result(won: bool) -> void:
 	var got := 0
 	for r in rows:
 		if r[1]: got += 1
-	var last := int(night.number) >= Nights.files().size()
+	var last := int(night.number) >= Nights.last_playable()
 	if won:
 		Progress.record(night, night_time, hud.clock_text(), got, rows.size(), max_stars)
+		Achievements.night_won(self)
 	else:
 		Progress.losses[night_id] = int(Progress.losses.get(night_id, 0)) + 1
 	var sc := UI.screen(hud, 0.7, false, 620.0)
@@ -1465,6 +1506,8 @@ func _show_result(won: bool) -> void:
 	if won and bool(night.get("finale", false)):
 		text = "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom for the first time. Thank you for playing!"
 	box.add_child(UI.label(text, 16, UI.TEXT, true))
+	if won and Nights.demo() and last:
+		box.add_child(UI.label("That’s the end of the demo. Wishlist Kitchen Rat on Steam to play all twenty nights.", 17, UI.ACCENT, true))
 	for r in rows:
 		box.add_child(UI.label(("✔  " if r[1] else "✖  ") + str(r[0]), 16, UI.GOOD if r[1] else UI.DIM))
 	var stats := HBoxContainer.new()
@@ -1482,8 +1525,8 @@ func _show_result(won: bool) -> void:
 			v.add_child(l)
 		stats.add_child(v)
 	if not won and int(Progress.losses.get(night_id, 0)) >= 2:
-		var tip := str(tasks.current().get("hint", "")) if tasks.current() != null else ""
-		box.add_child(UI.label("Tip: " + (tip if tip != "" else "sneak (Ctrl) near the cat and hide under furniture when it comes close.") + ("" if Settings.calm else " You can also turn on Calm mode in Settings."), 15, UI.ACCENT, true))
+		var tip := Keys.text(str(tasks.current().get("hint", ""))) if tasks.current() != null else ""
+		box.add_child(UI.label("Tip: " + (tip if tip != "" else "sneak (%s) near the cat and hide under furniture when it comes close." % Keys.label("sneak")) + ("" if Settings.calm else " You can also turn on Calm mode in Settings."), 15, UI.ACCENT, true))
 	if won and not last:
 		box.add_child(UI.button("Next night", func(): Main.I.start_number(int(night.number) + 1)))
 	box.add_child(UI.button("Replay night" if won else "Try again", _restart))
@@ -1551,7 +1594,7 @@ func _draw_trail(mi: MeshInstance3D, from: Vector3, to: Vector3, poison: bool, i
 	var b := to + Vector3.UP * 0.03
 	var side := (b - a).cross(Vector3.UP).normalized()
 	var alpha := clampf((_sniff_hold - 0.35) * 2.0, 0.0, 1.0) * (0.55 + 0.25 * sin(Time.get_ticks_msec() / 200.0)) * (1.0 if i == 0 else 0.55)
-	var c := Color(0.56, 0.88, 0.38) if poison else Color(1, 0.85, 0.5)
+	var c := Settings.poison_color() if poison else Color(1, 0.85, 0.5)
 	var t0 := Time.get_ticks_msec() / 1000.0
 	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for k in 24:

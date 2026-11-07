@@ -9,7 +9,10 @@ var g: Game
 var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
 var _rings: Array = []  # [MeshInstance3D, t, life, max_r]
+var _glints: Array = []  # [Sprite3D, node it marks, phase]
 static var _tex: ImageTexture
+static var _star: ImageTexture
+static var _dot: ImageTexture
 
 
 func _init(game: Game) -> void:
@@ -32,7 +35,139 @@ static func _dash_tex() -> ImageTexture:
 	return _tex
 
 
+## A soft round dot and a four-point star, drawn in code.
+static func _make_dot() -> ImageTexture:
+	if _dot:
+		return _dot
+	var n := 32
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var d := Vector2(x - n / 2.0 + 0.5, y - n / 2.0 + 0.5).length() / (n / 2.0)
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - d, 0.0, 1.0) ** 1.6))
+	_dot = ImageTexture.create_from_image(img)
+	return _dot
+
+
+static func _make_star() -> ImageTexture:
+	if _star:
+		return _star
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var p := Vector2(x - n / 2.0 + 0.5, y - n / 2.0 + 0.5) / (n / 2.0)
+			var a := maxf(0.0, 1.0 - absf(p.x) * 7.0 - absf(p.y)) + maxf(0.0, 1.0 - absf(p.y) * 7.0 - absf(p.x))
+			a += clampf(1.0 - p.length() * 3.0, 0.0, 1.0)
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
+	_star = ImageTexture.create_from_image(img)
+	return _star
+
+
+func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: float, life: float, gravity := -0.6) -> void:
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.emitting = false
+	p.amount = n
+	p.lifetime = life
+	p.explosiveness = 0.95
+	p.direction = Vector3.UP
+	p.spread = 80.0
+	p.initial_velocity_min = speed * 0.5
+	p.initial_velocity_max = speed
+	p.gravity = Vector3(0, gravity, 0)
+	p.scale_amount_min = size * 0.6
+	p.scale_amount_max = size
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_texture = _make_dot()
+	m.vertex_color_use_as_albedo = true
+	q.material = m
+	p.mesh = q
+	var grad := Gradient.new()
+	grad.set_color(0, col)
+	grad.set_color(1, Color(col.r, col.g, col.b, 0.0))
+	p.color_ramp = grad
+	add_child(p)
+	p.global_position = at + Vector3.UP * up
+	p.emitting = true
+	get_tree().create_timer(life + 0.3).timeout.connect(p.queue_free)
+
+
+## A puff of dust where she lands (bigger from higher up).
+func dust(at: Vector3, big: bool) -> void:
+	_particles(at, 14 if big else 7, Color(0.75, 0.7, 0.62, 0.55), 0.05 if big else 0.035, 0.5 if big else 0.3, 0.02, 0.7, -0.4)
+
+
+## Sparkles when she picks something up.
+func sparkle(at: Vector3, cheese: bool) -> void:
+	_particles(at, 10, Color(1.0, 0.85, 0.35, 0.95) if cheese else Color(0.95, 0.85, 0.6, 0.8), 0.025, 0.6, 0.04, 0.6, -1.2)
+
+
+func _motes() -> void:
+	# dust in the moonlight by the window
+	var win: Dictionary = g.night.get("window", {})
+	if float(win.get("w", 0)) <= 0.0:
+		return
+	var p := CPUParticles3D.new()
+	p.amount = 60
+	p.lifetime = 8.0
+	p.preprocess = 8.0
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(float(win.w) / 200.0, 0.7, 0.9)
+	p.direction = Vector3(0.2, -0.1, 0.3)
+	p.spread = 180.0
+	p.initial_velocity_min = 0.005
+	p.initial_velocity_max = 0.03
+	p.gravity = Vector3(0, -0.004, 0)
+	p.scale_amount_min = 0.006
+	p.scale_amount_max = 0.014
+	var q := QuadMesh.new()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_texture = _make_dot()
+	m.albedo_color = Color(0.75, 0.82, 1.0, 0.5)
+	q.material = m
+	p.mesh = q
+	add_child(p)
+	p.global_position = Nights.world(float(win.x) + float(win.w) / 2.0, 100, 120)
+
+
+## Noisy things and wobbly cups glint when she comes close, so every trap can be seen in advance.
+func _make_glints() -> void:
+	var marks := []
+	for z in g.noisy:
+		if z.kind in ["sofa", "board", "foil", "confetti", "puddle", "grain"]:
+			continue  # big floor areas: the noise warning covers them
+		marks.append(z)
+	for k in g.knockables:
+		if k.trap:
+			marks.append(k)
+	for n in marks:
+		var s := Sprite3D.new()
+		s.texture = _make_star()
+		s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		s.shaded = false
+		s.transparent = true
+		s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+		s.pixel_size = 0.0024
+		s.modulate = Color(1.0, 0.92, 0.6, 0.0)
+		s.no_depth_test = false
+		add_child(s)
+		s.global_position = (n as Node3D).global_position + Vector3.UP * 0.1
+		_glints.append([s, n, randf() * TAU])
+
+
 func _ready() -> void:
+	_motes()
+	_make_glints()
 	for z in g.zones:
 		if z is HideSpot:
 			var mi := MeshInstance3D.new()
@@ -99,6 +234,18 @@ func _process(dt: float) -> void:
 		var m := mi.material_override as StandardMaterial3D
 		m.albedo_color.a = lerpf(m.albedo_color.a, a, minf(1.0, dt * 6.0))
 	_draw_cone()
+	var t := Time.get_ticks_msec() / 1000.0
+	for e in _glints:
+		var s: Sprite3D = e[0]
+		var n: Node3D = e[1]
+		if not is_instance_valid(n) or (n is NoisyZone and n.once and n.used) or (n is Knockable and n.knocked):
+			s.visible = false
+			continue
+		var d := n.global_position.distance_to(rp)
+		var near := clampf(1.0 - (d - 0.5) / 2.0, 0.0, 1.0) if playing else 0.0
+		var tw := 0.5 + 0.5 * sin(t * 2.4 + float(e[2]))
+		s.modulate.a = near * (0.35 + 0.65 * tw)
+		s.scale = Vector3.ONE * (0.8 + 0.4 * tw)
 	for i in range(_rings.size() - 1, -1, -1):
 		var r: Array = _rings[i]
 		r[1] += dt

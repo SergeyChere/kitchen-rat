@@ -18,8 +18,12 @@ func _init() -> void:
 
 func _ready() -> void:
 	Sfx.setup(self)
+	if "--pad" in OS.get_cmdline_user_args():
+		Keys.pad = true
 	Settings.load_all()
+	Keys.apply_saved()
 	Progress.load_all()
+	Achievements.load_all()
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
@@ -29,6 +33,7 @@ func _ready() -> void:
 		show_menu()
 		if _args.get("screen", "") == "nights": show_nights()
 		elif _args.get("screen", "") == "settings": UI.settings_panel(self, show_menu)
+		elif _args.get("screen", "") == "controls": UI.controls_panel(self, show_menu)
 
 
 func _process(_dt: float) -> void:
@@ -59,6 +64,11 @@ func _process(_dt: float) -> void:
 		print("saved ", _args.shot)
 		if not _args.has("keep"):
 			get_tree().quit()
+
+
+func _input(e: InputEvent) -> void:
+	if not _args.has("pad"):
+		Keys.seen(e)
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -95,17 +105,18 @@ func show_menu() -> void:
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(logo)
 	box.add_child(UI.label("Kitchen Rat", 48, UI.ACCENT, true))
-	box.add_child(UI.label("A mother rat. Twenty nights. One hungry family.", 17, UI.DIM, true))
+	box.add_child(UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights. One hungry family.", 17, UI.DIM, true))
 	var files := Nights.files()
-	var next := clampi(Progress.unlocked, 1, files.size())
+	var next := clampi(Progress.unlocked, 1, Nights.last_playable())
 	var play_text := "Play"
-	if Progress.unlocked > files.size():
+	if Progress.unlocked > Nights.last_playable():
 		play_text = "Play again · Night 1"
 		next = 1
 	elif Progress.unlocked > 1:
 		play_text = "Continue · Night %d" % next
 	box.add_child(UI.button(play_text, start_number.bind(next)))
 	box.add_child(UI.button("Nights", show_nights))
+	box.add_child(UI.button("Achievements", show_achievements))
 	box.add_child(UI.button("Settings", func(): menu.hide(); UI.settings_panel(self, func(): if is_instance_valid(menu): menu.show())))
 	box.add_child(UI.button("Quit", get_tree().quit))
 	UI.focus_first(box)
@@ -114,11 +125,31 @@ func show_menu() -> void:
 ## Night number (1…20) → start it.
 func start_number(n: int) -> void:
 	var files := Nights.files()
-	if n < 1 or n > files.size():
+	if n < 1 or n > Nights.last_playable():
 		show_menu()
 		return
 	var f: String = files[n - 1]
 	start_night(f.substr(f.find("_") + 1))
+
+
+func show_achievements() -> void:
+	_clear()
+	var s := UI.screen(self, 0.0, true, 640.0)
+	menu = s[0]
+	var box: VBoxContainer = s[1]
+	box.add_child(UI.label("Achievements  %d / %d" % [Achievements.unlocked.size(), Achievements.LIST.size()], 30, UI.ACCENT, true))
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(0, 470)
+	box.add_child(sc)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(list)
+	for a in Achievements.LIST:
+		var got := Achievements.unlocked.has(a[0])
+		list.add_child(UI.label(("★  " if got else "☆  ") + str(a[1]), 18, UI.ACCENT if got else UI.TEXT))
+		list.add_child(UI.label("     " + str(a[2]), 14, UI.DIM))
+	box.add_child(UI.button("Back", show_menu, 220))
+	UI.focus_first(box)
 
 
 func show_nights() -> void:
@@ -161,7 +192,7 @@ func show_nights() -> void:
 			list.add_child(grid)
 		var id: String = files[i].substr(files[i].find("_") + 1)
 		var d := Nights.load_night(id)
-		var open := Progress.is_open(i + 1)
+		var open := Progress.is_open(i + 1) and i + 1 <= Nights.last_playable()
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(228, 118)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -169,7 +200,9 @@ func show_nights() -> void:
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		var best: Dictionary = Progress.best.get(id, {})
 		var txt := "Night %d\n%s\n" % [i + 1, str(d.get("name", id))]
-		if not open:
+		if i + 1 > Nights.last_playable():
+			txt += "In the full game"
+		elif not open:
 			txt += "🔒 Finish night %d to unlock" % i
 		elif not best.is_empty():
 			txt += "✓ Tasks %d / %d · %s" % [int(best.get("goals", 0)), int(best.get("of", 0)), str(best.get("clock", ""))]

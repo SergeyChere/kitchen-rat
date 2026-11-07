@@ -11,7 +11,8 @@ Every push to `main` that touches `godot/` builds the game on GitHub:
 2. Under **Artifacts**, download `KitchenRat-Godot`.
 3. Unzip it. Then unzip `KitchenRat-Windows.zip` (or Linux/Mac) and run `KitchenRat.exe`.
 
-When a release is published, the same zips are attached to it automatically.
+When a release is published, the same zips are attached to it automatically. The artifact also has
+`KitchenRat-Demo-*.zip`: the demo with Act 1 only (nights 1–5), for the Steam demo page and Next Fest.
 
 ## Open the project
 
@@ -47,7 +48,14 @@ and a results screen with Next night. Finishing a night opens the next one; prog
 night are saved. Settings: mouse sensitivity, invert Y, field of view, music and sound volume, quality, fullscreen,
 VSync, hints, Calm mode, reset progress. On screen: green outlines show hiding spots, a pale cone shows where the
 cat looks, Zzz / ? / ! over the cat, the owner and the dog, noise rings, "Hidden / Unseen / The cat sees you!",
-and an arrow to the nest while you carry food.
+and an arrow to the nest while you carry food. Noisy things glint as you come close and the noise meter warns
+"Careful: Clink" right by them; dust puffs when you land, sparkles when you grab food, moon dust by the window,
+the ceiling light stutters when the owner switches it on.
+
+Keys can be rebound (Settings → Controls), prompts and task hints switch to gamepad buttons when you play with a
+gamepad, and there are window size and colour-blind (purple poison) options. 15 achievements (menu →
+Achievements) are saved locally and sent to Steam when the game runs with the GodotSteam extension. Each room has
+its own background: the fridge in the kitchen, the boiler and dripping water in the pantry, a ticking clock.
 
 All 20 nights are playable:
 

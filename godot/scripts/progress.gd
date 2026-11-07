@@ -24,6 +24,7 @@ static func load_all() -> void:
 
 static func save() -> void:
 	var c := ConfigFile.new()
+	c.load(FILE)  # keep the achievements stored in the same file
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "best", best)
 	c.set_value("progress", "seen_prologue", seen_prologue)

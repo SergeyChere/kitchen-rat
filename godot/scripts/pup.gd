@@ -149,6 +149,7 @@ func tick(dt: float, trail: Array, idle_t: float) -> void:
 			mode = Mode.FOLLOW
 			force_say("Thanks, Mom!")
 			G.tasks.set_flag("pupRescued")
+			Achievements.unlock("RESCUER")
 		anim.play("freeze" if mode == Mode.STUCK else "idle")
 		return
 	if freeze_t > 0.0:

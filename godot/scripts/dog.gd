@@ -61,6 +61,7 @@ func distract(at: Vector3, kind: String) -> void:
 	G.bubble_on("Woof? Ball!", self, 0.75, 1.4)
 	if kind == "ball":
 		G.tasks.set_flag("dogBall")
+		Achievements.unlock("DOG_BALL")
 
 
 func wash_trail() -> void:

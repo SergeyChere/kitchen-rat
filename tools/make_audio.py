@@ -481,6 +481,29 @@ def rain_loop(n):
     return soft + drops * 0.8
 
 
+def clock_loop(n):
+    # tick … tock, one per second
+    m = Mix(n / SR + 0.5)
+    for t, f in ((0.0, 3200), (1.0, 2500)):
+        m.noise(t, 0.012, 0.5, 'bandpass', f, 4)
+        m.tone('sine', f * 0.5, t, 0.03, 0.15)
+    return m.render(0.15, 0.6, wrap=True)[:n]
+
+
+def fridge_loop(n, base=55.0, lp=220):
+    t = np.arange(n) / SR
+    hum = np.sin(2 * np.pi * base * t) * 0.5 + np.sin(2 * np.pi * base * 2 * t) * 0.25 + np.sin(2 * np.pi * base * 3 * t) * 0.1
+    wob = 1 + 0.08 * np.sin(2 * np.pi * 0.25 * t)
+    return hum * wob + filt(rng.uniform(-1, 1, n), 'lowpass', lp, 0.7, SR) * 0.6
+
+
+def drip_loop(n):
+    m = Mix(n / SR + 0.5)
+    for t in (0.3, 2.1, 3.0, 4.6):
+        m.tone('sine', rng.uniform(900, 1300), t, 0.09, 0.3, 0.002, 0.5, [(0.08, rng.uniform(1600, 2200), 'exp')])
+    return m.render(0.4, 1.0, wrap=True)[:n]
+
+
 def render_fx():
     os.makedirs(SND_DIR, exist_ok=True)
     for f in glob.glob(os.path.join(SND_DIR, '*.wav')):
@@ -492,7 +515,10 @@ def render_fx():
         x = trim(m.render(0.3), SR, 0.0008 * max(1e-6, np.abs(m.dry).max()) / 0.2)
         x = np.tanh(x * gain)
         write_wav(os.path.join(SND_DIR, name + '.wav'), x / max(1e-6, np.abs(x).max()) * 0.8, SR)  # loudness is set in sfx.gd
-    for name, x in (('hum_loop', make_loop(2.0, hum_loop)), ('rain_loop', make_loop(4.0, rain_loop))):
+    loops = (('hum_loop', make_loop(2.0, hum_loop)), ('rain_loop', make_loop(4.0, rain_loop)),
+             ('clock_loop', clock_loop(int(2.0 * SR))), ('fridge_loop', make_loop(4.0, fridge_loop)),
+             ('boiler_loop', make_loop(4.0, lambda n: fridge_loop(n, 41.0, 160))), ('drip_loop', drip_loop(int(6.0 * SR))))
+    for name, x in loops:
         write_wav(os.path.join(SND_DIR, name + '.wav'), x / np.abs(x).max() * 0.8, SR)
     print('sounds:', len(FX) + 2, 'files in', os.path.relpath(SND_DIR, REPO))
 

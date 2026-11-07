@@ -70,7 +70,7 @@ func _trigger(rat: Rat) -> void:
 		hide_when_used.visible = false
 	if sneak_flag != "" and _hint <= 0.0 and Game.I.tasks.flag_value(sneak_flag) == 0:
 		_hint = 6.0
-		Game.I.toast("Too loud! Hold Ctrl (or press C) and sneak across.")
+		Game.I.toast(Keys.text("Too loud! Hold Ctrl (or press C) and sneak across."))
 
 
 func exit(_rat: Rat) -> void:

@@ -131,8 +131,8 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 24)
-	grid.add_theme_constant_override("v_separation", 10)
-	box.add_child(grid)
+	grid.add_theme_constant_override("v_separation", 8)
+	_scroll(box, 380).add_child(grid)
 	_slider(grid, "Mouse sensitivity", 0.3, 2.5, 0.05, Settings.sens, func(v): Settings.sens = v, "%.2f×")
 	_check(grid, "Invert mouse Y", Settings.invert_y, func(v): Settings.invert_y = v)
 	_slider(grid, "Field of view", 50, 90, 1, Settings.fov, func(v): Settings.fov = v, "%d°")
@@ -145,10 +145,24 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 	q.item_selected.connect(func(i): Settings.quality = ["low", "medium", "high"][i]; Settings.save())
 	grid.add_child(_name("Quality"))
 	grid.add_child(q)
+	var res := OptionButton.new()
+	var sizes := ["1280x720", "1600x900", "1920x1080", "2560x1440"]
+	for o in sizes:
+		res.add_item(o.replace("x", " × "))
+	res.selected = maxi(0, sizes.find(Settings.resolution))
+	res.item_selected.connect(func(i): Settings.resolution = sizes[i]; Settings.save())
+	grid.add_child(_name("Window size"))
+	grid.add_child(res)
 	_check(grid, "Fullscreen", Settings.fullscreen, func(v): Settings.fullscreen = v; Settings.save())
 	_check(grid, "VSync", Settings.vsync, func(v): Settings.vsync = v; Settings.save())
 	_check(grid, "Hints", Settings.hints, func(v): Settings.hints = v)
 	_check(grid, "Calm mode (more time, quieter cat)", Settings.calm, func(v): Settings.calm = v)
+	_check(grid, "Colour-blind scents (poison purple)", Settings.colorblind, func(v): Settings.colorblind = v)
+	var ctl := Button.new()
+	ctl.text = "Controls…"
+	ctl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ctl.pressed.connect(func(): Sfx.play("click"); root.hide(); controls_panel(parent, func(): root.show()))
+	box.add_child(ctl)
 	var reset := Button.new()
 	reset.text = "Reset progress"
 	reset.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -167,6 +181,51 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 	box.add_child(button("Back", func(): Settings.save(); root.queue_free(); on_back.call(), 220))
 	focus_first(box)
 	return root
+
+
+## Rebind keys: click an action, press the new key (Esc cancels).
+static func controls_panel(parent: Node, on_back: Callable) -> Control:
+	var s := screen(parent, 0.8, false, 600.0)
+	var root: Control = s[0]
+	var box: VBoxContainer = s[1]
+	box.add_child(label("Controls", 30, ACCENT, true))
+	box.add_child(label("Click an action, then press a key or mouse button. Esc cancels. Gamepad buttons stay as they are.", 14, DIM, true))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 6)
+	_scroll(box, 400).add_child(grid)
+	for a in Keys.ACTIONS:
+		var action: String = a[0]
+		grid.add_child(_name(a[1]))
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(150, 36)
+		b.text = Keys.keyboard_label(action)
+		var pad := label(Keys.pad_label(action), 15, DIM)
+		pad.autowrap_mode = TextServer.AUTOWRAP_OFF
+		b.pressed.connect(func():
+			b.text = "Press a key…"
+			var c := Keys.Catcher.new()
+			c.done = func(e):
+				if e != null:
+					Keys.rebind(action, e)
+				b.text = Keys.keyboard_label(action)
+			root.add_child(c))
+		grid.add_child(b)
+		grid.add_child(pad)
+	box.add_child(button("Reset to defaults", func(): Keys.reset(); root.queue_free(); controls_panel(parent, on_back), 260))
+	box.add_child(button("Back", func(): root.queue_free(); on_back.call(), 220))
+	focus_first(box)
+	return root
+
+
+## A scroll area of at most h pixels (the panels must fit a 720-pixel-high screen).
+static func _scroll(box: Control, h: float) -> ScrollContainer:
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(0, h)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(sc)
+	return sc
 
 
 static func _name(text: String) -> Label:

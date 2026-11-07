@@ -207,7 +207,7 @@ func _mech(host: Node) -> void:
 		var t: Dictionary = g.night.tunnels[0]
 		rat.teleport(g.cracks[int(t.a)], 0)
 		await _wait(host, 0.2)
-		_check("standing in a linked crack shows the prompt", g.prompt.begins_with("Space"), g.prompt)
+		_check("standing in a linked crack shows the prompt", g.prompt.contains("crawl"), g.prompt)
 		var ok := g.use_tunnel()
 		await _wait(host, 0.2)
 		_check("crawled through the wall to the other crack", ok and rat.global_position.distance_to(g.cracks[int(t.b)]) < 0.2, str(rat.global_position))

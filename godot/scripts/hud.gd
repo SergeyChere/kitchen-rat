@@ -62,6 +62,10 @@ func _process(dt: float) -> void:
 		if _toasts[i][1] <= 0.0:
 			_toasts.remove_at(i)
 	_banner_time -= dt
+	for i in range(_ach.size() - 1, -1, -1):
+		_ach[i][1] -= dt
+		if _ach[i][1] <= 0.0:
+			_ach.remove_at(i)
 	for i in range(_recent.size() - 1, -1, -1):
 		_recent[i][1] -= dt
 		if _recent[i][1] <= 0.0:
@@ -111,7 +115,12 @@ func _clock(g: Game) -> String:
 	return "%02d:%02d" % [int(h) % 24, int((h - floorf(h)) * 60.0)]
 
 
+var _ach := []  # [title, time]
 var _recent := []  # [text, time, ok] tasks just completed or failed, shown at the top of the list
+
+
+func achievement(title: String) -> void:
+	_ach.append([title, 4.5])
 
 
 func task_done(text: String, ok: bool) -> void:
@@ -146,7 +155,7 @@ func _draw_hud() -> void:
 			_canvas.draw_rect(Rect2(0, 0, W, 64), Color.BLACK)
 			_canvas.draw_rect(Rect2(0, H - 64, W, 64), Color.BLACK)
 			if g.state == "intro":
-				_text(Vector2(W - 260, H - 26), "Space — skip", 15, Color(1, 1, 1, 0.75), 240, HORIZONTAL_ALIGNMENT_RIGHT)
+				_text(Vector2(W - 260, H - 26), Keys.label("jump") + " — skip", 15, Color(1, 1, 1, 0.75), 240, HORIZONTAL_ALIGNMENT_RIGHT)
 		if g.grid == null:
 			_text(Vector2(0, H / 2), "Loading…", 28, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
 		_canvas.draw_rect(Rect2(0, 0, W, H), Color(0, 0, 0, g.fade))
@@ -220,9 +229,10 @@ func _draw_hud() -> void:
 	var lvl := 3 if g.rat.running and g.rat.moving() else (1 if g.rat.moving() and not g.rat.sneaking else 0)
 	if g.rat.jumping: lvl = 1
 	var ntext := "Loud: running" if lvl == 3 else ("Quiet: walking" if lvl == 1 else ("Silent: sneaking" if g.rat.sneaking else "Silent"))
+	var warn := g.noisy_near != ""
 	for i in 3:
-		_canvas.draw_rect(Rect2(W - 242 + i * 18, 46, 14, 12), NOISE if i < lvl else BAR_BG)
-	_text(Vector2(W - 182, 57), ntext, 13, HINT)
+		_canvas.draw_rect(Rect2(W - 242 + i * 18, 46, 14, 12), NOISE if i < lvl else (Color(1, 0.62, 0.2, 0.55 + 0.35 * sin(Time.get_ticks_msec() / 150.0)) if warn else BAR_BG))
+	_text(Vector2(W - 182, 57), ("Careful: " + g.noisy_near.trim_suffix("!").trim_suffix("…")) if warn else ntext, 13, Color(1, 0.7, 0.3) if warn else HINT)
 
 	_draw_banner_and_bubbles(W)
 
@@ -230,7 +240,7 @@ func _draw_hud() -> void:
 	if not g.pups.is_empty():
 		var py := 78.0
 		_canvas.draw_rect(Rect2(W - 252, py, 240, 26 + 20 * g.pups.size()), PANEL)
-		_text(Vector2(W - 242, py + 18), "Pups  ·  Q wait/follow  ·  R fetch", 12, HINT)
+		_text(Vector2(W - 242, py + 18), "Pups  ·  %s wait/follow  ·  %s fetch" % [Keys.label("pups"), Keys.label("fetch")], 12, HINT)
 		for i in g.pups.size():
 			var pp: Pup = g.pups[i]
 			var st: String = ["following", "waiting", "fetching", "bringing food", "CAUGHT! Rescue!", "STUCK! Help!"][pp.mode]
@@ -243,7 +253,7 @@ func _draw_hud() -> void:
 		if g.prompt != "":
 			_key_prompt(W, H, g.prompt)
 		elif g.rat.has_jump_target():
-			_key_prompt(W, H, "Space — jump")
+			_key_prompt(W, H, Keys.label("jump") + " — jump")
 		elif not g.rat.carried.is_empty() and cam:
 			var to := g.hole - g.rat.global_position
 			to.y = 0.0
@@ -260,6 +270,13 @@ func _draw_hud() -> void:
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			_text(Vector2(0, H / 2), "Click to look around", 18, Color(1, 1, 1, 0.8), W, HORIZONTAL_ALIGNMENT_CENTER)
 
+	for i in _ach.size():
+		var a := clampf(float(_ach[i][1]), 0.0, 1.0)
+		var r := Rect2(W - 332, H - 150 - i * 74, 320, 64)
+		_canvas.draw_rect(r, Color(0.12, 0.1, 0.06, 0.92 * a))
+		_canvas.draw_rect(Rect2(r.position, Vector2(6, r.size.y)), Color(BAR.r, BAR.g, BAR.b, a))
+		_text(r.position + Vector2(18, 24), "ACHIEVEMENT UNLOCKED", 12, Color(BAR.r, BAR.g, BAR.b, a))
+		_text(r.position + Vector2(18, 48), "★ " + str(_ach[i][0]), 18, Color(1, 1, 1, a))
 	_canvas.draw_rect(Rect2(0, 0, W, H), Color(0, 0, 0, g.fade))
 
 
@@ -326,9 +343,9 @@ func _draw_tasks(g: Game, H: float) -> void:
 		lines.append([tx, 14, col, font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 14).y + 4])
 	var cur = t.current()
 	if cur != null:
-		var s1 := "○  " + str(cur.text)
+		var s1 := "○  " + Keys.text(str(cur.text))
 		lines.append([s1, 15, Color.WHITE, font.get_multiline_string_size(s1, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 15).y + 4])
-		var hint := str(cur.get("hint", ""))
+		var hint := Keys.text(str(cur.get("hint", "")))
 		if Settings.hints and hint != "":
 			lines.append(["    " + hint, 13, HINT, font.get_multiline_string_size("    " + hint, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 13).y + 4])
 		lines.append(["Step %d of %d" % [t.step + 1, t.chain.size()], 11, HINT, 16.0])
@@ -344,7 +361,7 @@ func _draw_tasks(g: Game, H: float) -> void:
 		var done := t.side_done.has(i)
 		var bad := t.side_failed.has(i)
 		var mark := "✓ " if done else ("✗ " if bad else "◇ ")
-		var tx := mark + "Side: " + str(t.side[i].text)
+		var tx := mark + "Side: " + Keys.text(str(t.side[i].text))
 		lines.append([tx, 13, Color(0.6, 0.88, 0.48) if done else (Color(0.91, 0.4, 0.29) if bad else Color(0.85, 0.85, 0.9)), font.get_multiline_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, w - 20, 13).y + 3])
 	for i in t.secret.size():
 		if t.secret_done.has(i):

@@ -58,6 +58,20 @@ func _room_light(on: bool) -> void:
 		if room_light.visible != on:
 			Sfx.play("light_switch", room_light.global_position)
 		room_light.visible = on
+		if on:
+			_flicker()
+
+
+## The ceiling light stutters for a moment when it comes on.
+func _flicker() -> void:
+	var l := room_light
+	for k in 5:
+		await get_tree().create_timer(0.05 + randf() * 0.07).timeout
+		if not is_instance_valid(l) or room_light != l:
+			return
+		l.visible = k % 2 == 1 or k == 4
+	if is_instance_valid(l) and room_light == l:
+		l.visible = in_room()
 
 
 func hear(at: Vector3, _radius: float, big: bool) -> void:

@@ -54,7 +54,11 @@ jobs:
           ~/godot/godot --headless --path godot --export-release "Windows"
           ~/godot/godot --headless --path godot --export-release "Linux"
           ~/godot/godot --headless --path godot --export-release "Mac"
-          ls -laR build/godot
+          mkdir -p build/godot-demo/windows build/godot-demo/linux build/godot-demo/mac
+          ~/godot/godot --headless --path godot --export-release "Windows Demo"
+          ~/godot/godot --headless --path godot --export-release "Linux Demo"
+          ~/godot/godot --headless --path godot --export-release "Mac Demo"
+          ls -laR build/godot build/godot-demo
 
       - name: Pack
         run: |
@@ -62,6 +66,10 @@ jobs:
           (cd windows && zip -qr ../../../KitchenRat-Windows.zip .)
           (cd linux && zip -qr ../../../KitchenRat-Linux.zip .)
           cp mac/KitchenRat.zip ../../KitchenRat-Mac.zip
+          cd ../godot-demo
+          (cd windows && zip -qr ../../../KitchenRat-Demo-Windows.zip .)
+          (cd linux && zip -qr ../../../KitchenRat-Demo-Linux.zip .)
+          cp mac/KitchenRat-Demo.zip ../../KitchenRat-Demo-Mac.zip
           ls -la ../../*.zip
 
       - uses: actions/upload-artifact@v4

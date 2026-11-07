@@ -21,6 +21,7 @@ const PEAK := {
 	"purr": 0.05, "scrape": 0.08, "scratch": 0.12, "snap": 0.79, "sniff": 0.12, "snore": 0.09, "splash": 0.17,
 	"squeak": 0.22, "squeaky": 0.12, "star_up": 0.5, "step": 0.035, "stomp": 0.3, "task": 0.19, "thud": 0.47,
 	"thunder": 0.6, "tv": 0.28, "whack": 0.72, "win": 0.31, "hum_loop": 0.12, "rain_loop": 0.14,
+	"clock_loop": 0.05, "fridge_loop": 0.06, "boiler_loop": 0.07, "drip_loop": 0.06,
 }
 
 static var I: Sfx

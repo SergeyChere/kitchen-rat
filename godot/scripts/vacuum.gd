@@ -100,3 +100,4 @@ func _carry_rat() -> void:
 	_bump = 1.0
 	if _ride > 3.0:
 		G.tasks.set_flag("ride")
+		Achievements.unlock("RIDER")

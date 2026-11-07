@@ -14,6 +14,9 @@ static var hints := true
 static var fullscreen := false
 static var vsync := true
 static var calm := false  # more time, the cat hears and sees less
+static var resolution := "1280x720"  # windowed size
+static var colorblind := false  # poison shows purple instead of green
+static var keys := {}  # action → ["key", physical keycode] | ["mouse", button] (rebound keys only)
 static var _loaded := false
 
 
@@ -33,6 +36,9 @@ static func load_all() -> void:
 		sfx = float(c.get_value("audio", "sfx", sfx))
 		hints = bool(c.get_value("game", "hints", hints))
 		calm = bool(c.get_value("game", "calm", calm))
+		colorblind = bool(c.get_value("game", "colorblind", colorblind))
+		resolution = str(c.get_value("video", "resolution", resolution))
+		keys = c.get_value("controls", "keys", {})
 	apply()
 
 
@@ -48,6 +54,9 @@ static func save() -> void:
 	c.set_value("audio", "sfx", sfx)
 	c.set_value("game", "hints", hints)
 	c.set_value("game", "calm", calm)
+	c.set_value("game", "colorblind", colorblind)
+	c.set_value("video", "resolution", resolution)
+	c.set_value("controls", "keys", keys)
 	c.save(FILE)
 	apply()
 
@@ -61,9 +70,21 @@ static func apply() -> void:
 		if DisplayServer.window_get_mode() != want and not (want == DisplayServer.WINDOW_MODE_WINDOWED and DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MAXIMIZED):
 			DisplayServer.window_set_mode(want)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+		if not fullscreen and DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
+			var r := resolution.split("x")
+			var want_size := Vector2i(int(r[0]), int(r[1]))
+			var screen := DisplayServer.screen_get_size()
+			want_size = Vector2i(mini(want_size.x, screen.x), mini(want_size.y, screen.y))
+			if DisplayServer.window_get_size() != want_size:
+				DisplayServer.window_set_size(want_size)
+				DisplayServer.window_set_position((screen - want_size) / 2)
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree and tree.root:
 		tree.root.msaa_3d = Viewport.MSAA_4X if quality == "high" else (Viewport.MSAA_2X if quality == "medium" else Viewport.MSAA_DISABLED)
+
+
+static func poison_color() -> Color:
+	return Color(0.75, 0.4, 0.95) if colorblind else Color(0.45, 0.9, 0.3)
 
 
 static func shadows() -> bool:
