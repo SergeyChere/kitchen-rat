@@ -41,13 +41,36 @@ Heat = **evidence** (permanent, from thefts) + **alarm** (temporary, decays when
 
 Alarm decays after 4 s out of sight (5/s), faster in the nest (14/s).
 
-| Stars | Heat | Response |
-|---|---|---|
-| ★ | 10 | Cat gets faster and sees further |
-| ★★ | 24 | Mousetraps appear (they smell like cheese) |
-| ★★★ | 40 | Owner wakes up, turns on the light, patrols with a flashlight, can see onto tables |
-| ★★★★ | 58 | Poisoned cheese appears (different smell, detectable by sniffing) |
-| ★★★★★ | 80 | Rat hunt: the owner is faster and won't leave until stars drop |
+Stars are reached at heat 10 / 24 / 40 / 58 / 80. Each night has an ordered list of threats; the
+n-th star unlocks the n-th threat. Stars beyond the list make everyone faster ("High alert").
+
+| Threat | What happens |
+|---|---|
+| cat | The cat starts asleep in its bed. Noise nearby or the first star wakes it. It can't climb, so it waits below |
+| owner | Footsteps, the door opens, the light comes on. Patrols with a flashlight, sees onto tables, chases, whacks with a slipper. Leaves if stars drop for 8 s |
+| traps | 3 mousetraps placed near furniture (2 more at 5 stars). They smell like cheese; sniffing reveals them |
+| poison | One cheese turns poisonous; new cheese has a 45% chance. Different scent color. Delivering it costs 4 food |
+| vacuum | A robot vacuum roams everywhere, including under furniture, eats floor crumbs and beeps loudly when it bumps you |
+
+## Nights
+
+| # | Room | Goal | Night length | Threat order |
+|---|---|---|---|---|
+| 1 | Kitchen | 10 | 4:00 | cat |
+| 2 | Living room | 14 | 4:30 | cat, owner |
+| 3 | Pantry | 16 | 4:45 | cat, owner, traps |
+| 4 | Dining room | 18 | 5:00 | cat, owner, traps, poison |
+| 5 | Kitchen, again | 22 | 5:00 | cat, owner, traps, poison, vacuum |
+
+Rooms are 960 × 600 and built from furniture pieces in `game/js/levels.js`. Any surface at most 57
+higher than the current one can be jumped to, so tall pieces need a step (chair → table, crates in a
+staircase, armchair → side table).
+
+## Sound
+
+All audio is synthesized in `game/js/audio.js`. Each night has its own key, tempo and chord loop. Two
+extra layers fade in on top: a "wanted" layer (ticking hats and a pulsing bass) that follows the star
+count, and chase drums while the cat or the owner is chasing you.
 
 ## Controls
 
@@ -63,13 +86,15 @@ See the main README.
 - [x] Wanted stars with mousetraps, the owner, poison
 - [x] Intro and outro cutscenes with the pups
 - [x] Desktop app (Electron) and CI builds
+- [x] Five nights in four rooms with escalating threats
+- [x] Synthesized adaptive music and sound effects
+- [x] Main menu, night select, pause, results, settings; saved progress
 
 ### Next
-- [ ] Sound: pup squeaks, footsteps, cat meows, tension music during chases
-- [ ] Settings menu: graphics quality (bloom on/off), mouse sensitivity, invert Y, volume
-- [ ] Save progress between nights; pups grow and ask for different food
-- [ ] Night 2+: new rooms (living room, pantry, basement), each adding one mechanic
-- [ ] Chapter 1 vertical slice: walls/pipes traversal path, kitchen heist, chase back to the nest
+- [ ] Pups grow between nights and ask for different food
+- [ ] Traversal paths between rooms (inside walls, pipes) as short linear levels
+- [ ] Gamepad support
+- [ ] More owner behaviour: sets traps where you were last seen, calls for help at 5 stars
 
 ### Unity port
 - [ ] Port jumping and surfaces

@@ -1,8 +1,9 @@
 # Kitchen Rat
 
-A stealth game about a mother rat who sneaks into a human kitchen at night to feed her hungry pups.
-Every theft leaves evidence, and the house fights back GTA-style: the more you steal, the higher your
-wanted level, from a wary cat to mousetraps, the owner with a flashlight, and poisoned cheese.
+A stealth game about a mother rat who sneaks into a different room of the house every night to feed
+her hungry pups. Every theft leaves evidence, and the house fights back GTA-style: the more you steal,
+the higher your wanted level, from a sleepy cat to the owner with a flashlight, mousetraps, poisoned
+cheese and a robot vacuum.
 
 ![icon](build/icon.png)
 
@@ -52,6 +53,25 @@ release (takes about 10 minutes), and the download links above switch to it auto
 
 Open `game/index.html` directly. Everything it needs is in `game/vendor/`, so it works offline.
 
+## The nights
+
+| Night | Room | Food to bring | New danger |
+|---|---|---|---|
+| 1 | The Kitchen | 10 | The cat (asleep when you arrive) |
+| 2 | The Living Room | 14 | The owner, with a flashlight |
+| 3 | The Pantry | 16 | Mousetraps that smell like cheese |
+| 4 | The Dining Room | 18 | Poisoned cheese |
+| 5 | The Kitchen, Again | 22 | A robot vacuum that goes under furniture |
+
+Inside a night the dangers arrive one by one as your wanted stars rise. Finishing a night unlocks the
+next one; progress and settings are saved automatically.
+
+## Settings
+
+Mouse sensitivity, invert Y, field of view, music and sound effect volume, graphics quality
+(High: bloom and shadows, Medium: no bloom, Low: no post effects or shadows), and hints on/off.
+Open them from the main menu or the pause menu.
+
 ## Controls
 
 | Action | Key |
@@ -69,9 +89,12 @@ Open `game/index.html` directly. Everything it needs is in `game/vendor/`, so it
 ## Project layout
 
 ```
-game/            The game itself: one HTML file (three.js r128) plus vendored libraries and fonts
-  index.html
-  vendor/
+game/            The game itself (three.js r128), runs offline
+  index.html     Markup, styles and menus
+  js/audio.js    Synthesized sound effects and adaptive music (Web Audio, no audio files)
+  js/levels.js   The five nights: furniture, threats, palettes, music. Add a night here
+  js/game.js     Room builder, rat, cat, owner, vacuum, wanted level, cutscenes, menus
+  vendor/        three.js and fonts
 electron/        Desktop shell: window, fullscreen, quit button bridge
 build/icon.png   App icon (used by the window and the installers)
 unity/           Unity port in progress (C#). Behind the HTML version, see unity/README.md
