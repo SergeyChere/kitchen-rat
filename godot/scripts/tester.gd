@@ -41,6 +41,30 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "chairray":
+		await _wait(host, 0.5)
+		for x in [586, 596, 606]:
+			var o := Nights.world(x, 420, 100)
+			var hit := g.ray(o, o + Vector3.DOWN * 1.2)
+			print("ray at ", x, ": ", hit.get("position", "none"), " ", hit.get("collider", null), " normal ", hit.get("normal", null))
+		for c in g._builder.furn.get_children():
+			if str(c.name).begins_with("chair"):
+				for b in c.find_children("*", "CollisionShape3D", true, false):
+					print(c.name, " shape ", (b as CollisionShape3D).global_position, " ", (b as CollisionShape3D).shape)
+				break
+		host.get_tree().quit()
+		return
+	if name == "islands":
+		for path in ["furniture/chair", "furniture/table_kitchen", "furniture/stool", "furniture/low_shelf", "furniture/kitchen_island"]:
+			var n: Node3D = (load("res://assets/models/" + path + ".glb") as PackedScene).instantiate()
+			for mi in n.find_children("*", "MeshInstance3D", true, false):
+				var isl := LevelBuilder._islands((mi as MeshInstance3D).mesh)
+				var txt := ""
+				for i in isl: txt += " [%s %.2f]" % [str(i[0].size.snapped(Vector3.ONE * 0.01)), i[2]]
+				print(path, " ", mi.name, " ", isl.size(), txt)
+			n.free()
+		host.get_tree().quit()
+		return
 	if name == "ypos":
 		await _wait(host, 1.0)
 		print("rat y ", g.rat.global_position.y, " floor ", g.rat.is_on_floor())
@@ -77,7 +101,7 @@ func _run(host: Node) -> void:
 			g.cam.snap(r.rotation.y)
 			if st[1] == "cabinet":  # walk to the far end of the upper shelf first
 				Input.action_press("forward")
-				await _wait(host, 0.8)
+				await _wait(host, 0.55)
 				Input.action_release("forward")
 			await _wait(host, 0.4)
 			_check("sees a jump target toward " + str(st[0]), r.has_jump_target(), "at " + str(r.global_position))

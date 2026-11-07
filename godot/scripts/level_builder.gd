@@ -120,22 +120,98 @@ func fit(n: Node3D, w: float, d: float, h := 0.0) -> void:
 
 
 ## Static collision from the meshes, plus an optional surface id ("chair", "table"…) the rat can stand on.
+## Furniture and props (under furn / decor) are split into their parts (legs, top, seat…): every part that is
+## box-like (fills at least 65% of its bounding box) gets a solid box, the rest (bowls, curved things) a two-sided
+## triangle mesh. Boxes have no gaps to slip into and no hollow inside to end up in.
 func collide(n: Node3D, surface := "") -> void:
 	if n == null:
 		return
+	var parts := n.get_parent() == furn or n.get_parent() == decor or (n.get_parent() != null and n.get_parent().get_parent() == decor)
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		if _soft(m.name):
 			continue
-		var body := StaticBody3D.new()
-		body.collision_layer = 1
-		body.collision_mask = 0
-		var cs := CollisionShape3D.new()
-		cs.shape = m.mesh.create_trimesh_shape()
-		body.add_child(cs)
-		m.add_child(body)
-		if surface != "":
-			body.set_meta("surface", surface)
+		var rest := []
+		if parts:
+			# boxes: one unscaled body at the mesh, boxes placed in it (shapes can't take a non-uniform scale)
+			var gt := m.global_transform
+			var sc := gt.basis.get_scale()
+			var bx := StaticBody3D.new()
+			bx.collision_layer = 1
+			bx.collision_mask = 0
+			bx.top_level = true
+			m.add_child(bx)
+			bx.global_transform = Transform3D(gt.basis.orthonormalized(), gt.origin)
+			if surface != "":
+				bx.set_meta("surface", surface)
+			for isl in _islands(m.mesh):
+				if isl[2] >= 0.65:
+					var bb: AABB = isl[0]
+					var cs := CollisionShape3D.new()
+					var sh := BoxShape3D.new()
+					sh.size = Vector3(maxf(bb.size.x * sc.x, 0.004), maxf(bb.size.y * sc.y, 0.004), maxf(bb.size.z * sc.z, 0.004))
+					cs.shape = sh
+					cs.position = bx.global_transform.affine_inverse() * (gt * bb.get_center())
+					bx.add_child(cs)
+				else:
+					rest.append_array(isl[1])
+		if not parts or not rest.is_empty():
+			var body := StaticBody3D.new()
+			body.collision_layer = 1
+			body.collision_mask = 0
+			m.add_child(body)
+			if surface != "":
+				body.set_meta("surface", surface)
+			var cs := CollisionShape3D.new()
+			var tri := ConcavePolygonShape3D.new()
+			tri.set_faces(PackedVector3Array(rest) if parts else m.mesh.get_faces())
+			tri.backface_collision = true
+			cs.shape = tri
+			body.add_child(cs)
+
+
+## The mesh's connected parts: [local AABB, triangle vertices, how much of the AABB it fills (0…1)].
+static func _islands(mesh: Mesh) -> Array:
+	var faces := mesh.get_faces()  # 3 vertices per triangle
+	var key := {}  # snapped position → vertex id
+	var parent := PackedInt32Array()
+	var ids := PackedInt32Array()
+	ids.resize(faces.size())
+	for i in faces.size():
+		var p := faces[i]
+		var k := Vector3i(roundi(p.x * 2000.0), roundi(p.y * 2000.0), roundi(p.z * 2000.0))
+		if not key.has(k):
+			key[k] = parent.size()
+			parent.append(parent.size())
+		ids[i] = key[k]
+	var find := func(a: int) -> int:
+		while parent[a] != a:
+			parent[a] = parent[parent[a]]
+			a = parent[a]
+		return a
+	for t in range(0, faces.size(), 3):
+		var a: int = find.call(ids[t])
+		for j in [1, 2]:
+			var b: int = find.call(ids[t + j])
+			if a != b:
+				parent[b] = a
+	var groups := {}  # root → [verts]
+	for t in range(0, faces.size(), 3):
+		var r: int = find.call(ids[t])
+		if not groups.has(r):
+			groups[r] = []
+		groups[r].append_array([faces[t], faces[t + 1], faces[t + 2]])
+	var out := []
+	for r in groups:
+		var vs: Array = groups[r]
+		var bb := AABB(vs[0], Vector3.ZERO)
+		var vol := 0.0
+		for t in range(0, vs.size(), 3):
+			bb = bb.expand(vs[t]).expand(vs[t + 1]).expand(vs[t + 2])
+			vol += (vs[t] as Vector3).dot((vs[t + 1] as Vector3).cross(vs[t + 2])) / 6.0
+		var bv := maxf(bb.size.x, 0.0001) * maxf(bb.size.y, 0.0001) * maxf(bb.size.z, 0.0001)
+		out.append([bb, vs, absf(vol) / bv])
+	return out
 
 
 ## Cloth, blankets and screens: no collision, and they don't count for sizing.
@@ -691,9 +767,14 @@ func _knockables() -> void:
 		var model := spawn(path, body.global_position, 0.0, body)
 		var b := aabb_of(model)
 		var cs := CollisionShape3D.new()
-		var sh := BoxShape3D.new()
-		sh.size = b.size
-		cs.shape = sh
+		if body.is_round():  # a sphere, so it rolls
+			var sp := SphereShape3D.new()
+			sp.radius = maxf(b.size.x, b.size.z) * 0.5
+			cs.shape = sp
+		else:
+			var sh := BoxShape3D.new()
+			sh.size = b.size
+			cs.shape = sh
 		cs.position = b.get_center()
 		body.add_child(cs)
 		g.knockables.append(body)

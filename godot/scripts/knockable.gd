@@ -11,16 +11,24 @@ var group := ""
 var knocked := false
 var _landed := false
 var _speed := 0.0
-var _slide := Vector3.ZERO  # pushed: it slides along the surface until it goes over the edge, then falls
-var _slid := 0.0
+var _start_y := 0.0
 
 
 func _ready() -> void:
 	freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 	freeze = true
+	var pm := PhysicsMaterial.new()  # slides off a table, bounces a little on the floor
+	pm.friction = 0.25
+	pm.bounce = 0.25
+	physics_material_override = pm
 	contact_monitor = true
 	max_contacts_reported = 4
 	body_entered.connect(_on_body_entered)
+
+
+## Round things roll (Game gives them a sphere to collide with).
+func is_round() -> bool:
+	return kind in ["apple", "ball", "orange"]
 
 
 func sound() -> String:
@@ -39,30 +47,24 @@ func knock(d: Vector3) -> void:
 		return
 	knocked = true
 	d.y = 0.0
-	_slide = d.normalized() if d.length() > 0.001 else push_dir
+	_start_y = global_position.y
+	var dir := d.normalized() if d.length() > 0.001 else push_dir
+	var push := 1.5 + (Game.I.rat.move_speed * 0.4 if Game.I and Game.I.rat else 0.0)  # a running rat shoves harder
+	freeze = false
+	apply_central_impulse((dir * push + Vector3.UP * 0.25) * mass)
+	apply_torque_impulse(dir.cross(Vector3.UP) * -0.004 * mass * (3.0 if is_round() else 1.0))
 	Game.I.tasks.knocked[kind] = true
 	if group != "":
 		Game.I.knock_group(self)
 
 
-func _physics_process(dt: float) -> void:
-	if knocked and _slide != Vector3.ZERO:
-		global_position += _slide * 0.7 * dt
-		_slid += 0.7 * dt
-		var q := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.05, global_position + Vector3.DOWN * 0.04, 1, [get_rid()])
-		var supported := not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
-		if not supported or _slid > 1.0:  # over the edge: let it fall
-			freeze = false
-			apply_central_impulse((_slide * 0.6 + Vector3.UP * 0.1) * mass)
-			apply_torque_impulse(Vector3(randf() - 0.5, randf() - 0.5, randf() - 0.5) * 0.01)
-			_slide = Vector3.ZERO
-		return
+func _physics_process(_dt: float) -> void:
 	if knocked:
 		_speed = maxf(_speed * 0.9, linear_velocity.length())
 
 
 func _on_body_entered(_b: Node) -> void:
-	if not knocked or _landed or _speed < 1.2:
+	if not knocked or _landed or _speed < 1.2 or global_position.y > _start_y - 0.1:  # only once it has fallen
 		return
 	_landed = true
 	Game.I.knock_landed(self, global_position)

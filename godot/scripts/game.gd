@@ -503,7 +503,8 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 	var breaks := k.kind == "cup" and at.y < 0.2  # a mug that hits the floor breaks
 	print_verbose("knock landed ", k.kind, " at ", at)
 	noise(at, 4.6, "Crash!" if breaks else k.sound(), true, -1.0, true)
-	Sfx.play("crash" if breaks else KNOCK_SND.get(k.kind, "thud"), at)
+	var loud := clampf(remap(k._speed, 1.2, 4.0, -8.0, 2.0), -8.0, 2.0)  # harder hit, louder
+	Sfx.play("crash" if breaks else KNOCK_SND.get(k.kind, "thud"), at, loud)
 	if breaks:
 		var shards := _builder.spawn("props/mug_broken", Vector3(k.global_position.x, 0.0, k.global_position.z), randf() * 360.0, _builder.decor)
 		if shards:

@@ -165,9 +165,16 @@ func _physics_process(dt: float) -> void:
 	if d.length() > 0.01:
 		rotation.y = rotate_toward(rotation.y, Nights.yaw_to(d), 10.0 * dt)
 
+	if _land_t > 0.0:
+		spd *= 0.4  # getting up after a landing (longer after a big drop)
 	var before := global_position
-	velocity.x = d.x * spd
-	velocity.z = d.z * spd
+	# a little weight: she speeds up and slows down over a moment (slower to get going with a load)
+	var want := Vector2(d.x, d.z) * spd
+	var cur := Vector2(velocity.x, velocity.z)
+	var rate := (9.0 * (1.0 - 0.12 * carry_weight())) if want.length() > cur.length() * 0.9 else 7.0
+	cur = cur.move_toward(want, rate * dt)
+	velocity.x = cur.x
+	velocity.z = cur.y
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = -0.5
 	velocity.y -= gravity * dt
@@ -295,6 +302,18 @@ func _tick_jump(dt: float) -> void:
 		p = _climb_pos(t)
 	else:
 		p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
+	# a real flight: something in the way (a chair back, a wall, a lamp) stops her and she drops
+	if not _jump_up or t < 0.35:
+		var hit := move_and_collide(p - global_position, true)
+		if hit and hit.get_normal().y < 0.5:
+			var away := hit.get_normal()
+			away.y = 0.0
+			jumping = false
+			if model:
+				model.rotation.x = 0.0
+			velocity = away.normalized() * 0.4 + Vector3.DOWN * 0.5
+			Sfx.play("thud", global_position, -10.0, 1.6)
+			return
 	global_position = p
 	if model:
 		model.rotation.x = -deg_to_rad(_climb_tilt(t)) if _jump_up else 0.0
@@ -304,7 +323,8 @@ func _tick_jump(dt: float) -> void:
 	if model:
 		model.rotation.x = 0.0
 	velocity = Vector3(0, -0.5, 0)
-	_land_t = 0.2
+	var drop := _from.y - _to.y
+	_land_t = clampf(0.12 + drop * 0.35, 0.12, 0.5) if not _jump_up else 0.12
 	add_noise(0.15 if _jump_up else 0.35)
 	_update_surface()
 	landed.emit(_from.y - _to.y)
