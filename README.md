@@ -71,6 +71,11 @@ Nights menu as "in development". The plan is in the design doc.
 | 8 | Dinner Leftovers | 16 | Paths inside the walls: hide in a crack, press Space to come out of another. Drag a chicken leg home |
 | 9 | The Laundry Room | 16 | The cat eats, then naps. Start the washing machine to hide your steps |
 | 10 | The Storm | 18 | Thunder hides every sound, lightning shows you. Then the power goes out |
+| 11 | Mousetraps | 18 | Brave comes along (Q: wait/follow, R: fetch). Sniff out traps, drop things on them to spring them |
+| 12 | Sticky Traps | 18 | Yellow tape holds you in place. Curious spots hidden things. Roll a potato home |
+| 13 | The Kids’ Room | 18 | Don’t wake the kid. Squeaky toys, Lego, a music box, a night light. Shy freezes at loud noises but warns you of danger |
+| 14 | The Party | 18 | Guests sleep over (snoring stops = waking up). Greedy runs for food. Steal the cake |
+| 15 | Poison | 20 | Green scent means poison. Curious and Greedy both come along |
 
 Tasks for the night show up one at a time in the bottom-left corner. Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
 night unlocks the next one; progress and settings are saved automatically.

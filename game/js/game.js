@@ -616,6 +616,11 @@ const NOISY = {
   balloon: { mode: 'step', label: 'POP!', radius: 420, amt: 0.8, big: true, snd: 'bang', once: true },
   confetti: { mode: 'walk', label: 'Rustle', radius: 140, amt: 0.3, snd: 'crinkle', cd: 0.5 },
   glasses: { mode: 'walk', label: 'Clink!', radius: 220, amt: 0.5, snd: 'clink', cd: 0.9 },
+  lego: { mode: 'walk', label: 'Ouch! Lego!', radius: 190, amt: 0.45, snd: 'crunch', cd: 0.8 },
+  musicbox: { mode: 'step', label: '♪ Twinkle twinkle… ♪', radius: 300, amt: 0.6, snd: 'musicbox', cd: 5 },
+  nightlight: { mode: 'walk', label: 'Click! The night light is on', radius: 160, amt: 0.25, snd: 'lightSwitch', cd: 6, effect: 'light' },
+  bottles: { mode: 'walk', label: 'Clatter!', radius: 240, amt: 0.5, snd: 'clink', cd: 0.8 },
+  popper: { mode: 'step', label: 'BANG! A party popper!', radius: 450, amt: 0.85, big: true, snd: 'bang', once: true },
 };
 function addNoisy(p) {
   const def = NOISY[p.kind], s = p.surf ? null : surfaceAt(p.x, p.y);
@@ -631,6 +636,7 @@ function triggerNoisy(z) {
   if (Snd.fx[z.snd]) Snd.fx[z.snd]();
   noise(rat.x, rat.y, z.radius, z.label, !!z.big, z.amt);
   if (z.mesh && z.kind === 'balloon') z.mesh.visible = false;
+  if (z.effect === 'light') { lightOn = true; clearTimeout(L.lightTimer); L.lightTimer = setTimeout(() => { if (human.mode === 'away') lightOn = false; }, 6000); }
   if (z.effect === 'wash') { washT = 45; L.hums.push({ x: z.x, y: z.y, r: 300, wash: true }); if (Q) Q.flags.washer = true; bubble('Rumble rumble…', z.x, z.y, 60, 2); }
   if (z.effect === 'tv' && L.tv) { L.tv.base = 1.9; L.tv.mat.color.set(0x9cc2ff); L.tvOn = true; if (cat.mode === 'sleep') wakeCat(rat.x, rat.y); }
   if (Q) Q.flags.mistakes = (Q.flags.mistakes || 0) + 1;
@@ -645,6 +651,11 @@ const PROPS = {
     else if (p.kind === 'bag') { for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(8 + i * 2, 0), T(0xe8e4dc, { flatShading: true })); b.scale.y = 0.45; b.position.set(p.x + (i - 1) * 9, y0 + 3, p.y + (i % 2) * 6); b.rotation.y = i; add(b); } }
     else if (p.kind === 'grain') { const r = p.r || 26; for (let i = 0; i < 46; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; box(1.6, 1, 1.6, T(0xe0c890), p.x + Math.cos(a) * d, y0 + 0.5, p.y + Math.sin(a) * d, { block: false, line: false }); } }
     else if (p.kind === 'puddle') { const m = new THREE.Mesh(new THREE.CircleGeometry(p.r || 24, 24), new THREE.MeshBasicMaterial({ color: 0x8ab4e0, transparent: true, opacity: 0.35, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, y0 + 0.6, p.y); m.scale.y = 0.7; add(m); }
+    else if (p.kind === 'lego') { const r = p.r || 24; for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; box(4, 2.4, 2.6, T([0xe84a5a, 0x4a9ae8, 0xf2c84a, 0x6ac46a][i % 4]), p.x + Math.cos(a) * d, y0 + 1.2, p.y + Math.sin(a) * d, { block: false, line: false }); } }
+    else if (p.kind === 'musicbox') { box(12, 8, 9, T(0xd88ab0), p.x, y0 + 4, p.y, { block: false }); box(12.5, 1.5, 9.5, T(0xf2d06a), p.x, y0 + 8.5, p.y, { block: false, line: false }); }
+    else if (p.kind === 'nightlight') { const b = new THREE.Mesh(new THREE.SphereGeometry(4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe8a0 })); b.position.set(p.x + (p.w || 0) / 2, 8, p.y + (p.h || 0) / 2); add(b); }
+    else if (p.kind === 'bottles') { for (let i = 0; i < 3; i++) { const c = cyl(4, 16, T(0x3a7a4a), p.x + i * 9 + (p.w || 0) / 2 - 9, y0 + 4, p.y + (p.h || 0) / 2 + (i % 2) * 6); c.rotation.z = Math.PI / 2; } }
+    else if (p.kind === 'popper') { cyl(2.5, 9, T(0xe8b84a), p.x, y0 + 4.5, p.y, { r2: 4 }); }
     else if (p.kind === 'washer') { box(5, 3, 5, T(0x3ac04a, { emissive: 0x105a10 }), p.x, y0 + 1.6, p.y, { block: false, line: false }); }
     else if (p.kind === 'hanger') { for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(6, 0.6, 4, 3), T(0xb8bcc4)); t.rotation.x = -Math.PI / 2; t.position.set(p.x + i * 10 - 10 + (p.w || 0) / 2, y0 + 0.8, p.y + (p.h || 0) / 2 + (i % 2) * 6); add(t); } }
     else if (p.kind === 'balloon') { const b = new THREE.Mesh(new THREE.SphereGeometry(9, 14, 10), T([0xe84a5a, 0x4a9ae8, 0xf2c84a][Math.floor(Math.random() * 3)])); b.scale.y = 1.15; b.position.set(p.x, y0 + 10, p.y); b.castShadow = true; outline(b, 0.8); add(b); z.mesh = b; }
@@ -656,6 +667,9 @@ const PROPS = {
     const m = box(26, 30, 18, T(0xd8c49a), p.x, h + 15, p.y, { block: false }); box(26.5, 4, 18.5, T(0xb04a3a), p.x, h + 22, p.y, { block: false, line: false });
     L.gnaws.push({ x: p.x, y: p.y, h, surf: s ? s.id : 'floor', prog: 0, done: false, spawn: p.spawn || 4, tag: p.tag, mesh: m, sndT: 0 });
   },
+  sticky(p) { const s0 = p.floor ? null : surfaceAt(p.x + p.w / 2, p.y + p.h / 2), h = s0 ? s0.h : 0; L.sticky.push({ x: p.x, y: p.y, w: p.w, h: p.h, top: h });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.h), new THREE.MeshBasicMaterial({ color: 0xe8d070, transparent: true, opacity: 0.45, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x + p.w / 2, h + 0.8, p.y + p.h / 2); add(m); },
+  backpack(p) { PROPS.gnaw(Object.assign({}, p, { spawn: p.spawn || 4 })); const g = L.gnaws[L.gnaws.length - 1]; g.mesh.material = T(0x3a6ac8); g.cookies = true; },
   hum(p) { L.hums.push({ x: p.x, y: p.y, r: p.r || 120, label: p.label || 'The hum hides your steps' }); },
   foil(p) {
     L.foils.push(R(p.x, p.y, p.w, p.h));
@@ -719,7 +733,7 @@ function buildLevel(i) {
   // knockables
   (d.knocks || []).forEach(k => { const s = surfaceAt(k.x, k.y); if (!s) return; const info = KNOCK_INFO[k.kind]; L.knocks.push({ kind: k.kind, x: k.x, y: k.y, to: k.to, h: s.h, surf: s.id, word: info.word, text: info.text, snd: info.snd, trap: !!k.trap, group: k.group, spawn: k.spawn, delay: -1, done: false, fall: null, mesh: knockMesh(k.kind) }); });
   // props: foil (crinkles under the paws unless you sneak), bread box; secrets: hidden collectibles
-  L.foils = []; L.secrets = []; L.noisy = []; L.gnaws = []; L.hums = []; L.tvOn = false;
+  L.foils = []; L.secrets = []; L.noisy = []; L.gnaws = []; L.hums = []; L.sticky = []; L.tvOn = false;
   (d.props || []).forEach(p => PROPS[p.t] && PROPS[p.t](p));
   (d.secrets || []).forEach(sc => { const s0 = sc.floor ? null : surfaceAt(sc.x, sc.y), h = s0 ? s0.h : 0; L.secrets.push({ kind: sc.kind, label: sc.label || COLLECT[sc.kind] && COLLECT[sc.kind].label, x: sc.x, y: sc.y, h, always: !!sc.always, mesh: collectMesh(sc.kind, sc.x, h, sc.y), found: false }); });
   L.tv = L.flickers.find(f => f.type === 'tv') || null;
@@ -844,8 +858,11 @@ function resetRun() {
   (L.secrets || []).forEach(sc => { sc.found = false; sc.mesh.visible = false; });
   const fd = foodDef();
   fd.spots.forEach(([type, x, y, o]) => placeItem(type, x, y, o));
+  rat.stuckT = 0; rat.stuckImm = 0; makeComps(); makeSleepers();
+  (L.d.trapSpots || []).forEach(([x, y, o]) => { const t = makeTrap(x, y); t.hidden = !!(o && o.hidden); traps.push(t); });
   for (let i = 0; i < fd.random.crumb; i++) spawnItem('crumb');
   for (let i = 0; i < fd.random.cheese; i++) spawnItem('cheese');
+  if (L.d.poisonStart) { const c = items.filter(i => i.type === 'cheese' && !i.tag && !i.poison); for (let k = 0; k < L.d.poisonStart && c.length; k++) makePoison(c.splice(Math.floor(Math.random() * c.length), 1)[0]); }
   updHud();
 }
 function foodDef() {
@@ -1154,7 +1171,7 @@ function updateProps(dt) {
   }
   for (const sc of L.secrets) {
     if (sc.found || rat.jump || Math.abs(rat.h - sc.h) > 8 || Math.hypot(sc.x - rat.x, sc.y - rat.y) > 16) continue;
-    sc.found = true; sc.mesh.visible = false; if (Q) Q.flags[sc.kind] = true;
+    sc.found = true; sc.mesh.visible = false; if (Q) { Q.flags[sc.kind] = true; Q.flags.collected = (Q.flags.collected || 0) + 1; }
     bubble(sc.label || 'Found something!', rat.x, rat.y, rat.h + 32, 2.6); Snd.fx.cheese();
   }
   // noisy things on the floor and furniture
@@ -1169,13 +1186,18 @@ function updateProps(dt) {
     const g = gnawCand; g.prog += dt / 2.2; g.sndT -= dt;
     if (g.sndT <= 0) { g.sndT = 0.45; Snd.fx.gnaw(); noise(g.x, g.y, 200, 'Gnaw gnaw', false, 0.3); }
     if (g.prog >= 1) {
-      g.done = true; g.mesh.scale.y = 0.55; if (Q) Q.flags.gnaw = true;
-      for (let i = 0; i < g.spawn; i++) { const a = i / g.spawn * 6.28; placeItem(i === 0 && g.tag ? 'cheese' : 'crumb', g.x + Math.cos(a) * 26, g.y + Math.sin(a) * 26 + 18, { tag: i === 0 ? g.tag : undefined }); }
-      PARENT = world; PROPS.noisy({ kind: 'grain', x: g.x, y: g.y + 22, r: 32 }); bubble('The bag is open! Careful, the grain crunches.', rat.x, rat.y, rat.h + 30, 2.4);
+      g.done = true; g.mesh.scale.y = 0.55; if (Q) Q.flags[g.cookies ? 'backpack' : 'gnaw'] = true;
+      for (let i = 0; i < g.spawn; i++) { const a = i / g.spawn * 6.28; placeItem(g.cookies ? 'cookie' : i === 0 && g.tag ? 'cheese' : 'crumb', g.x + Math.cos(a) * 26, g.y + Math.sin(a) * 26 + 18, { tag: i === 0 ? g.tag : undefined }); }
+      if (!g.cookies) { PARENT = world; PROPS.noisy({ kind: 'grain', x: g.x, y: g.y + 22, r: 32 }); } bubble(g.cookies ? 'Cookies! The backpack is open.' : 'The bag is open! Careful, the grain crunches.', rat.x, rat.y, rat.h + 30, 2.4);
     }
   }
   // the cat's bell: you can hear where it is
   if (L.d.catBell && cat.mode !== 'sleep' && cat.mode !== 'away' && cat.speed > 20) { bellT -= dt; if (bellT <= 0) { bellT = 0.45; Snd.fx.bell(0.06 * clamp01(1 - Math.hypot(cat.x - rat.x, cat.y - rat.y) / 700)); } }
+}
+function updateSticky(dt) {
+  if (rat.stuckT > 0) { rat.stuckT -= dt; rat.stuckSnd = (rat.stuckSnd || 0) - dt; if (rat.stuckSnd <= 0) { rat.stuckSnd = 0.6; Snd.fx.squeak(1.2, 0.12); noise(rat.x, rat.y, 200, 'Squeak! Stuck!', false, 0.4); } if (rat.stuckT <= 0) rat.stuckImm = 1.6; return; }
+  rat.stuckImm = Math.max(0, (rat.stuckImm || 0) - dt);
+  if (rat.stuckImm <= 0 && !rat.jump && L.sticky.some(r => Math.abs(rat.h - r.top) < 6 && inRect(rat.x, rat.y, r))) { rat.stuckT = 2.2; run.stuck = true; if (Q) Q.flags.stuck = (Q.flags.stuck || 0) + 1; bubble('Ugh, sticky tape!', rat.x, rat.y, rat.h + 30, 1.6); }
 }
 let gnawCand = null, bellT = 0, tunnelCand = null, washT = 0, flashT = 0, thunderT = 0, stormMaskT = 0, nextBolt = 8, blackout = false, mudMove = 0;
 function crackAt() { for (let i = 0; i < L.cracks.length; i++) if (inRect(rat.x, rat.y, L.cracks[i], 2)) return i; return -1; }
@@ -1210,6 +1232,132 @@ function updateWorld(dt) {
   }
 }
 let lastRX2 = 0, lastRY2 = 0;
+// ================= PUPS THAT COME ALONG =================
+const PUP_INFO = {
+  brave: { name: 'Brave', color: 0xc4aaa6, speed: 1.15 }, greedy: { name: 'Greedy', color: 0xd0b8b2, speed: 0.95 },
+  shy: { name: 'Shy', color: 0xb09f9b, speed: 1 }, curious: { name: 'Curious', color: 0xa7978f, speed: 1.05 },
+};
+let comps = [], momTrail = [], idleT = 0, pupWarnT = 0;
+function makeComps() {
+  comps.forEach(c => scene.remove(c.mesh)); comps = []; momTrail = [];
+  const list = L.d.pups || []; const age = L.d.pupAge || 0.62;
+  list.forEach((k, i) => { const info = PUP_INFO[k], m = makeRodent(info.color, age); comps.push({ kind: k, name: info.name, info, x: hole.x + 20 + i * 12, y: hole.y - 20 - i * 10, a: 0, mode: 'follow', item: null, step: 0, mesh: m, freezeT: 0, target: null, saidT: 0, h: 0 }); });
+}
+const pupHidden = c => L.hides.some(h => inRect(c.x, c.y, h)) || Math.hypot(c.x - hole.x, c.y - hole.y) < hole.r;
+function pupSay(c, t, d = 1.4) { if (c.saidT > 0) return; c.saidT = 1.5; bubble(t, c.x, c.y, 18, d); Snd.fx.squeak(1.8 + Math.random() * 0.3, 0.07); }
+function capturePup(c, by) {
+  if (c.mode === 'captured' || c.mode === 'stuck') return;
+  if (c.item) { placeItem(c.item.type, c.x, c.y, { floor: true }); c.item = null; }
+  if (by === 'trap' || by === 'sticky') { c.mode = 'stuck'; pupSay(c, 'Mom! I’m stuck!', 2); }
+  else { c.mode = 'captured'; const b = L.d.catBed; c.x = b[0] + 22; c.y = b[1] + 6; pupSay(c, 'MOM! HELP!', 2.2); banner(c.name + ' got caught!', by === 'owner' ? 'The owner dropped them by the cat bed. Rescue them!' : 'The cat dragged them to its bed. Distract it and rescue them!', 4); }
+  run.pupCaught = true; Snd.fx.caught();
+}
+function stepPup(c, tx, ty, spd, dt) { const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy); if (d < 2) return true; const m = Math.min(d, spd * dt); const e = { x: c.x + dx / d * m, y: c.y + dy / d * m, r: 6 }; resolve(e, L.solids); c.x = e.x; c.y = e.y; c.a += angDiff(c.a, Math.atan2(dy, dx)) * Math.min(1, dt * 10); c.step += m * 0.25; return false; }
+function nearestFood(x, y, r, allowPoison) { let best = null, bd = r; for (const it of items) { if (it.big || it.h > 2 || (it.poison && !allowPoison)) continue; const d = Math.hypot(it.x - x, it.y - y); if (d < bd) { bd = d; best = it; } } return best; }
+function updatePups(dt) {
+  if (!comps.length) return;
+  // the mother's momTrail
+  const last = momTrail[momTrail.length - 1];
+  if (rat.surf === 'floor' && !rat.jump && (!last || Math.hypot(last[0] - rat.x, last[1] - rat.y) > 8)) { momTrail.push([rat.x, rat.y]); if (momTrail.length > 80) momTrail.shift(); }
+  const moving = Math.hypot(rat.x - lastRX, rat.y - lastRY) > 0.2; idleT = moving ? 0 : idleT + dt; pupWarnT -= dt;
+  if (pressed.KeyQ) {
+    const anyFollow = comps.some(c => c.mode === 'follow' || c.mode === 'fetch');
+    comps.forEach(c => { if (c.mode === 'captured' || c.mode === 'stuck' || c.mode === 'carry') return;
+      if (anyFollow) { c.mode = 'stay'; let best = null, bd = 140; for (const h of L.hides) { if (!h.land) continue; const d = Math.hypot(h.x + h.w / 2 - c.x, h.y + h.h / 2 - c.y); if (d < bd) { bd = d; best = h; } } c.target = best ? [best.x + best.w / 2, best.y + best.h / 2] : [c.x, c.y]; pupSay(c, best ? 'I’ll hide here!' : 'I’ll wait!'); if (Q) Q.flags.pupStay = true; }
+      else { c.mode = 'follow'; pupSay(c, 'Coming, Mom!'); } });
+  }
+  if (pressed.KeyR) {
+    const c = comps.find(q => q.mode === 'follow' || q.mode === 'stay');
+    const it = c && nearestFood(rat.x, rat.y, 200, false);
+    if (c && it) { c.mode = 'fetch'; c.target = it; pupSay(c, 'I’ll get it!'); } else if (c) pupSay(c, 'I don’t see any food nearby');
+  }
+  for (const c of comps) {
+    c.saidT -= dt; c.freezeT -= dt;
+    const spd = 150 * c.info.speed * (rat.crouch ? 0.5 : 1);
+    if (c.mode === 'captured' || c.mode === 'stuck') { if (Math.random() < dt * 0.4) pupSay(c, 'Mom…'); if (rat.surf === 'floor' && !rat.jump && Math.hypot(rat.x - c.x, rat.y - c.y) < 20) { c.mode = 'follow'; pupSay(c, 'Thanks, Mom!'); if (Q) Q.flags.pupRescued = true; } continue; }
+    if (c.freezeT > 0) continue;
+    // personalities
+    if (c.kind === 'greedy' && c.mode === 'follow') { const it = nearestFood(c.x, c.y, 100, true); if (it) { c.mode = 'fetch'; c.target = it; pupSay(c, it.poison ? 'Ooh, green cheese!' : 'Food!'); } }
+    if (c.kind === 'brave' && c.mode === 'follow' && idleT > 2.5) { const it = nearestFood(c.x, c.y, 240, false); if (it) { c.mode = 'fetch'; c.target = it; pupSay(c, 'I’ll go first!'); } }
+    if (c.kind === 'shy' && pupWarnT <= 0 && cat.mode !== 'sleep' && cat.mode !== 'away' && Math.hypot(cat.x - c.x, cat.y - c.y) < 220) { pupWarnT = 6; c.saidT = 0; pupSay(c, '!! The cat!', 1.6); }
+    if (c.kind === 'curious') for (const it of items) if (Math.hypot(it.x - c.x, it.y - c.y) < 110) it.reveal = Math.max(it.reveal || 0, 2);
+    if (c.kind === 'curious') for (const sc of L.secrets) if (!sc.found && Math.hypot(sc.x - c.x, sc.y - c.y) < 140 && !sc.pointed) { sc.pointed = true; sc.always = true; pupSay(c, 'Mom, look! Something shiny!', 2); }
+    if (c.mode === 'follow') {
+      const hid = ratHidden && rat.surf === 'floor';
+      let tx, ty, gap = 22 + comps.indexOf(c) * 16;
+      if (hid) { tx = rat.x + (comps.indexOf(c) - 0.5) * 8; ty = rat.y + 6; gap = 4; }
+      else { let acc = 0, k = momTrail.length - 1; tx = momTrail[k] ? momTrail[k][0] : rat.x; ty = momTrail[k] ? momTrail[k][1] : rat.y;
+        while (k > 0 && acc < gap) { acc += Math.hypot(momTrail[k][0] - momTrail[k - 1][0], momTrail[k][1] - momTrail[k - 1][1]); k--; tx = momTrail[k][0]; ty = momTrail[k][1]; } }
+      if (Math.hypot(tx - c.x, ty - c.y) > (hid ? 2 : 6)) stepPup(c, tx, ty, Math.hypot(tx - c.x, ty - c.y) > 120 ? spd * 1.4 : spd, dt);
+    } else if (c.mode === 'stay') { if (c.target) stepPup(c, c.target[0], c.target[1], spd, dt); }
+    else if (c.mode === 'fetch') {
+      const it = c.target;
+      if (!items.includes(it)) { c.mode = 'follow'; continue; }
+      if (stepPup(c, it.x, it.y, spd, dt) || Math.hypot(it.x - c.x, it.y - c.y) < 8) { items.splice(items.indexOf(it), 1); scene.remove(it.mesh); if (it.wisps) it.wisps.forEach(w => scene.remove(w.s)); c.item = it; c.mode = 'carry'; Snd.fx.pickup(); }
+    } else if (c.mode === 'carry') {
+      if (stepPup(c, hole.x, hole.y, spd, dt) || Math.hypot(hole.x - c.x, hole.y - c.y) < 14) { const it = c.item; c.item = null; fed = Math.max(0, fed + (it.poison ? -4 : it.v)); if (it.poison) { run.poisonDelivered = true; pupSay(c, 'Oops… it was green', 2); } else pupSay(c, '+' + it.v + ' for the nest!'); Snd.fx.deliver(); if (Q) Q.flags.pupFetch = (Q.flags.pupFetch || 0) + 1; c.mode = 'follow'; updHud(); }
+    }
+    // dangers: the cat, the owner, traps, sticky tape
+    if (!pupHidden(c)) {
+      if (cat.mode !== 'sleep' && cat.mode !== 'away' && cat.mode !== 'eat' && Math.hypot(cat.x - c.x, cat.y - c.y) < 22) capturePup(c, 'cat');
+      else if (human.mode !== 'away' && human.mode !== 'coming' && human.mode !== 'leaving' && Math.hypot(human.x - c.x, human.y - c.y) < 30) capturePup(c, 'owner');
+    }
+    for (const t of traps) if (!t.sprung && Math.hypot(t.x - c.x, t.y - c.y) < 10) { t.sprung = true; t.bait.visible = false; Snd.fx.snap(); noise(t.x, t.y, 300, 'SNAP!', true, 0.6); capturePup(c, 'trap'); }
+    if (L.sticky.some(r => r.top === 0 && inRect(c.x, c.y, r))) capturePup(c, 'sticky');
+  }
+}
+function syncPups(inRun) {
+  for (const c of comps) {
+    const m = c.mesh, u = m.userData; m.visible = inRun || state === 'outro';
+    m.position.set(c.x, 0, c.y); m.rotation.y = -c.a;
+    if (u.legs) u.legs.forEach((l, i) => l.rotation.z = Math.sin(c.step + i * Math.PI) * 0.5);
+    if (c.item) { if (!c.item.mesh.parent || c.item.mesh.parent !== scene) scene.add(c.item.mesh); c.item.mesh.position.set(c.x + Math.cos(c.a) * 8, 3, c.y + Math.sin(c.a) * 8); }
+  }
+}
+// ================= PEOPLE WHO SLEEP IN THE ROOM (the kid, guests) =================
+let sleepers = [];
+function makeSleepers() {
+  sleepers.forEach(z => { scene.remove(z.mesh); z.tag.remove(); }); sleepers = [];
+  (L.d.sleepers || []).forEach(sd => {
+    const m = makeHuman(); const k = sd.kind === 'kid' ? 0.62 : 0.9; m.scale.setScalar(k); scene.add(m);
+    const tag = document.createElement('div'); tag.className = 'tag'; $('tags').appendChild(tag);
+    sleepers.push(Object.assign({ sleep: 1, stage: 0, calmT: 0, awakeT: 0, snoreT: 1, mesh: m, tag, k }, sd));
+  });
+}
+function disturbSleepers(x, y, radius, amt) {
+  for (const z of sleepers) { if (z.awakeT > 0) continue; const d = Math.hypot(z.x - x, z.y - y); if (d >= radius) continue;
+    z.sleep -= amt * (1 - d / radius) * (1 + stars * 0.2) * (z.sense || 1); z.calmT = 2.5; if (z.sleep <= 0) wakeSleeper(z); }
+}
+function wakeSleeper(z) {
+  z.awakeT = z.kind === 'kid' ? 12 : 9; z.sleep = 0; run.sleeperWoke = true;
+  if (z.kind === 'kid') { bubble('MOOOM! A RAT!!!', z.x, z.y, 70, 2.6); Snd.fx.meow('angry'); alarm += 45; if (cat.mode === 'sleep') wakeCat(z.x, z.y); }
+  else { bubble('Huh? Wha…', z.x, z.y, 80, 2); alarm += 20; }
+}
+function updateSleepers(dt) {
+  for (const z of sleepers) {
+    if (z.awakeT > 0) {
+      z.awakeT -= dt;
+      const dx = rat.x - z.x, dy = rat.y - z.y, d = Math.hypot(dx, dy);
+      if (!ratHidden && d < 260 && Math.abs(angDiff(z.face, Math.atan2(dy, dx))) < 0.9 && los(z.x, z.y, rat.x, rat.y, 60)) { alarm += dt * 14; if (Math.random() < dt) bubble('There! A rat!', z.x, z.y, 80, 1.2); }
+      if (z.awakeT <= 0) { z.sleep = 0.55; z.stage = 1; bubble('…zzz', z.x, z.y, 70, 1.4); }
+      continue;
+    }
+    z.calmT -= dt; if (z.calmT <= 0) z.sleep = Math.min(1, z.sleep + dt * 0.04);
+    const st = z.sleep > 0.6 ? 0 : z.sleep > 0.3 ? 1 : 2; if (st > z.stage) bubble(st === 1 ? 'Mmm…' : (z.kind === 'kid' ? 'Mom…?' : '*snort*'), z.x, z.y, 70, 1.3); z.stage = st;
+    z.snoreT -= dt; if (z.snoreT <= 0 && st === 0) { z.snoreT = 3.4; if (z.kind !== 'kid') { Snd.fx.purr(0.08 * clamp01(1 - Math.hypot(z.x - rat.x, z.y - rat.y) / 600)); say('Zzzz', z.x, z.y, 70, '#9fb4ff', 16); } }
+  }
+}
+function syncSleepers(inRun) {
+  for (const z of sleepers) {
+    const m = z.mesh; m.visible = inRun; const up = z.awakeT > 0 ? 1 : 0;
+    m.position.set(z.x, z.bedH || 0, z.y); m.rotation.set(0, -z.face, 0); m.rotation.z = lerp(m.rotation.z, up ? -0.5 : -Math.PI / 2, 0.2);
+    const p = project(z.x, (z.bedH || 0) + 45, z.y);
+    if (inRun && p.vis) { const col = z.awakeT > 0 ? '#e8664a' : z.stage === 0 ? '#9fb4ff' : z.stage === 1 ? '#f2c14e' : '#e8664a';
+      z.tag.hidden = false; z.tag.style.left = p.x + 'px'; z.tag.style.top = p.y + 'px'; z.tag.style.color = col; z.tag.style.fontSize = '14px';
+      z.tag.innerHTML = '<span class="zz">' + (z.awakeT > 0 ? 'AWAKE!' : z.kind === 'kid' ? 'Kid · Zzz' : 'Guest · Zzz') + '</span><span class="sleepbar"><i style="width:' + Math.round((z.awakeT > 0 ? 0 : z.sleep) * 100) + '%;background:' + col + '"></i></span>'; }
+    else z.tag.hidden = true;
+  }
+}
 const inHum = () => L.hums.some(h => Math.hypot(h.x - rat.x, h.y - rat.y) < h.r);
 // ---- tasks: a chain shown one step at a time, side tasks and secrets (bottom-left list)
 function checkTask(t) {
@@ -1226,6 +1374,7 @@ function checkTask(t) {
 }
 const keepBroken = t => {
   const a = t.check[1];
+  if (a === 'pup') return !!run.pupCaught; if (a === 'sticky') return !!run.stuck; if (a === 'poison') return !!run.poisonDelivered; if (a === 'sleeper') return !!run.sleeperWoke;
   if (a === 'seenOwner') return !!run.seenOwner; if (a === 'balloon') return L.noisy.some(z => z.kind === 'balloon' && z.used);
   if (a === 'catWoke') return run.catWoke; if (a === 'chased') return run.chased; if (a === 'caught') return lives < 3; if (a === 'tv') return L.tvOn;
   const k = L.knocks.find(q => q.kind === a); return !!(k && k.done);
@@ -1236,6 +1385,10 @@ function tickTasks(dt) {
   if (cat.mode === 'sleep' && dc < 95) Q.flags.passCat = true;
   if (ratHidden && cat.mode !== 'sleep' && cat.mode !== 'away' && dc < 140) Q.flags.hidNearCat = true;
   if (L.d.cat === 'eating' && cat.mode === 'sleep') Q.flags.catNapping = true;
+  if (comps.length && L.gnaws.length && comps.some(c => Math.hypot(c.x - L.gnaws[0].x, c.y - L.gnaws[0].y) < 70)) Q.flags.pupAtBag = true;
+  if (comps.length && comps.every(c => Math.hypot(c.x - hole.x, c.y - hole.y) < 60)) Q.flags.pupHome = true;
+  if (sleepers.some(z => z.awakeT <= 0 && Math.hypot(z.x - rat.x, z.y - rat.y) < 120)) Q.flags.passSleeper = true;
+  for (const it of items) if (it.poison && it.reveal > 0 && !it.seenP) { it.seenP = true; Q.flags.poisonSeen = (Q.flags.poisonSeen || 0) + 1; }
   if (ratHidden && human.mode !== 'away' && human.mode !== 'coming') Q.flags.hidFromOwner = true;
   if (human.mode === 'drink') Q.flags.ownerDrinking = true;
   while (Q.i < T.chain.length && checkTask(T.chain[Q.i])) { completeTask('c' + Q.i, T.chain[Q.i].text); Q.i++; }
@@ -1247,7 +1400,7 @@ function tickTasks(dt) {
   (T.secret || []).forEach((t, k) => { const id = 'x' + k; if (!Q.done.has(id) && checkTask(t)) completeTask(id, 'Secret: ' + t.text); });
   Q.recent = Q.recent.filter(r => (r.t -= dt) > 0); Q.foilMsgT = Math.max(0, Q.foilMsgT - dt);
   renderTasks();
-  if (Q.i >= T.chain.length && fed >= L.d.goal) startOutro();
+  if (Q.i >= T.chain.length && fed >= L.d.goal && comps.every(c => c.mode !== 'captured' && c.mode !== 'stuck')) startOutro();
 }
 const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function renderTasks() {
@@ -1270,6 +1423,7 @@ function taskHint() {
   if (Q.foilMsgT > 0 && !Q.flags.foilSneak) return 'Too loud! Hold Ctrl (or press C) and sneak across the foil.';
   const T = L.d.tasks;
   if (Q.i < T.chain.length) return T.chain[Q.i].hint || '';
+  if (comps.some(c => c.mode === 'captured' || c.mode === 'stuck')) return 'Rescue your pup first: walk up to them.';
   return fed < L.d.goal ? 'Every task is done. Bring ' + (L.d.goal - fed) + ' more food home to finish the night.' : '';
 }
 const goalCount = d => d.tasks ? 1 + d.tasks.side.length + (d.tasks.secret || []).length : (d.goals || ['fed']).length;
@@ -1290,10 +1444,12 @@ function nightGoals(won) {
 // (1 = wakes it instantly). Quiet footsteps (radius < 100) don't raise the wanted level.
 function noise(x, y, radius, label, big, amt) {
   if (stormMaskT > 0 && noiseSrc !== 'knock') { addRing(x, y, false, 0.3); return; }
+  if (big) for (const c of comps) if (c.kind === 'shy' && Math.hypot(c.x - x, c.y - y) < 350 && c.mode !== 'captured' && c.mode !== 'stuck') { c.freezeT = 3; c.saidT = 0; pupSay(c, 'Eek! I can’t move!', 1.8); }
   if (amt == null) amt = big ? 0.9 : radius > 150 ? 0.3 : 0.4;
   addRing(x, y, big, radius < 100 ? 0.35 : 1);
   alarm += big ? 7 : radius > 150 ? 0.5 : radius > 100 ? 2 : 0;
   if (label) say(label, x, y, 24, '#f2c14e', 20);
+  if (sleepers.length) disturbSleepers(x, y, radius, amt);
   if ((human.mode === 'patrol' || human.mode === 'look') && Math.hypot(human.x - x, human.y - y) < (big ? 700 : 320)) { human.mode = 'patrol'; human.path = astar(L.grid, human.x, human.y, x, y); human.lastX = x; human.lastY = y; human.known = true; }
   if (cat.mode === 'away') return;
   const dc = Math.hypot(cat.x - x, cat.y - y);
@@ -1351,7 +1507,7 @@ function updateSniff(dt) {
   const want = (keys.KeyE || mouseR || touchSniff) && !rat.jump;
   if (want && !rat.sniffing) {
     rat.sniffing = true; rat.sniffHold = 0; rat.sniffMin = 1.0; rat.sniffSnd = 0.4; rat.retarget = 0; tut.sniffed = true; Snd.fx.sniff();
-    for (const t of traps) if (!t.sprung && Math.hypot(t.x - rat.x, t.y - rat.y) < 260) { t.reveal = 6; say('Trap!', t.x, t.y, 26, '#e8664a', 18); }
+    for (const t of traps) if (!t.sprung && Math.hypot(t.x - rat.x, t.y - rat.y) < 260) { t.reveal = 6; say('Trap!', t.x, t.y, 26, '#e8664a', 18); if (!t.found) { t.found = true; if (Q) Q.flags.trapFound = (Q.flags.trapFound || 0) + 1; } }
   }
   if (!rat.sniffing) return;
   rat.sniffHold += dt; rat.sniffMin -= dt; rat.sniffSnd -= dt; rat.retarget -= dt;
@@ -1431,7 +1587,7 @@ function update(dt) {
     const sprinting = (keys.ShiftLeft || keys.ShiftRight || touchRun) && moving;
     rat.crouch = crouching; if (crouching && moving) tut.crouched = true;
     const dragging = rat.carry.some(i => i.big);
-    const spd = moving ? (sprinting && !dragging ? 195 : crouching ? 62 : 120) * (dragging ? 0.55 : 1 - 0.13 * carryW()) : 0;
+    const spd = moving && !(rat.stuckT > 0) ? (sprinting && !dragging ? 195 : crouching ? 62 : 120) * (dragging ? 0.55 : 1 - 0.13 * carryW()) : 0;
     const px = rat.x, py = rat.y;
     if (rat.surf === 'floor') moveFloor(rat, mx * spd, mz * spd, dt, L.solids);
     else { const s = S(rat.surf), nx = rat.x + mx * spd * dt; if (onSurf(s, nx, rat.y, 4)) rat.x = nx; const ny = rat.y + mz * spd * dt; if (onSurf(s, rat.x, ny, 4)) rat.y = ny; }
@@ -1450,7 +1606,7 @@ function update(dt) {
   // --- actions ---
   jumpCand = findJump(); knockCand = null;
   if (!rat.jump) for (const k of L.knocks) { if (k.done || k.trap || k.surf !== rat.surf) continue; if (Math.hypot(k.x - rat.x, k.y - rat.y) < 30) { knockCand = k; break; } }
-  if (pressed.Space && jumpCand) doJump(jumpCand);
+  if (pressed.Space && jumpCand && !(rat.stuckT > 0)) doJump(jumpCand);
   if (pressed.KeyF && knockCand) { knockOver(knockCand); bubble('Hee hee', rat.x, rat.y, rat.h + 30, 1); }
   // traps on the edge of a table: walk (don't sneak) past them and they fall
   if (!rat.jump) for (const k of L.knocks) if (k.trap && !k.done && k.surf === rat.surf && noiseLvl >= 1 && Math.hypot(k.x - rat.x, k.y - rat.y) < 22) { knockOver(k); bubble('Oops!', rat.x, rat.y, rat.h + 30, 1.2); }
@@ -1463,6 +1619,7 @@ function update(dt) {
       if (it.type === 'cheese') { bubble('Cheeese!', rat.x, rat.y, rat.h + 30, 1.2); Snd.fx.cheese(); } else Snd.fx.pickup();
     } }
   if (rat.carry.length && rat.surf === 'floor' && Math.hypot(rat.x - hole.x, rat.y - hole.y) < hole.r + 6) {
+    if (rat.carry.some(i => i.poison)) run.poisonDelivered = true;
     const pz = rat.carry.filter(i => i.poison).length, v = rat.carry.reduce((s, i) => s + (i.poison ? 0 : i.v), 0); fed = Math.max(0, fed + v - pz * 4);
     rat.carry.forEach(it => { ratMesh.userData.mouth.remove(it.mesh); if (!it.poison) addToPile(it.type); });
     if (Q) { Q.delivAny = true; rat.carry.forEach(i => i.tag && Q.deliv.add(i.tag)); if (carryW() >= 3) Q.flags.full = true; }
@@ -1484,10 +1641,11 @@ function update(dt) {
   updateVacuum(dt);
   if (!rat.jump && rat.surf === 'floor') for (const t of traps) { if (t.sprung) continue; if (Math.hypot(t.x - rat.x, t.y - rat.y) < 12) { t.sprung = true; t.bait.visible = false; t.wisps && t.wisps.forEach(w => scene.remove(w.s)); t.wisps = null; caught('SNAP!', t.x, t.y, 26, 'snap'); break; } }
   if (state !== 'play') return;
-  updateProps(dt); updateWorld(dt);
+  updateProps(dt); updateWorld(dt); updatePups(dt); updateSleepers(dt); updateSticky(dt); if (state !== 'play') return;
   if (Q) { tickTasks(dt); if (state !== 'play') return; }
   for (const k of L.knocks) if (k.delay > 0) { k.delay -= dt; if (k.delay <= 0) knockOver(k); }
-  for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noiseSrc = 'knock'; noise(k.to[0], k.to[1], 460, k.text, true); noiseSrc = ''; if (k.spawn) placeItem(k.spawn, k.to[0] + 14, k.to[1]); } }
+  for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noiseSrc = 'knock'; noise(k.to[0], k.to[1], 460, k.text, true); noiseSrc = ''; if (k.spawn) placeItem(k.spawn, k.to[0] + 14, k.to[1]);
+    for (const t of traps) if (!t.sprung && Math.hypot(t.x - k.to[0], t.y - k.to[1]) < 24) { t.sprung = true; t.bait.visible = false; if (t.wisps) { t.wisps.forEach(w => scene.remove(w.s)); t.wisps = null; } Snd.fx.snap(); placeItem('cheese', t.x + 10, t.y + 8, { tag: 'bait', floor: true }); if (Q) Q.flags.disarm = (Q.flags.disarm || 0) + 1; say('Snap! Disarmed', t.x, t.y, 30, '#9fd27a', 18); } } }
   if (L.crackle && Math.random() < dt * 7) Snd.fx.crackle(0.06 * clamp01(1 - Math.hypot(rat.x - L.crackle.x, rat.y - L.crackle.y) / 500));
   // --- wanted level ---
   if (catSees || humanSees) unseenT = 0; else unseenT += dt;
@@ -1754,7 +1912,7 @@ function sync(dt) {
   // vacuum
   vacMesh.visible = vac.on; if (vac.on) { vacMesh.position.set(vac.x, 0, vac.y); vacMesh.rotation.y = -vac.a; vacMesh.userData.ledM.color.set(vac.bumpT > 1.5 ? 0xff4a3a : 0x6ee07a); }
   // traps
-  for (const t of traps) { t.reveal = Math.max(0, t.reveal - dt); t.warn.visible = t.reveal > 0 && !t.sprung; t.bar.rotation.z = lerp(t.bar.rotation.z, t.sprung ? -Math.PI : 0, Math.min(1, dt * 25));
+  for (const t of traps) { t.reveal = Math.max(0, t.reveal - dt); t.warn.visible = t.reveal > 0 && !t.sprung; if (t.hidden) t.mesh.visible = t.sprung || t.reveal > 0 || Math.hypot(t.x - rat.x, t.y - rat.y) < 35; t.bar.rotation.z = lerp(t.bar.rotation.z, t.sprung ? -Math.PI : 0, Math.min(1, dt * 25));
     if (t.wisps) t.wisps.forEach(w => { const u = (clock * 0.35 + w.ph) % 1; w.s.position.set(t.x + Math.sin(clock * 2 + w.ph * 9) * 5 * u, 8 + u * 42, t.y + Math.cos(clock * 1.7 + w.ph * 7) * 5 * u); w.s.material.opacity = Math.sin(u * Math.PI) * 0.55; w.s.scale.setScalar(5 + u * 9); w.s.material.color.set(t.reveal > 0 ? 0xe8664a : 0xf2d36a); }); }
   // kitchen clock
   if (L.clock) { const mins = 23 * 60 + (state === 'menu' ? clock * 2 : nightT / L.d.night * 360); L.clock.m.rotation.z = -(mins % 60) / 60 * Math.PI * 2; L.clock.h.rotation.z = -((mins / 60) % 12) / 12 * Math.PI * 2; }
@@ -1767,6 +1925,7 @@ function sync(dt) {
     const inside = d === 0 && rat.surf === 'floor' && !rat.jump;
     const target = !inRun ? 0 : inside ? 0.9 : 0.6 * clamp01(1 - (d - 15) / 230);
     mk.m.material.opacity = lerp(mk.m.material.opacity, target * (0.85 + Math.sin(clock * 3 + r.x) * 0.15), Math.min(1, dt * 6)); mk.m.visible = mk.m.material.opacity > 0.01; }
+  syncPups(inRun); syncSleepers(inRun);
   if (L.secrets) for (const sc of L.secrets) { sc.mesh.visible = inRun && !sc.found && (sc.always || Math.hypot(sc.x - rat.x, sc.y - rat.y) < 75); sc.mesh.rotation.y = clock * 2; }
   holeLight.intensity = 0.65 + Math.sin(clock * 3) * 0.15; nestLight.intensity = 1.25 + Math.sin(clock * 1.7) * 0.08;
   // camera
@@ -1777,7 +1936,7 @@ function sync(dt) {
   if (playing) {
     if (knockCand) { const p = project(knockCand.x, knockCand.h + 22, knockCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'F'; $('promptTxt').textContent = 'Knock over ' + knockCand.word; } }
     else if (tunnelCand != null) { const p = project(rat.x, rat.h + 34, rat.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Space'; $('promptTxt').textContent = 'Crawl through the wall'; } }
-    else if (gnawCand) { const p = project(gnawCand.x, gnawCand.h + 36, gnawCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Hold F'; $('promptTxt').textContent = gnawCand.prog > 0 ? 'Gnawing… ' + Math.round(gnawCand.prog * 100) + '%' : 'Gnaw the bag open (noisy)'; } }
+    else if (gnawCand) { const p = project(gnawCand.x, gnawCand.h + 36, gnawCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Hold F'; $('promptTxt').textContent = gnawCand.prog > 0 ? 'Gnawing… ' + Math.round(gnawCand.prog * 100) + '%' : gnawCand.cookies ? 'Gnaw the backpack open (noisy)' : 'Gnaw the bag open (noisy)'; } }
     else if (jumpCand) { marker.visible = true; marker.position.set(jumpCand.x, jumpCand.s.h + 0.7, jumpCand.y); const sc = 1 + Math.sin(clock * 6) * 0.12; marker.scale.set(sc, sc, sc);
       const p = project(jumpCand.x, jumpCand.s.h + 14, jumpCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = usingTouch ? 'Jump' : 'Space'; $('promptTxt').textContent = jumpCand.s.h > rat.h ? 'Jump up' : 'Jump down'; } }
   }
@@ -1813,6 +1972,7 @@ function sync(dt) {
     else if (catSees) { chip.textContent = 'The cat sees you!'; chip.className = 'chip seen'; }
     else if (rat.h >= 30) { chip.textContent = hm !== 'away' && hm !== 'coming' ? 'Up high, but the owner can still reach you' : cat.mode === 'away' ? 'Up high' : 'Up high: the cat can’t reach you'; chip.className = 'chip'; }
     else { chip.textContent = 'Unseen'; chip.className = 'chip'; }
+    { const pc = $('pupChip'); pc.hidden = !comps.length; if (comps.length) pc.textContent = comps.map(c => c.name + (c.mode === 'stay' ? ' (waiting)' : c.mode === 'captured' || c.mode === 'stuck' ? ' (needs help!)' : c.mode === 'fetch' || c.mode === 'carry' ? ' (fetching)' : '')).join(', ') + ' · Q wait/follow · R fetch'; }
     { const nc = $('noiseChip'); nc.hidden = false;
       const lvl = rat.jump ? 1 : noiseLvl, sneaking = rat.crouch && lvl === 0 && !rat.jump;
       nc.className = 'chip noise-' + lvl; $('noiseTxt').textContent = lvl === 3 ? 'Loud: running' : lvl === 1 ? 'Quiet: walking' : sneaking ? 'Silent: sneaking' : 'Silent';

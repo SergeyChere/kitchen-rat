@@ -120,6 +120,7 @@
     task() { if (!ok()) return; const t = now(); [659, 880, 1319].forEach((f, i) => tone('sine', f, t + i * 0.09, 0.35, 0.09, null, 0.005, 0.3)); },
     fail() { if (!ok()) return; const t = now(); tone('triangle', 330, t, 0.25, 0.08); tone('triangle', 262, t + 0.12, 0.3, 0.08); },
     crinkle() { if (!ok()) return; const t = now(); for (let i = 0; i < 6; i++) noise(t + i * 0.035 + Math.random() * 0.02, 0.03, 0.12, 'highpass', 3000 + Math.random() * 3000, 0.8); },
+    musicbox() { if (!ok()) return; const t = now(); [1047, 1047, 1568, 1568, 1760, 1760, 1568].forEach((f, i) => tone('sine', f, t + i * 0.28, 0.3, 0.06, null, 0.005, 0.25)); },
     scratch() { if (!ok()) return; const t = now(); for (let i = 0; i < 5; i++) noise(t + i * 0.05, 0.04, 0.14, 'bandpass', 2400 + i * 300, 2); },
     squeaky() { if (!ok()) return; const t = now(); const o = tone('square', 1400, t, 0.22, 0.09); o.frequency.exponentialRampToValueAtTime(2300, t + 0.08); o.frequency.exponentialRampToValueAtTime(1100, t + 0.2); },
     creak() { if (!ok()) return; const t = now(); const o = tone('sawtooth', 140, t, 0.45, 0.07, null, 0.05); o.frequency.linearRampToValueAtTime(210, t + 0.2); o.frequency.linearRampToValueAtTime(120, t + 0.42); },
