@@ -1,0 +1,465 @@
+{
+ "number": 7,
+ "id": "flashlight",
+ "name": "The Flashlight",
+ "act": 2,
+ "goal": 16,
+ "seconds": 720,
+ "prologue": false,
+ "finale": false,
+ "cat": "sleep",
+ "catSense": 1,
+ "sleepSense": 1.2,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [],
+ "catBed": [
+  300,
+  480
+ ],
+ "bowl": [],
+ "dock": [
+  900,
+  380
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [],
+ "starTip": "The cat sleeps lighter now",
+ "openFood": false,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 300,
+ "lamp": "bulb",
+ "decor": "pantry",
+ "window": {
+  "x": 220,
+  "w": 120,
+  "y": 205,
+  "h": 60
+ },
+ "teaser": "The dining room, and the paths inside the walls.",
+ "blurb": "The owner patrols with a flashlight. Stay out of the beam.",
+ "startTitle": "Flashlight patrol",
+ "startSub": "He comes and goes. Watch the beam and hide.",
+ "introMom": "He walks around with a flashlight now. The beam is narrow. If I stay out of it, he won’t see me.",
+ "introPups": [
+  "Mom, there was a light under the door!",
+  "Squeak!",
+  "Stay in the dark!"
+ ],
+ "pal": {
+  "fog": 658700,
+  "sky": 6257258,
+  "ground": 2236186,
+  "hemi": 0.5,
+  "moon": 0.45,
+  "floor": "concrete",
+  "floorA": "#3a403d",
+  "wall": "brick",
+  "wallA": "#5e3e30",
+  "wallB": "#342620",
+  "trim": 2761760,
+  "ceil": 1711130
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "crumb",
+    "x": 350,
+    "y": 176,
+    "tag": "top",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "sausage",
+    "x": 345,
+    "y": 186,
+    "tag": "salami",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 560,
+    "y": 360,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 680,
+    "y": 525,
+    "tag": "",
+    "hidden": true,
+    "floor": true
+   },
+   {
+    "type": "cheese",
+    "x": 140,
+    "y": 44,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 120,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 420,
+    "y": 520,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 760,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 900,
+    "y": 250,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 230,
+    "y": 470,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 3,
+  "randomCheese": 1,
+  "refill": 4
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Stay hidden through a flashlight patrol",
+    "hint": "He sweeps the room with his flashlight, then leaves. Keep out of the beam: hide under the workbench or in a crack.",
+    "type": "count",
+    "arg": "ownerClean",
+    "n": 1,
+    "reveal": -1
+   },
+   {
+    "text": "Climb to the top of the crate stairs",
+    "hint": "The crates go up like stairs: 40, 80, 120. Grab the crumb on top.",
+    "type": "pick",
+    "arg": "top",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Steal the salami from the top crate",
+    "hint": "It’s heavy. You can jump down with it, but not up.",
+    "type": "pick",
+    "arg": "salami",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Drag the salami home",
+    "hint": "Slow and noisy. Time it between patrols.",
+    "type": "deliver",
+    "arg": "salami",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Take the spare battery (his flashlight will die)",
+    "hint": "",
+    "type": "flag",
+    "arg": "battery",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Don’t wake the cat",
+    "hint": "",
+    "type": "keep",
+    "arg": "catWoke",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the lost key",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "patrol",
+  "at": [
+   25,
+   210,
+   400,
+   580
+  ],
+  "stand": [],
+  "face": 0,
+  "stay": 14,
+  "light": false,
+  "route": [
+   {
+    "x": 700,
+    "y": 300
+   },
+   {
+    "x": 420,
+    "y": 470
+   },
+   {
+    "x": 200,
+    "y": 330
+   },
+   {
+    "x": 560,
+    "y": 250
+   },
+   {
+    "x": 850,
+    "y": 420
+   }
+  ]
+ },
+ "furn": [
+  {
+   "t": "shelfUnit",
+   "x": 480,
+   "y": 0,
+   "w": 200,
+   "h": 50
+  },
+  {
+   "t": "washer",
+   "x": 830,
+   "y": 12,
+   "w": 90,
+   "h": 80
+  },
+  {
+   "t": "washer",
+   "x": 730,
+   "y": 12,
+   "w": 90,
+   "h": 80,
+   "dryer": true
+  },
+  {
+   "t": "basket",
+   "x": 700,
+   "y": 120,
+   "w": 52,
+   "h": 44,
+   "ht": 45
+  },
+  {
+   "t": "box",
+   "x": 40,
+   "y": 40,
+   "w": 70,
+   "h": 60,
+   "ht": 50
+  },
+  {
+   "t": "box",
+   "x": 110,
+   "y": 22,
+   "w": 60,
+   "h": 50,
+   "ht": 92
+  },
+  {
+   "t": "crate",
+   "x": 200,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 40
+  },
+  {
+   "t": "crate",
+   "x": 260,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 80
+  },
+  {
+   "t": "crate",
+   "x": 320,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 120
+  },
+  {
+   "t": "bench",
+   "x": 470,
+   "y": 320,
+   "w": 180,
+   "h": 90
+  },
+  {
+   "t": "stool",
+   "x": 420,
+   "y": 352
+  },
+  {
+   "t": "cans",
+   "x": 130,
+   "y": 340,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "t": "lowShelf",
+   "x": 640,
+   "y": 500,
+   "w": 80,
+   "h": 50
+  },
+  {
+   "t": "boiler",
+   "x": 870,
+   "y": 470,
+   "w": 80,
+   "h": 110
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 580,
+   "y": 440,
+   "w": 56,
+   "h": 40,
+   "kind": "bag"
+  },
+  {
+   "t": "noisy",
+   "x": 420,
+   "y": 300,
+   "kind": "grain",
+   "r": 26
+  },
+  {
+   "t": "noisy",
+   "x": 700,
+   "y": 180,
+   "w": 40,
+   "h": 20,
+   "kind": "hanger"
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "can",
+   "x": 500,
+   "y": 332,
+   "toX": 500,
+   "toY": 300,
+   "trap": true,
+   "group": "cans",
+   "spawn": ""
+  },
+  {
+   "kind": "can",
+   "x": 522,
+   "y": 332,
+   "toX": 524,
+   "toY": 296,
+   "trap": true,
+   "group": "cans",
+   "spawn": ""
+  },
+  {
+   "kind": "bottle",
+   "x": 630,
+   "y": 340,
+   "toX": 668,
+   "toY": 352,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 250
+  },
+  {
+   "wall": "s",
+   "x": 500,
+   "y": 0
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 180
+  },
+  {
+   "wall": "s",
+   "x": 800,
+   "y": 0
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "battery",
+   "x": 820,
+   "y": 560,
+   "floor": true,
+   "always": true,
+   "label": ""
+  },
+  {
+   "kind": "button",
+   "x": 60,
+   "y": 140,
+   "floor": true,
+   "always": false,
+   "label": "A lost key! The owner looked everywhere for it."
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

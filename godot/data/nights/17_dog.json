@@ -1,0 +1,433 @@
+{
+ "number": 17,
+ "id": "dog",
+ "name": "The Dog",
+ "act": 4,
+ "goal": 20,
+ "seconds": 900,
+ "prologue": false,
+ "finale": false,
+ "cat": "away",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [],
+ "catBed": [
+  215,
+  500
+ ],
+ "bowl": [
+  820,
+  540
+ ],
+ "dock": [
+  900,
+  330
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [
+  "owner"
+ ],
+ "starTip": "The owner will come if you’re too loud",
+ "openFood": true,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [
+  "shy",
+  "greedy"
+ ],
+ "pupAge": 0.78,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 240,
+ "lamp": "shade",
+ "decor": "living",
+ "window": {
+  "x": 680,
+  "w": 200,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "The basement. The owner sealed the cracks.",
+ "blurb": "The neighbors’ dog follows your scent. Shy and Greedy come along.",
+ "startTitle": "The dog follows your scent",
+ "startSub": "Puddles and the litter box wash your trail away.",
+ "introMom": "The neighbors left their dog here. Dogs follow your smell, not your noise. Water washes the smell away.",
+ "introPups": [
+  "Mom, something big is barking!",
+  "Squeak!!",
+  "It smells us!"
+ ],
+ "pal": {
+  "fog": 1053722,
+  "sky": 9083576,
+  "ground": 3024416,
+  "hemi": 0.74,
+  "moon": 0.7,
+  "floor": "wood",
+  "floorA": "#5a4232",
+  "wall": "damask",
+  "wallA": "#3c5655",
+  "wallB": "#466361",
+  "trim": 3024418,
+  "ceil": 2500654
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "biscuit",
+    "x": 840,
+    "y": 540,
+    "tag": "biscuit",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 372,
+    "y": 28,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 520,
+    "y": 252,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 175,
+    "y": 175,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 90,
+    "y": 120,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 270,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 700,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 880,
+    "y": 200,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 360,
+    "y": 480,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 230,
+    "y": 80,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 4,
+  "randomCheese": 2,
+  "refill": 6
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Sneak past the sleeping dog",
+    "hint": "It sleeps like the cat did: watch its Zzz bar. Once awake, it follows your scent.",
+    "type": "flag",
+    "arg": "passDog",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Wash off your scent in the puddle",
+    "hint": "The dog tracks your trail for 30 seconds. Walking through water or the litter box wipes it.",
+    "type": "flag",
+    "arg": "trailBroken",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Distract the dog with the ball",
+    "hint": "The ball is on the TV stand. Push it off (F) and the dog runs to play.",
+    "type": "flag",
+    "arg": "dogBall",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Steal the dog biscuit",
+    "hint": "From the dog’s bowl by the window.",
+    "type": "pick",
+    "arg": "biscuit",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Drag the biscuit home",
+    "hint": "Slow. The dog may follow your trail, so wash it off again.",
+    "type": "deliver",
+    "arg": "biscuit",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Never get chased by the dog",
+    "hint": "",
+    "type": "keep",
+    "arg": "dogChase",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Keep both pups safe all night",
+    "hint": "",
+    "type": "keep",
+    "arg": "pup",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the dog’s chew toy",
+    "hint": "",
+    "type": "flag",
+    "arg": "toy",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "bookcase",
+   "x": 0,
+   "y": 0,
+   "w": 60,
+   "h": 190
+  },
+  {
+   "t": "tvStand",
+   "x": 330,
+   "y": 0,
+   "w": 300,
+   "h": 55
+  },
+  {
+   "t": "sofa",
+   "x": 300,
+   "y": 330,
+   "w": 360,
+   "h": 110,
+   "face": "n",
+   "color": 6969999
+  },
+  {
+   "t": "coffeeTable",
+   "x": 380,
+   "y": 200,
+   "w": 200,
+   "h": 80,
+   "plate": true
+  },
+  {
+   "t": "armchair",
+   "x": 720,
+   "y": 330,
+   "w": 96,
+   "h": 96,
+   "face": "n",
+   "color": 10115656
+  },
+  {
+   "t": "sideTable",
+   "x": 840,
+   "y": 350,
+   "w": 50,
+   "h": 50,
+   "ht": 62
+  },
+  {
+   "t": "lamp",
+   "x": 860,
+   "y": 470,
+   "w": 26,
+   "h": 26
+  },
+  {
+   "t": "plant",
+   "x": 892,
+   "y": 16,
+   "w": 52,
+   "h": 52
+  },
+  {
+   "t": "fireplace",
+   "x": 0,
+   "y": 250,
+   "w": 46,
+   "h": 150
+  },
+  {
+   "t": "ottoman",
+   "x": 150,
+   "y": 150,
+   "w": 50,
+   "h": 50
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 760,
+   "y": 560,
+   "kind": "puddle",
+   "r": 26
+  },
+  {
+   "t": "noisy",
+   "x": 120,
+   "y": 470,
+   "w": 60,
+   "h": 44,
+   "kind": "litter"
+  },
+  {
+   "t": "noisy",
+   "x": 600,
+   "y": 420,
+   "kind": "squeaky"
+  },
+  {
+   "t": "noisy",
+   "x": 52,
+   "y": 408,
+   "w": 120,
+   "h": 18,
+   "kind": "board"
+  },
+  {
+   "t": "noisy",
+   "x": 300,
+   "y": 330,
+   "w": 516,
+   "h": 110,
+   "kind": "sofa",
+   "surf": "sofa"
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "ball",
+   "x": 600,
+   "y": 28,
+   "toX": 600,
+   "toY": 92,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "book",
+   "x": 352,
+   "y": 26,
+   "toX": 352,
+   "toY": 82,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "vase",
+   "x": 865,
+   "y": 375,
+   "toX": 908,
+   "toY": 382,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "s",
+   "x": 600,
+   "y": 0
+  },
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 470
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 540
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "toy",
+   "x": 480,
+   "y": 240,
+   "floor": true,
+   "always": false,
+   "label": "The dog’s chew toy. Gross, but the pups love it."
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [
+  640,
+  500
+ ],
+ "zones": [],
+ "tunnels": []
+}

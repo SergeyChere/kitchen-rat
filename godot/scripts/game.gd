@@ -1,0 +1,777 @@
+class_name Game
+extends Node3D
+## One night, ported from the prototype's update(): builds the room, then runs food, delivery, noise, the wanted
+## level and its threats, lives, sniffing, mousetraps, poison, tasks and the clock. The HUD lives in hud.gd.
+
+signal ended(won: bool)
+
+static var I: Game
+const STAR_AT := [10, 24, 40, 58, 80]
+
+var night: Dictionary
+var night_id := "kitchen"
+var tasks: TaskTracker
+var grid: NavGrid
+var rat: Rat
+var cat: CatAI
+var owner_ai: OwnerAI
+var cam: FollowCamera
+var hud: Hud
+var room_light: Light3D
+var hole := Vector3.ZERO
+var run := {"catWoke": false, "chased": false, "seenOwner": false, "poisonDelivered": false, "caught": false}
+var fed := 0
+var lives := 3
+var stars := 0
+var max_stars := 0
+var night_time := 0.0
+var grace_t := 0.0
+var in_hum := 0
+var state := "intro"  # intro, play, pause, won, lost
+var end_title := ""
+var end_text := ""
+
+var foods: Array[Food] = []
+var traps: Array[Trap] = []
+var knockables: Array[Knockable] = []
+var zones: Array[Zone] = []
+var high_surfaces: Array[Node3D] = []
+
+var _evidence := 0.0
+var _alarm := 0.0
+var _unseen := 0.0
+var _refill := 0.0
+var _noise_t := 0.0
+var _bump_t := 0.0
+var _stars_done := {}
+var _sniffing := false
+var _sniff_hold := 0.0
+var _scent: Array[Food] = []
+var _trails: Array[MeshInstance3D] = []
+var _builder: LevelBuilder
+
+
+func _init(id := "kitchen") -> void:
+	night_id = id
+
+
+func _ready() -> void:
+	I = self
+	night = Nights.load_night(night_id)
+	tasks = TaskTracker.new(night.get("tasks", {}))
+	tasks.completed.connect(func(t): toast("✓ " + t))
+	tasks.failed.connect(func(t): toast("✗ " + t))
+	tasks.on_surface = func(a): return not rat.jumping and rat.surface_id.begins_with(a)
+	tasks.hidden_in = func(a): return rat.hide_kind() == a
+	tasks.keep_broken = _keep_broken
+
+	_builder = LevelBuilder.new(self, night)
+	_builder.build()
+	_make_rat()
+	_make_agents()
+	hud = Hud.new()
+	add_child(hud)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_builder.build_contents()
+	await get_tree().physics_frame
+	for z in find_children("*", "Zone", true, false):
+		zones.append(z)
+	for b in find_children("*", "StaticBody3D", true, false):
+		var s := surface_of(b)
+		if s != "floor" and s != "fridge" and b.get_parent() is MeshInstance3D:
+			high_surfaces.append(b.get_parent())
+	var no_go := []
+	for z in zones:
+		if z is HideSpot and (z as HideSpot).id != "crack":
+			no_go.append(z)
+	grid = NavGrid.new(self, no_go)
+	cat.setup(night)
+	var door := float(night.get("door", 300))
+	owner_ai.setup(night, Nights.world(935, door if door > 0 else 300))
+	var fd: Dictionary = night.get("food", {})
+	for i in int(fd.get("randomCrumb", 4)): spawn_random("crumb")
+	for i in int(fd.get("randomCheese", 3)): spawn_random("cheese")
+	var ps := int(night.get("poisonStart", 0))
+	if ps > 0:
+		var c := foods.filter(func(f): return f.is_cheese() and f.id == "" and not f.poison)
+		c.shuffle()
+		for k in mini(ps, c.size()):
+			c[k].make_poison()
+	for i in 3:
+		_trails.append(_make_trail())
+	rat.landed.connect(_on_landed)
+	print_verbose("night ready: ", foods.size(), " food, ", zones.size(), " zones")
+	rat.frozen = true
+
+
+func _make_rat() -> void:
+	rat = Rat.new()
+	rat.name = "Rat"
+	var cs := CollisionShape3D.new()
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.055
+	cap.height = 0.12
+	cs.shape = cap
+	cs.position = Vector3(0, 0.062, 0)
+	rat.add_child(cs)
+	add_child(rat)
+	rat.global_position = Nights.world(180, 680, 2)
+	rat.rotation.y = PI  # facing north, toward the mouse hole
+	var model := _builder.spawn("characters/rat_mother", rat.global_position, 0.0, rat)
+	model.rotation = Vector3.ZERO
+	model.position = Vector3.ZERO
+	rat.anim = ClipPlayer.new(model)
+	var b := LevelBuilder.aabb_of(model)
+	rat.mouth = Node3D.new()
+	rat.add_child(rat.mouth)
+	rat.mouth.position = Vector3(0, b.size.y * 0.35, b.end.z - 0.01)
+	var ring := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.05
+	cyl.bottom_radius = 0.05
+	cyl.height = 0.004
+	ring.mesh = cyl
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(1, 0.85, 0.2)
+	ring.material_override = m
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.visible = false
+	add_child(ring)
+	rat.marker = ring
+	cam = FollowCamera.new()
+	cam.target = rat
+	add_child(cam)
+	cam.snap(PI)
+
+
+func _make_agents() -> void:
+	cat = CatAI.new()
+	cat.name = "Cat"
+	add_child(cat)
+	var cm := _builder.spawn("characters/cat", Vector3.ZERO, 0.0, cat)
+	cm.position = Vector3.ZERO
+	cat.anim = ClipPlayer.new(cm)
+	owner_ai = OwnerAI.new()
+	owner_ai.name = "Owner"
+	add_child(owner_ai)
+	var om := _builder.spawn("characters/owner", Vector3.ZERO, 0.0, owner_ai)
+	om.position = Vector3.ZERO
+	owner_ai.anim = ClipPlayer.new(om)
+	owner_ai.body = om
+	var fl := SpotLight3D.new()
+	fl.spot_angle = 22.0
+	fl.spot_range = 6.0
+	fl.light_energy = 4.0
+	fl.light_color = Color(1, 0.95, 0.8)
+	fl.shadow_enabled = true
+	fl.visible = false
+	owner_ai.add_child(fl)
+	fl.position = Vector3(0.15, 1.3, 0.2)
+	owner_ai.flashlight = fl
+	owner_ai.room_light = room_light
+
+
+# ---------- queries ----------
+
+func ray(a: Vector3, b: Vector3) -> Dictionary:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1)
+	return get_world_3d().direct_space_state.intersect_ray(q)
+
+
+func sphere_free(p: Vector3, r: float) -> bool:
+	var sh := SphereShape3D.new()
+	sh.radius = r
+	return _shape_free(sh, p)
+
+
+func box_free(center: Vector3, half: Vector3) -> bool:
+	var sh := BoxShape3D.new()
+	sh.size = half * 2.0
+	return _shape_free(sh, center)
+
+
+func _shape_free(sh: Shape3D, p: Vector3) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = sh
+	q.transform = Transform3D(Basis(), p)
+	q.collision_mask = 1
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
+static func surface_of(collider: Object) -> String:
+	if collider is Node and (collider as Node).has_meta("surface"):
+		return str((collider as Node).get_meta("surface"))
+	return "floor"
+
+
+func playing() -> bool: return state == "play"
+func hole_point() -> Vector3: return hole
+
+
+func _keep_broken(a: String) -> bool:
+	match a:
+		"catWoke": return run.catWoke
+		"chased": return run.chased
+		"caught": return lives < 3
+		"seenOwner": return run.seenOwner
+		"poison": return run.poisonDelivered
+	return tasks.knocked.has(a)
+
+
+# ---------- events ----------
+
+## A noise heard within radius (m). amt: how much it disturbs a sleeping cat at point-blank range (1 wakes it).
+func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, from_knock := false) -> void:
+	if amt < 0.0:
+		amt = 0.9 if big else (0.3 if radius > 1.5 else 0.4)
+	_alarm += 7.0 if big else (0.5 if radius > 1.5 else (2.0 if radius > 1.0 else 0.0))
+	if label != "":
+		bubble_at(label, at + Vector3.UP * 0.24, 1.4, Color(0.95, 0.76, 0.3))
+	owner_ai.hear(at, radius, big)
+	cat.hear(at, radius, big, amt, from_knock)
+
+
+func add_alarm(a: float) -> void:
+	_alarm += a
+
+
+func deliver() -> void:
+	var poison := 0
+	var value := 0
+	var cheese := false
+	var weight := rat.carry_weight()
+	for f in rat.carried:
+		if f.poison: poison += 1
+		value += f.value()
+		if f.is_cheese() and not f.poison: cheese = true
+		if f.id != "": tasks.delivered[f.id] = true
+		foods.erase(f)
+		f.queue_free()
+	tasks.delivered_any = true
+	if weight >= 3:
+		tasks.set_flag("full")
+	rat.carried.clear()
+	fed = maxi(0, fed + value - poison * 4)
+	var top := hole + Vector3.UP * 0.32
+	if poison > 0:
+		run.poisonDelivered = true
+		bubble_at("Poison! −%d" % (poison * 4), top, 1.6, Color(0.6, 0.88, 0.4))
+		bubble_at("Ew! Tummy ache…", top + Vector3.DOWN * 0.1, 2.0)
+	else:
+		bubble_at("+%d" % value, top, 1.4, Color(0.95, 0.76, 0.3))
+		var left := int(night.goal) - fed
+		bubble_at("Cheese! Yay!" if cheese else ("Squeak! More!" if left > 8 else ("Almost full!" if left > 3 else "Just a little more!")), top + Vector3.DOWN * 0.1, 1.8)
+	var refill := int((night.get("food", {}) as Dictionary).get("refill", 5))
+	while refill > 0 and _loose_food() < refill + 3:
+		if not spawn_random(""):
+			break
+
+
+func caught(text: String, at: Vector3) -> void:
+	if grace_t > 0.0 or state != "play":
+		return
+	lives -= 1
+	run.caught = true
+	bubble_at(text, at, 1.6, Color(0.91, 0.4, 0.29))
+	for f in rat.carried:
+		f.carried = false
+		f.reparent(self, true)
+		var p := rat.global_position + Vector3(randf_range(-0.15, 0.15), 0.3, randf_range(-0.15, 0.15))
+		var hit := ray(p, p + Vector3.DOWN * 3.0)
+		f.global_position = hit.position if not hit.is_empty() else Vector3(p.x, 0, p.z)
+		f.rotation = Vector3.ZERO
+	rat.carried.clear()
+	rat.teleport(hole + Vector3(0.22, 0.02, -0.22), PI * 0.75)
+	cam.snap(PI * 0.75)
+	grace_t = 3.0
+	cat.after_catch()
+	_alarm += 10.0
+	if lives <= 0:
+		_end(false, "You got caught", "The pups got %d of %d and are waiting for Mom. Top wanted level: %s." % [fed, int(night.goal), _star_text(max_stars)])
+
+
+func knock_landed(k: Knockable, at: Vector3) -> void:
+	noise(at, 4.6, k.sound(), true, -1.0, true)
+	if k.spawn != "":
+		spawn_food(k.spawn, at + Vector3(0.14, 0, 0), "", false)
+	for t in traps:
+		if t.sprung or Vector2(t.global_position.x - at.x, t.global_position.z - at.z).length() > 0.24:
+			continue
+		t.spring()
+		spawn_food("cheese", t.global_position + Vector3(0.1, 0, 0.08), "bait", false)
+		tasks.flag("disarm")
+		bubble_at("Snap! Disarmed", t.global_position + Vector3.UP * 0.3, 1.4, Color(0.62, 0.82, 0.48))
+
+
+func _on_landed(drop: float) -> void:
+	if drop > 0.5 and rat.surface_id == "floor":
+		noise(rat.global_position, 1.6, "Thud", false, 0.55)
+	for z in zones:
+		if z is NoisyZone and z.contains(rat.global_position):
+			(z as NoisyZone).on_landed(rat)
+
+
+# ---------- loop ----------
+
+func _unhandled_input(e: InputEvent) -> void:
+	if e.is_action_pressed("pause"):
+		if state == "play": _set_paused(true)
+		elif state == "pause": _set_paused(false)
+	elif e.is_action_pressed("restart") and state in ["pause", "won", "lost"]:
+		_restart()
+	elif e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+		if state == "intro": begin()
+		elif state == "pause": _set_paused(false)
+		elif state == "won" or state == "lost": _restart()
+	elif e.is_action_pressed("jump") and state == "intro":
+		begin()
+
+
+func _process(dt: float) -> void:
+	if state != "play" or grid == null:
+		return
+	night_time += dt
+	if night_time >= float(night.get("seconds", 900)):
+		_end(false, "Dawn", "The owners are waking up. The pups got %d of %d. There is always tomorrow night." % [fed, int(night.goal)])
+		return
+	grace_t = maxf(0.0, grace_t - dt)
+	var rp := rat.global_position
+	_tick_rat_noise(dt)
+	_pick_up(rp)
+	_tick_zones(rp, dt)
+	_tick_knockables(rp)
+	_tick_sniff(dt)
+	_tick_food_visibility(rp)
+	for t in traps:
+		if t.sprung or rp.y > 0.05 or rat.jumping or Vector2(t.global_position.x - rp.x, t.global_position.z - rp.z).length() > 0.12:
+			continue
+		t.spring()
+		caught("SNAP!", t.global_position + Vector3.UP * 0.26)
+		break
+	if state != "play":
+		return
+	_refill -= dt
+	if _refill <= 0.0:
+		_refill = 3.0
+		var refill := int((night.get("food", {}) as Dictionary).get("refill", 5))
+		if refill > 0 and _loose_food() < refill:
+			spawn_random("")
+	_tick_flags()
+	tasks.tick()
+	_tick_wanted(dt)
+	if fed >= int(night.goal) and (not tasks.has_tasks() or tasks.chain_done()):
+		_end(true, "The nest is full!", "The pups are fed. Next night: " + str(night.get("teaser", "")))
+
+
+func _tick_rat_noise(dt: float) -> void:
+	_noise_t -= dt
+	_bump_t -= dt
+	if not rat.moving() or rat.jumping:
+		return
+	var on_floor := rat.surface_id == "floor"
+	if rat.dragging() and _noise_t <= 0.0:
+		_noise_t = 0.6
+		noise(rat.global_position, 0.6 if rat.sneaking else 1.2, "", false, 0.05 if rat.sneaking else 0.15)
+	elif rat.running and _noise_t <= 0.0:
+		_noise_t = 0.35
+		noise(rat.global_position, 2.1, "", false, 0.3)
+	elif not rat.running and not rat.sneaking and on_floor and in_hum == 0 and _noise_t <= 0.0:
+		_noise_t = 0.45
+		noise(rat.global_position, 0.95, "", false, 0.1)
+	if rat.running and on_floor and rat.blocked and _bump_t <= 0.0:
+		_bump_t = 0.9
+		noise(rat.global_position, 1.7, "Thump!", false, 0.45)
+
+
+func _pick_up(rp: Vector3) -> void:
+	if rat.jumping:
+		return
+	for i in range(foods.size() - 1, -1, -1):
+		var f := foods[i]
+		if f.carried or f.hidden:
+			continue
+		var d := f.global_position - rp
+		if absf(d.y) > 0.12 or Vector2(d.x, d.z).length() > 0.17:
+			continue
+		if f.is_find:
+			toast(f.label if f.label != "" else "A find for the nest!")
+			tasks.set_flag(f.type)
+			tasks.flag("collected")
+			foods.remove_at(i)
+			f.queue_free()
+			continue
+		if rat.carry_weight() + f.weight() > rat.capacity:
+			continue
+		rat.carry(f)
+		if f.id != "":
+			tasks.picked[f.id] = true
+			if owner_ai.mode == OwnerAI.Mode.DRINK:
+				tasks.set_flag("underNose")
+		if not f.poison:
+			_evidence += 9.0 if f.is_cheese() else 3.0
+		if f.is_cheese():
+			bubble_at("Cheeese!", rp + Vector3.UP * 0.3, 1.2)
+
+
+func _tick_zones(rp: Vector3, dt: float) -> void:
+	for z in zones:
+		var inside := z.contains(rp)
+		if inside and not z.inside: z.enter(rat)
+		if not inside and z.inside: z.exit(rat)
+		z.inside = inside
+		if inside: z.stay(rat, dt)
+
+
+func _tick_knockables(rp: Vector3) -> void:
+	var push := Input.is_action_just_pressed("push")
+	for k in knockables:
+		if k.knocked or rat.jumping:
+			continue
+		var d := k.global_position - rp
+		if absf(d.y) > 0.2:
+			continue
+		var flat := Vector3(d.x, 0, d.z)
+		var dist := flat.length()
+		if k.trap and dist < 0.22 and rat.moving() and not rat.sneaking:
+			k.knock(k.push_dir)
+			bubble_at("Oops!", rp + Vector3.UP * 0.3, 1.2)
+		elif not k.trap and push and dist < 0.3:
+			k.knock(flat if flat.length() > 0.01 else rat.global_transform.basis.z)
+			bubble_at("Hee hee", rp + Vector3.UP * 0.3, 1.0)
+			push = false
+
+
+func _tick_sniff(dt: float) -> void:
+	var want := Input.is_action_pressed("sniff") and not rat.jumping
+	var rp := rat.global_position
+	if want and not _sniffing:
+		_sniffing = true
+		_sniff_hold = 0.0
+		for t in traps:
+			if t.sprung or t.global_position.distance_to(rp) > 2.6:
+				continue
+			bubble_at("Trap!", t.global_position + Vector3.UP * 0.26, 1.4, Color(0.91, 0.4, 0.29))
+			if not t.found:
+				tasks.flag("trapFound")
+			t.reveal()
+	if not want:
+		_sniffing = false
+	if not _sniffing:
+		for tr in _trails: tr.visible = false
+		return
+	var before := _sniff_hold
+	_sniff_hold += dt
+	if _sniff_hold > 0.6:
+		tasks.set_flag("sniffed")
+	if (before <= 0.35 and _sniff_hold > 0.35) or floori(before / 0.5) != floori(_sniff_hold / 0.5):
+		_pick_scent(before <= 0.35)
+	for i in _trails.size():
+		var on := i < _scent.size() and is_instance_valid(_scent[i]) and _sniff_hold > 0.35
+		_trails[i].visible = on
+		if on:
+			_draw_trail(_trails[i], rat.mouth.global_position if rat.mouth else rp, _scent[i].global_position, _scent[i].poison, i)
+
+
+func _pick_scent(first: bool) -> void:
+	var rp := rat.global_position
+	var cand := []
+	for f in foods:
+		if f.carried or f.is_find:
+			continue
+		var d := f.global_position - rp
+		var score := Vector2(d.x, d.z).length() + absf(d.y) * 0.6 - (1.2 if f.is_cheese() else 0.0)
+		if score < 9.0:
+			cand.append([score, f])
+	cand.sort_custom(func(a, b): return a[0] < b[0])
+	_scent.clear()
+	for i in mini(3, cand.size()):
+		var f: Food = cand[i][1]
+		_scent.append(f)
+		f.reveal_t = 7.0
+		if f.hidden and f.global_position.distance_to(rp) < 1.6:
+			f.hidden = false
+			bubble_at("Something hidden here!", f.global_position + Vector3.UP * 0.2, 1.6)
+	if not first:
+		return
+	if _scent.is_empty():
+		bubble_at("I can’t smell anything…", rp + Vector3.UP * 0.34, 1.5)
+		return
+	var t := _scent[0]
+	var to := t.global_position - rp
+	var cf := Vector3(sin(cam.yaw), 0, cos(cam.yaw))
+	var rel := rad_to_deg(cf.signed_angle_to(Vector3(to.x, 0, to.z), Vector3.UP))
+	var ar := absf(rel)
+	var where := "ahead" if ar < 29.0 else ("behind" if ar > 149.0 else ("to the left" if rel > 0.0 else "to the right"))
+	var up := ", up high" if to.y > 0.2 else (", down low" if to.y < -0.2 else "")
+	var what := "Ew, poisoned cheese" if t.poison else ("Cheese" if t.is_cheese() else "Crumbs")
+	bubble_at("%s %s%s · %.1f m" % [what, where, up, Vector2(to.x, to.z).length()], rp + Vector3.UP * 0.34, 2.2)
+
+
+func _tick_food_visibility(rp: Vector3) -> void:
+	var open := bool(night.get("openFood", false))
+	for f in foods:
+		if f.carried:
+			continue
+		f.visible = not f.hidden and (open or f.is_find or f.reveal_t > 0.0 or f.global_position.distance_to(rp) < 1.6)
+
+
+func _tick_flags() -> void:
+	var rp := rat.global_position
+	if cat.visible:
+		var dc := Vector2(cat.global_position.x - rp.x, cat.global_position.z - rp.z).length()
+		if cat.mode == CatAI.Mode.SLEEP and dc < 0.95: tasks.set_flag("passCat")
+		if rat.hidden() and cat.awake() and dc < 1.4: tasks.set_flag("hidNearCat")
+		if str(night.get("cat", "")) == "eating" and cat.mode == CatAI.Mode.SLEEP: tasks.set_flag("catNapping")
+	if owner_ai.in_room():
+		if rat.hidden(): tasks.set_flag("hidFromOwner")
+		if owner_ai.mode == OwnerAI.Mode.DRINK: tasks.set_flag("ownerDrinking")
+
+
+func _tick_wanted(dt: float) -> void:
+	var seen := cat.sees or owner_ai.sees
+	_unseen = 0.0 if seen else _unseen + dt
+	if rat.in_nest and _unseen > 1.0: _alarm -= dt * 14.0
+	elif _unseen > 4.0: _alarm -= dt * 5.0
+	_alarm = clampf(_alarm, 0.0, 60.0)
+	var ns := 0
+	if bool(night.get("wanted", false)):
+		for t in STAR_AT:
+			if _evidence + _alarm >= t: ns += 1
+	if ns > stars:
+		_on_stars(ns, stars)
+	stars = ns
+	max_stars = maxi(max_stars, stars)
+
+
+func _on_stars(ns: int, os: int) -> void:
+	var threats: Array = night.get("threats", [])
+	for s in range(os + 1, ns + 1):
+		if _stars_done.has(s):
+			continue
+		_stars_done[s] = true
+		var st := "★".repeat(s)
+		var t: String = threats[s - 1] if s - 1 < threats.size() else ""
+		if t != "":
+			_trigger_threat(t)
+			match t:
+				"cat": banner(st + " The cat woke up", "It can’t climb after you, but it will wait below. Hide to lose it.", 5.0)
+				"owner": banner(st + " The owner woke up", "He can spot you even on tables. Hide under furniture or in a crack.", 5.0)
+				"traps": banner(st + " Mousetraps!", "The owner set traps. They smell like cheese too, so sniff first (hold E).", 5.0)
+				"poison": banner(st + " Poisoned cheese", "Poisoned cheese smells green. Sniff before you grab.", 5.0)
+				_: banner(st + " " + t, "", 4.0)
+		elif threats.is_empty():
+			var tip := str(night.get("starTip", ""))
+			banner(st + " The house is restless", tip if tip != "" else "Everyone is faster and sharper now", 3.5)
+		else:
+			banner(st + " High alert", "Everyone in the house is faster and sharper now", 4.5)
+			if threats.has("traps") and s == 5:
+				place_traps(2)
+
+
+func _trigger_threat(t: String) -> void:
+	if t == "cat": cat.wake_up()
+	elif t == "traps": place_traps(3)
+	elif t == "poison":
+		var c := foods.filter(func(f): return f.is_cheese() and not f.poison and not f.carried)
+		if not c.is_empty(): c.pick_random().make_poison()
+		spawn_random("cheese")
+
+
+# ---------- spawning ----------
+
+func _loose_food() -> int:
+	var n := 0
+	for f in foods:
+		if not f.carried and not f.is_find: n += 1
+	return n
+
+
+func spawn_model_food(model: String, at: Vector3) -> Food:
+	var f := Food.new()
+	_builder.foods.add_child(f)
+	f.global_position = at
+	f.rotation.y = randf() * TAU
+	var m := _builder.spawn(model, at, 0.0, f)
+	if m:
+		m.position = Vector3.ZERO
+		m.rotation = Vector3.ZERO
+	foods.append(f)
+	return f
+
+
+func spawn_food(type: String, at: Vector3, tag: String, poison: bool) -> Food:
+	var f := spawn_model_food(Food.model_for(type), at)
+	f.type = type
+	f.id = tag
+	if poison:
+		f.make_poison()
+	return f
+
+
+func spawn_random(type: String) -> bool:
+	if type == "":
+		type = "cheese" if randf() < 0.3 else "crumb"
+	var cheese := type == "cheese"
+	var open := bool(night.get("openFood", false))
+	var high := not high_surfaces.is_empty() and randf() < ((0.45 if open else 0.8) if cheese else 0.25)
+	var poison := cheese and stars >= Nights.threat_star(night, "poison") and randf() < 0.45
+	for tries in 60:
+		var p: Vector3
+		if high:
+			var s: Node3D = high_surfaces.pick_random()
+			var b := LevelBuilder.world_aabb(s)
+			if b.size.x < 0.3 or b.size.z < 0.3:
+				continue
+			var o := Vector3(randf_range(b.position.x + 0.12, b.end.x - 0.12), b.end.y + 0.3, randf_range(b.position.z + 0.12, b.end.z - 0.12))
+			var hit := ray(o, o + Vector3.DOWN * 2.0)
+			if hit.is_empty() or hit.normal.y < 0.85 or hit.position.y > 1.2 or (hit.collider as Node).get_parent() != s:
+				continue
+			p = hit.position
+		else:
+			p = grid.random_free(1.2, hole)
+			if not sphere_free(p + Vector3.UP * 0.08, 0.05):
+				continue
+		var clash := false
+		for f in foods:
+			if not f.carried and Vector2(f.global_position.x - p.x, f.global_position.z - p.z).length() < 0.24:
+				clash = true
+		for k in knockables:
+			if Vector2(k.global_position.x - p.x, k.global_position.z - p.z).length() < 0.24:
+				clash = true
+		if clash:
+			continue
+		spawn_food(type, p, "", poison)
+		return true
+	return false
+
+
+func add_trap(at: Vector3, hidden: bool) -> Trap:
+	var t := Trap.new()
+	t.hidden = hidden
+	_builder.decor.add_child(t)
+	t.global_position = at
+	t.rotation.y = randf() * TAU
+	var m := _builder.spawn("props/mousetrap", at, 0.0, t)
+	if m:
+		m.position = Vector3.ZERO
+		m.rotation = Vector3.ZERO
+	traps.append(t)
+	return t
+
+
+func place_traps(n: int) -> void:
+	var placed := 0
+	for t in 500:
+		if placed >= n:
+			break
+		var p := grid.random_free(0.0, Vector3.ZERO)
+		if p.distance_to(hole) < 1.5 or p.distance_to(rat.global_position) < 0.9 or p.distance_to(owner_ai.door) < 0.7:
+			continue
+		var near := false
+		for q in traps:
+			if q.global_position.distance_to(p) < 1.0: near = true
+		if near:
+			continue
+		var by_furn := grid.blocked_at(p + Vector3.RIGHT * 0.45) or grid.blocked_at(p + Vector3.LEFT * 0.45) or grid.blocked_at(p + Vector3.FORWARD * 0.45) or grid.blocked_at(p + Vector3.BACK * 0.45)
+		if not by_furn and randf() < 0.7:
+			continue
+		add_trap(p + Vector3(randf_range(-0.04, 0.04), 0, randf_range(-0.04, 0.04)), false)
+		placed += 1
+
+
+# ---------- states ----------
+
+func begin() -> void:
+	if grid == null:
+		return
+	state = "play"
+	rat.frozen = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _set_paused(on: bool) -> void:
+	state = "pause" if on else "play"
+	get_tree().paused = false
+	rat.frozen = on
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if on else Input.MOUSE_MODE_CAPTURED
+
+
+func _end(won: bool, title: String, text: String) -> void:
+	if won:
+		tasks.finish_night()
+	state = "won" if won else "lost"
+	end_title = title
+	end_text = text
+	rat.frozen = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	ended.emit(won)
+
+
+func _restart() -> void:
+	Main.I.start_night(night_id)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state == "play":
+		_set_paused(true)
+
+
+static func _star_text(n: int) -> String:
+	return "none" if n == 0 else "★".repeat(n)
+
+
+# ---------- messages ----------
+
+func bubble_at(text: String, at: Vector3, dur: float, col := Color.WHITE) -> void:
+	hud.bubble(text, at, null, 0.0, dur, col)
+
+
+func bubble_on(text: String, follow: Node3D, height: float, dur: float) -> void:
+	hud.bubble(text, Vector3.ZERO, follow, height, dur, Color.WHITE)
+
+
+func toast(text: String) -> void:
+	hud.toast(text)
+
+
+func banner(title: String, sub: String, dur: float) -> void:
+	hud.banner(title, sub, dur)
+
+
+# ---------- scent trails ----------
+
+func _make_trail() -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = ImmediateMesh.new()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visible = false
+	add_child(mi)
+	return mi
+
+
+func _draw_trail(mi: MeshInstance3D, from: Vector3, to: Vector3, poison: bool, i: int) -> void:
+	var im := mi.mesh as ImmediateMesh
+	im.clear_surfaces()
+	var a := from + Vector3.UP * 0.05
+	var b := to + Vector3.UP * 0.03
+	var side := (b - a).cross(Vector3.UP).normalized()
+	var alpha := clampf((_sniff_hold - 0.35) * 2.0, 0.0, 1.0) * (0.55 + 0.25 * sin(Time.get_ticks_msec() / 200.0)) * (1.0 if i == 0 else 0.55)
+	var c := Color(0.56, 0.88, 0.38) if poison else Color(1, 0.85, 0.5)
+	var t0 := Time.get_ticks_msec() / 1000.0
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	for k in 24:
+		var t := k / 23.0
+		var p := a.lerp(b, t) + Vector3.UP * sin(t * PI) * 0.15 + side * sin(t * 12.0 + t0 * 3.0 + i) * 0.02
+		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
+		im.surface_add_vertex(p + Vector3.UP * 0.004)
+		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
+		im.surface_add_vertex(p - Vector3.UP * 0.004)
+	im.surface_end()

@@ -1,0 +1,406 @@
+{
+ "number": 6,
+ "id": "water",
+ "name": "A Glass of Water",
+ "act": 2,
+ "goal": 14,
+ "seconds": 720,
+ "prologue": false,
+ "finale": false,
+ "cat": "sleep",
+ "catSense": 1,
+ "sleepSense": 1,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [],
+ "catBed": [
+  470,
+  545
+ ],
+ "bowl": [
+  770,
+  215
+ ],
+ "dock": [
+  900,
+  430
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [],
+ "starTip": "The cat sleeps lighter now",
+ "openFood": true,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 320,
+ "lamp": "shade",
+ "decor": "kitchen",
+ "window": {
+  "x": 410,
+  "w": 220,
+  "y": 0,
+  "h": 0
+ },
+ "teaser": "The pantry, and the owner patrols with a flashlight.",
+ "blurb": "The owner comes down for a drink. Hide, then steal right under his nose.",
+ "startTitle": "The owner wakes up at night",
+ "startSub": "When you hear footsteps, hide. When he drinks, steal.",
+ "introMom": "The owner noticed food going missing. He gets up at night for water. When he comes, I hide. When he drinks, I take.",
+ "introPups": [
+  "Mom, we heard footsteps upstairs!",
+  "Squeak…",
+  "Is it the big human?"
+ ],
+ "pal": {
+  "fog": 922144,
+  "sky": 8228804,
+  "ground": 2761776,
+  "hemi": 0.74,
+  "moon": 0.84,
+  "floor": "tile",
+  "floorA": "#3b4058",
+  "floorB": "#4a5070",
+  "wall": "stripes",
+  "wallA": "#4b5272",
+  "wallB": "#545c80",
+  "trim": 3812912,
+  "ceil": 2238010
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "crumb",
+    "x": 660,
+    "y": 420,
+    "tag": "tbl1",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 720,
+    "y": 470,
+    "tag": "tbl2",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 780,
+    "y": 420,
+    "tag": "tbl3",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cookie",
+    "x": 470,
+    "y": 300,
+    "tag": "cookie",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cookie",
+    "x": 540,
+    "y": 296,
+    "tag": "cookie2",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 116,
+    "y": 30,
+    "tag": "",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 300,
+    "y": 460,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 880,
+    "y": 520,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 160,
+    "y": 200,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 4,
+  "randomCheese": 1,
+  "refill": 5
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Pick up the crumbs on the table",
+    "hint": "Climb a chair, then the table. Grab 3 crumbs.",
+    "type": "pickN",
+    "arg": "tbl",
+    "n": 3,
+    "reveal": -1
+   },
+   {
+    "text": "Hide when the owner comes in",
+    "hint": "Footsteps and a light under the door: the owner is coming. Get under furniture or into a crack.",
+    "type": "flag",
+    "arg": "hidFromOwner",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Steal a cookie while he drinks",
+    "hint": "He drinks at the sink with his back to the room. The cookies are on the island behind him.",
+    "type": "flag",
+    "arg": "underNose",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Wait until he goes back to bed",
+    "hint": "Stay hidden until the door closes and the light goes off.",
+    "type": "count",
+    "arg": "ownerLeft",
+    "n": 1,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Never get spotted by the owner",
+    "hint": "",
+    "type": "keep",
+    "arg": "seenOwner",
+    "n": 0,
+    "reveal": 1
+   },
+   {
+    "text": "Don’t wake the cat",
+    "hint": "",
+    "type": "keep",
+    "arg": "catWoke",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the bottle cap",
+    "hint": "",
+    "type": "flag",
+    "arg": "button",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "water",
+  "at": [
+   40,
+   250,
+   470
+  ],
+  "stand": [
+   480,
+   104
+  ],
+  "face": -1.5707963267948966,
+  "stay": 16,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "counter",
+   "x": 0,
+   "y": 0,
+   "w": 960,
+   "h": 72
+  },
+  {
+   "t": "counter",
+   "x": 0,
+   "y": 72,
+   "w": 72,
+   "h": 240,
+   "join": true
+  },
+  {
+   "t": "fridge",
+   "x": 830,
+   "y": 72,
+   "w": 130,
+   "h": 110
+  },
+  {
+   "t": "island",
+   "x": 380,
+   "y": 250,
+   "w": 200,
+   "h": 90
+  },
+  {
+   "t": "box",
+   "x": 586,
+   "y": 262,
+   "w": 44,
+   "h": 44,
+   "ht": 44
+  },
+  {
+   "t": "table",
+   "x": 620,
+   "y": 380,
+   "w": 200,
+   "h": 130,
+   "cloth": 13196106,
+   "plate": true
+  },
+  {
+   "t": "chair",
+   "x": 580,
+   "y": 404,
+   "back": "w"
+  },
+  {
+   "t": "chair",
+   "x": 580,
+   "y": 456,
+   "back": "w"
+  },
+  {
+   "t": "chair",
+   "x": 830,
+   "y": 430,
+   "back": "e"
+  },
+  {
+   "t": "lowShelf",
+   "x": 200,
+   "y": 300,
+   "w": 62,
+   "h": 50
+  },
+  {
+   "t": "stool",
+   "x": 84,
+   "y": 236
+  }
+ ],
+ "props": [
+  {
+   "t": "noisy",
+   "x": 770,
+   "y": 215,
+   "kind": "glasses",
+   "r": 20
+  },
+  {
+   "t": "noisy",
+   "x": 500,
+   "y": 284,
+   "w": 40,
+   "h": 24,
+   "kind": "bag"
+  },
+  {
+   "t": "noisy",
+   "x": 180,
+   "y": 86,
+   "w": 110,
+   "h": 16,
+   "kind": "board"
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "jar",
+   "x": 470,
+   "y": 60,
+   "toX": 470,
+   "toY": 102,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  },
+  {
+   "kind": "cup",
+   "x": 655,
+   "y": 398,
+   "toX": 655,
+   "toY": 362,
+   "trap": true,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "s",
+   "x": 330,
+   "y": 0
+  },
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 420
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 230
+  },
+  {
+   "wall": "s",
+   "x": 760,
+   "y": 0
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "button",
+   "x": 262,
+   "y": 560,
+   "floor": true,
+   "always": false,
+   "label": "A shiny bottle cap!"
+  }
+ ],
+ "trapSpots": [],
+ "lights": [
+  {
+   "x": 900,
+   "y": 560,
+   "h": 60,
+   "c": 16754784,
+   "i": 1,
+   "r": 520
+  }
+ ],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

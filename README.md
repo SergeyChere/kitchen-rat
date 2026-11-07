@@ -24,6 +24,9 @@ These links always point to the newest release. All versions: [Releases](https:/
 
 ## For developers
 
+> **The game is being ported to Godot 4.** This is now the main version. See [godot/README.md](godot/README.md).
+> Test builds are under **Actions → Build Godot game → Artifacts**. The Unity port in `unity/` is frozen.
+
 ### Run from source
 
 You need [Node.js](https://nodejs.org) 20 or newer.

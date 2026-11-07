@@ -1,0 +1,441 @@
+{
+ "number": 4,
+ "id": "pantry",
+ "name": "The Pantry",
+ "act": 1,
+ "goal": 14,
+ "seconds": 720,
+ "prologue": false,
+ "finale": false,
+ "cat": "sleep",
+ "catSense": 1,
+ "sleepSense": 1.6,
+ "catBell": false,
+ "eatTime": 40,
+ "catStart": [],
+ "catBed": [
+  300,
+  480
+ ],
+ "bowl": [],
+ "dock": [
+  900,
+  380
+ ],
+ "exit": [],
+ "wanted": true,
+ "threats": [],
+ "starTip": "The cat sleeps even lighter now",
+ "openFood": false,
+ "tvOff": false,
+ "storm": false,
+ "blackout": 0,
+ "pups": [],
+ "pupAge": 0,
+ "vacuumStart": false,
+ "poisonStart": 0,
+ "door": 300,
+ "lamp": "bulb",
+ "decor": "pantry",
+ "window": {
+  "x": 220,
+  "w": 120,
+  "y": 205,
+  "h": 60
+ },
+ "teaser": "The kitchen again. The cat is awake and the food is hidden.",
+ "blurb": "Food is hidden. Sniff it out, and don’t wake the light-sleeping cat.",
+ "startTitle": "Food is hidden tonight",
+ "startSub": "Hold E to sniff. The cat sleeps lightly, so keep it quiet.",
+ "introMom": "The pantry. They hide the good stuff in there. I’ll need my nose tonight… and the cat sleeps lightly.",
+ "introPups": [
+  "Mom, we smell something yummy downstairs!",
+  "Squeak?",
+  "Hurry back!"
+ ],
+ "pal": {
+  "fog": 790543,
+  "sky": 7309946,
+  "ground": 2762272,
+  "hemi": 0.64,
+  "moon": 0.55,
+  "floor": "concrete",
+  "floorA": "#3e4541",
+  "wall": "brick",
+  "wallA": "#6a4636",
+  "wallB": "#3a2a24",
+  "trim": 2761760,
+  "ceil": 1842716
+ },
+ "food": {
+  "spots": [
+   {
+    "type": "cheese",
+    "x": 560,
+    "y": 360,
+    "tag": "cache1",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 350,
+    "y": 180,
+    "tag": "cache2",
+    "hidden": true,
+    "floor": false
+   },
+   {
+    "type": "cheese",
+    "x": 680,
+    "y": 525,
+    "tag": "cache3",
+    "hidden": true,
+    "floor": true
+   },
+   {
+    "type": "crumb",
+    "x": 120,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 420,
+    "y": 520,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 760,
+    "y": 300,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 900,
+    "y": 250,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   },
+   {
+    "type": "crumb",
+    "x": 230,
+    "y": 470,
+    "tag": "",
+    "hidden": false,
+    "floor": false
+   }
+  ],
+  "randomCrumb": 3,
+  "randomCheese": 1,
+  "refill": 4
+ },
+ "tasks": {
+  "goal": "Fill the nest",
+  "chain": [
+   {
+    "text": "Sniff out a hidden cache",
+    "hint": "Food is hidden tonight. Hold E to stand up and sniff: scent trails lead to it.",
+    "type": "pickN",
+    "arg": "cache",
+    "n": 1,
+    "reveal": -1
+   },
+   {
+    "text": "Gnaw open the grain sack",
+    "hint": "Hold F next to the sack by the washing machines. Gnawing is loud: check the cat’s Zzz bar first.",
+    "type": "flag",
+    "arg": "gnaw",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Push the box off the top of the stack",
+    "hint": "Climb the boxes in the corner by the window. Push the top box (F) and a cheese falls out.",
+    "type": "knock",
+    "arg": "carton",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Find all 3 hidden caches",
+    "hint": "One is on the workbench, one up the crates, one under the low shelf. Sniff to see them.",
+    "type": "pickN",
+    "arg": "cache",
+    "n": 3,
+    "reveal": -1
+   }
+  ],
+  "side": [
+   {
+    "text": "Don’t wake the cat",
+    "hint": "",
+    "type": "keep",
+    "arg": "catWoke",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Don’t knock over the cans on the workbench",
+    "hint": "",
+    "type": "keep",
+    "arg": "can",
+    "n": 0,
+    "reveal": -1
+   }
+  ],
+  "secret": [
+   {
+    "text": "Find the old photo",
+    "hint": "",
+    "type": "flag",
+    "arg": "photo",
+    "n": 0,
+    "reveal": -1
+   }
+  ]
+ },
+ "owner": {
+  "type": "",
+  "at": [],
+  "stand": [],
+  "face": 0,
+  "stay": 0,
+  "light": true,
+  "route": []
+ },
+ "furn": [
+  {
+   "t": "shelfUnit",
+   "x": 480,
+   "y": 0,
+   "w": 200,
+   "h": 50
+  },
+  {
+   "t": "washer",
+   "x": 830,
+   "y": 12,
+   "w": 90,
+   "h": 80
+  },
+  {
+   "t": "washer",
+   "x": 730,
+   "y": 12,
+   "w": 90,
+   "h": 80,
+   "dryer": true
+  },
+  {
+   "t": "basket",
+   "x": 700,
+   "y": 120,
+   "w": 52,
+   "h": 44,
+   "ht": 45
+  },
+  {
+   "t": "box",
+   "x": 40,
+   "y": 40,
+   "w": 70,
+   "h": 60,
+   "ht": 50
+  },
+  {
+   "t": "box",
+   "x": 110,
+   "y": 22,
+   "w": 60,
+   "h": 50,
+   "ht": 92
+  },
+  {
+   "t": "crate",
+   "x": 200,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 40
+  },
+  {
+   "t": "crate",
+   "x": 260,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 80
+  },
+  {
+   "t": "crate",
+   "x": 320,
+   "y": 150,
+   "w": 60,
+   "h": 60,
+   "ht": 120
+  },
+  {
+   "t": "bench",
+   "x": 470,
+   "y": 320,
+   "w": 180,
+   "h": 90
+  },
+  {
+   "t": "stool",
+   "x": 420,
+   "y": 352
+  },
+  {
+   "t": "cans",
+   "x": 130,
+   "y": 340,
+   "w": 44,
+   "h": 44
+  },
+  {
+   "t": "lowShelf",
+   "x": 640,
+   "y": 500,
+   "w": 80,
+   "h": 50
+  },
+  {
+   "t": "boiler",
+   "x": 870,
+   "y": 470,
+   "w": 80,
+   "h": 110
+  }
+ ],
+ "props": [
+  {
+   "t": "gnaw",
+   "x": 790,
+   "y": 200,
+   "spawn": 5
+  },
+  {
+   "t": "noisy",
+   "x": 580,
+   "y": 440,
+   "w": 56,
+   "h": 40,
+   "kind": "bag"
+  },
+  {
+   "t": "noisy",
+   "x": 200,
+   "y": 240,
+   "w": 60,
+   "h": 36,
+   "kind": "bag"
+  },
+  {
+   "t": "noisy",
+   "x": 420,
+   "y": 300,
+   "kind": "grain",
+   "r": 26
+  }
+ ],
+ "knocks": [
+  {
+   "kind": "can",
+   "x": 500,
+   "y": 332,
+   "toX": 500,
+   "toY": 300,
+   "trap": true,
+   "group": "cans",
+   "spawn": ""
+  },
+  {
+   "kind": "can",
+   "x": 522,
+   "y": 332,
+   "toX": 524,
+   "toY": 296,
+   "trap": true,
+   "group": "cans",
+   "spawn": ""
+  },
+  {
+   "kind": "can",
+   "x": 544,
+   "y": 332,
+   "toX": 548,
+   "toY": 300,
+   "trap": true,
+   "group": "cans",
+   "spawn": ""
+  },
+  {
+   "kind": "carton",
+   "x": 140,
+   "y": 44,
+   "toX": 140,
+   "toY": 100,
+   "trap": false,
+   "group": "",
+   "spawn": "cheese"
+  },
+  {
+   "kind": "bottle",
+   "x": 630,
+   "y": 340,
+   "toX": 668,
+   "toY": 352,
+   "trap": false,
+   "group": "",
+   "spawn": ""
+  }
+ ],
+ "cracks": [
+  {
+   "wall": "w",
+   "x": 0,
+   "y": 250
+  },
+  {
+   "wall": "s",
+   "x": 500,
+   "y": 0
+  },
+  {
+   "wall": "e",
+   "x": 0,
+   "y": 180
+  },
+  {
+   "wall": "s",
+   "x": 800,
+   "y": 0
+  }
+ ],
+ "secrets": [
+  {
+   "kind": "photo",
+   "x": 856,
+   "y": 560,
+   "floor": true,
+   "always": false,
+   "label": ""
+  }
+ ],
+ "trapSpots": [],
+ "lights": [],
+ "sleepers": [],
+ "dog": [],
+ "zones": [],
+ "tunnels": []
+}

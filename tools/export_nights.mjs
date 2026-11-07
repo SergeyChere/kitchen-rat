@@ -1,5 +1,5 @@
 // Export the 20 nights from game/js/levels.js to JSON files the Unity version reads
-// (unity/Assets/Resources/Nights/NN_id.json). Run after changing levels.js:  node tools/export_nights.mjs
+// (godot/data/nights/NN_id.json, and unity/Assets/Resources/Nights for the Unity version). Run after changing levels.js:  node tools/export_nights.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -10,9 +10,12 @@ const ctx = { window: {}, Math };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(root, 'game/js/levels.js'), 'utf8'), ctx);
 const LEVELS = ctx.window.LEVELS;
-const out = path.join(root, 'unity/Assets/Resources/Nights');
-fs.mkdirSync(out, { recursive: true });
-for (const f of fs.readdirSync(out)) if (f.endsWith('.json')) fs.rmSync(path.join(out, f));
+const outs = [path.join(root, 'godot/data/nights'), path.join(root, 'unity/Assets/Resources/Nights')];
+for (const out of outs) {
+  fs.mkdirSync(out, { recursive: true });
+  for (const f of fs.readdirSync(out)) if (f.endsWith('.json')) fs.rmSync(path.join(out, f));
+}
+const out = outs[0];
 
 const pair = v => (Array.isArray(v) ? [v[0], v[1]] : []);
 const task = t => ({
@@ -64,8 +67,8 @@ LEVELS.forEach((d, i) => {
     tunnels: (d.tunnels || []).map(([a, b]) => ({ a, b })),
   };
   const file = String(i + 1).padStart(2, '0') + '_' + d.id + '.json';
-  fs.writeFileSync(path.join(out, file), JSON.stringify(n, null, 1));
+  for (const o of outs) fs.writeFileSync(path.join(o, file), JSON.stringify(n, null, 1));
   index.push(file.replace('.json', ''));
 });
-fs.writeFileSync(path.join(out, 'index.txt'), index.join('\n') + '\n');
+for (const o of outs) fs.writeFileSync(path.join(o, 'index.txt'), index.join('\n') + '\n');
 console.log('exported', index.length, 'nights to', path.relative(root, out));

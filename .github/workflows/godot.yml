@@ -1,0 +1,77 @@
+name: Build Godot game
+
+# The Godot version of the game (godot/): free to build on GitHub's own runners, no license needed.
+# Runs on published releases (attaches the zips), on changes in godot/ and by hand.
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths: ['godot/**', '.github/workflows/godot.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot and export templates
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot and export templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q godot.zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && rm godot.zip
+
+      - name: Install export templates
+        run: |
+          dir=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$dir" && cd ~/godot
+          unzip -q -o templates.tpz -d tmp && mv tmp/templates/* "$dir"/ && rm -rf tmp
+
+      - name: Import assets
+        run: ~/godot/godot --headless --path godot --import || true
+
+      - name: Export Windows, Linux, Mac
+        run: |
+          mkdir -p build/godot/windows build/godot/linux build/godot/mac
+          ~/godot/godot --headless --path godot --export-release "Windows"
+          ~/godot/godot --headless --path godot --export-release "Linux"
+          ~/godot/godot --headless --path godot --export-release "Mac"
+          ls -laR build/godot
+
+      - name: Pack
+        run: |
+          cd build/godot
+          (cd windows && zip -qr ../../../KitchenRat-Windows.zip .)
+          (cd linux && zip -qr ../../../KitchenRat-Linux.zip .)
+          cp mac/KitchenRat.zip ../../KitchenRat-Mac.zip
+          ls -la ../../*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Godot
+          path: KitchenRat-*.zip
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: KitchenRat-*.zip

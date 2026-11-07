@@ -15,6 +15,7 @@ CM = 0.01
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 ROOT = os.path.join(REPO, 'unity', 'Assets', 'Art')   # models go straight into the Unity project
 DOCS = os.path.join(REPO, 'art')                      # previews and MODELS.md
+GODOT = os.path.join(REPO, 'godot', 'assets', 'models')  # the same models as glTF for Godot
 _mats = {}
 
 
@@ -207,6 +208,12 @@ def save(category, name, objs, anim=False):
         bake_anim=anim, bake_anim_use_all_actions=anim, bake_anim_use_nla_strips=False,
         bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0, path_mode='COPY')
     tris = sum(len(p.vertices) - 2 for o in allo if o.type == 'MESH' for p in o.data.polygons)
+    gout = os.path.join(GODOT, category)
+    os.makedirs(gout, exist_ok=True)
+    bpy.ops.export_scene.gltf(
+        filepath=os.path.join(gout, name + '.glb'), export_format='GLB', use_selection=True, export_yup=True,
+        export_apply=False, export_animations=anim, export_animation_mode='ACTIONS', export_force_sampling=True,
+        export_frame_range=False, export_def_bones=False, export_skins=True, export_lights=False, export_cameras=False)
     return path, tris
 
 

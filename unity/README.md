@@ -1,5 +1,8 @@
 # Kitchen Rat — Unity project
 
+> **Frozen.** The project moved to Godot 4. See ../godot/README.md.
+
+
 The Unity version of the game. The three.js prototype in `game/` is the reference for how everything should feel.
 
 ## Open it

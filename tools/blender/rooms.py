@@ -23,7 +23,13 @@ def wall(name, extra=None, cut=None):
         parts.append(box(x1 - x0, 10, 250 - z1, (x0 + x1) / 2, 0, z1, W))
     else:
         parts.append(box(120, 10, 250, 0, 0, 0, W))
-    parts += [box(120, 3, 14, 0, -6.5, 0, T, bevel=0.4), box(120, 4, 6, 0, -7, 244, T, bevel=0.6)]
+    if cut and cut[2] <= 0:  # an opening at the floor (mouse hole, door): the baseboard stops at its sides
+        x0, x1 = cut[0], cut[1]
+        if x0 > -60: parts.append(box(x0 + 60, 3, 14, (-60 + x0) / 2, -6.5, 0, T, bevel=0.4))
+        if x1 < 60: parts.append(box(60 - x1, 3, 14, (x1 + 60) / 2, -6.5, 0, T, bevel=0.4))
+    else:
+        parts.append(box(120, 3, 14, 0, -6.5, 0, T, bevel=0.4))
+    parts.append(box(120, 4, 6, 0, -7, 244, T, bevel=0.6))
     if extra:
         extra(parts, mov)
     return model(C, name, parts, mov or None)
@@ -33,7 +39,10 @@ def wall_mousehole():
     """A real 22 × 22 cm opening at the bottom, with an arched wooden trim: the rat walks through it to the nest."""
     def ex(parts, mov):
         T = mat(TRIM, 0.6)
-        parts += [torus(12, 1.8, 0, -6, 11, T, seg=16, rseg=4, rot=(90, 0, 0)), box(3.6, 3, 11, -13, -6.2, 0, T), box(3.6, 3, 11, 13, -6.2, 0, T)]
+        parts += [box(3.6, 3, 12, -13, -6.2, 0, T), box(3.6, 3, 12, 13, -6.2, 0, T)]  # posts
+        for i in range(7):  # an arch over the opening, open at the floor
+            a = math.radians(i * 30)
+            parts.append(box(6.6, 3, 3.4, -13 * math.cos(a), -6.2, 10.5 + 13 * math.sin(a), T, rot=(0, -(i * 30 - 90) + 90, 0)))
     return wall('wall_mousehole', ex, cut=(-11, 11, 0, 22))
 
 
