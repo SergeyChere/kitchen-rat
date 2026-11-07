@@ -7,6 +7,11 @@ sound and falls back to the synthesized one (tools/make_audio.py) otherwise. Sou
 godot/assets/sounds/real/CREDITS.md.
 
 Run:  sh tools/fetch_sounds.sh /tmp/sounds && python3 tools/import_sounds.py /tmp/sounds
+
+Your own sounds (e.g. from a paid library): put them in sounds_incoming/<sound>/ (any format ffmpeg reads: wav, mp3,
+ogg, flac…; up to 6 takes per sound) and run the script; they replace the free ones for that sound. Names ending in
+_loop are made seamless. Run without the download folder to import only sounds_incoming/ and keep the rest.
+The list of sounds is in sounds_incoming/README.md. The folder itself is not committed (licensed source files).
 """
 import glob
 import os
@@ -19,6 +24,7 @@ import numpy as np
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, 'godot', 'assets', 'sounds', 'real')
+INCOMING = os.path.join(REPO, 'sounds_incoming')
 SR = 32000
 
 KI = 'kenney-impact-sounds-for-godot/addons/kenney impact sounds/'
@@ -106,32 +112,60 @@ def write_ogg(path, x):
     os.remove(tmp)
 
 
+def make_loop(x):
+    ov = int(0.3 * SR)
+    n = len(x) - ov
+    y = x[:n].copy()
+    k = np.linspace(0, 1, ov)
+    y[:ov] = y[:ov] * k + x[n:n + ov] * (1 - k)
+    return y / np.abs(y).max() * 0.8
+
+
+def put(name, files, loop=False):
+    for f in glob.glob(os.path.join(OUT, name + '_*.ogg')):
+        os.remove(f)
+    for i, f in enumerate(files[:6]):
+        x = load(f)
+        write_ogg(os.path.join(OUT, '%s_%d.ogg' % (name, i)), make_loop(x) if loop else clean(x))
+    return min(len(files), 6)
+
+
 def main(src):
     os.makedirs(OUT, exist_ok=True)
-    for f in glob.glob(os.path.join(OUT, '*.ogg')):
-        os.remove(f)
     total = 0
-    for name, pats in MAP.items():
-        files = []
-        for p in pats:
-            files += sorted(glob.glob(os.path.join(src, p)))
-        if not files:
-            print('missing:', name)
-            continue
-        for i, f in enumerate(files[:6]):
-            write_ogg(os.path.join(OUT, '%s_%d.ogg' % (name, i)), clean(load(f)))
-            total += 1
-    for name, p in LOOPS.items():
-        x = load(os.path.join(src, p))
-        ov = int(0.3 * SR)
-        n = len(x) - ov
-        y = x[:n].copy()
-        k = np.linspace(0, 1, ov)
-        y[:ov] = y[:ov] * k + x[n:n + ov] * (1 - k)
-        write_ogg(os.path.join(OUT, name + '_0.ogg'), y / np.abs(y).max() * 0.8)
-        total += 1
-    with open(os.path.join(OUT, 'CREDITS.md'), 'w') as f:
-        f.write(CREDITS)
+    own = {}
+    if os.path.isdir(INCOMING):
+        for d in sorted(os.listdir(INCOMING)):
+            fs = sorted(f for f in glob.glob(os.path.join(INCOMING, d, '*')) if not f.endswith('.md'))
+            if fs:
+                own[d] = fs
+    if os.path.isdir(src):
+        for name, pats in MAP.items():
+            if name in own:
+                continue
+            files = []
+            for p in pats:
+                files += sorted(glob.glob(os.path.join(src, p)))
+            if not files:
+                print('missing:', name)
+                continue
+            total += put(name, files)
+        for name, p in LOOPS.items():
+            if name not in own:
+                total += put(name, [os.path.join(src, p)], True)
+        with open(os.path.join(OUT, 'CREDITS.md'), 'w') as f:
+            f.write(CREDITS)
+    else:
+        print('no free-pack folder at', src, '- importing only sounds_incoming/')
+    for name, fs in own.items():
+        n = put(name, fs, name.endswith('_loop'))
+        print('own:', name, n)
+        total += n
+    if own:
+        cp = os.path.join(OUT, 'CREDITS.md')
+        txt = open(cp).read().split('\nOwn licensed')[0] if os.path.exists(cp) else CREDITS
+        with open(cp, 'w') as f:
+            f.write(txt + '\nOwn licensed recordings (not CC0, from the developer\'s sound library subscription): %s\n' % ', '.join(sorted(own)))
     print('imported', total, 'recordings into', os.path.relpath(OUT, REPO))
 
 
