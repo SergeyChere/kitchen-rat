@@ -252,7 +252,19 @@ marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
 const crumbGeo = new THREE.SphereGeometry(3.5, 8, 6), crumbMat = T(0xe3c08e, { emissive: 0x3a2a12 });
 const cheeseGeo = new THREE.CylinderGeometry(10, 10, 8, 8, 1, false, 0, Math.PI / 3), cheeseMat = T(0xf7c64e, { emissive: 0x8a6214 });
 const poisonMat = T(0xd6d45a, { emissive: 0x2e4a10 });
+const BIG = { chicken: 1, pizza: 1, cake: 1, potato: 1, fat: 1, biscuit: 1, cookie: 0 };
+function bigMesh(type) {
+  const g = new THREE.Group(), P = PARENT; PARENT = g;
+  if (type === 'chicken') { const m = new THREE.Mesh(new THREE.SphereGeometry(8, 12, 10), T(0xc8843a)); m.scale.set(1.4, 0.9, 1); m.position.y = 7; g.add(m); outline(m, 0.8); cyl(2, 14, T(0xf0e8d8), 14, 5, 0).rotation.z = Math.PI / 2; }
+  else if (type === 'pizza') { const m = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 2.4, 3, 1, false, 0, Math.PI / 3), T(0xe8b04a)); m.position.y = 1.4; g.add(m); outline(m, 0.6); [[-4, 6], [3, 9], [-1, 12]].forEach(([x, z]) => cyl(2, 0.8, T(0xc0392b), x, 3, z, { line: false })); }
+  else if (type === 'cake') { box(18, 10, 14, T(0xf4e0c8), 0, 5, 0, { block: false }); box(18.5, 3, 14.5, T(0xe86a8a), 0, 11, 0, { block: false, line: false }); }
+  else if (type === 'potato') { const m = new THREE.Mesh(new THREE.SphereGeometry(8, 10, 8), T(0xb08a5a)); m.scale.set(1.3, 0.9, 1); m.position.y = 7; g.add(m); outline(m, 0.8); }
+  else if (type === 'fat') { box(18, 9, 12, T(0xf2ead8), 0, 4.5, 0, { block: false }); box(18.4, 2, 12.4, T(0xd8a0a0), 0, 6, 0, { block: false, line: false }); }
+  else if (type === 'biscuit') { cyl(10, 4, T(0xc8925a), 0, 2, 0, { seg: 14 }); }
+  PARENT = P; scene.add(g); return g;
+}
 function itemMesh(type, poison) {
+  if (BIG[type]) return bigMesh(type);
   if (type === 'sausage') { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 30, 12), T(0xb0453a)); m.rotation.z = Math.PI / 2; m.position.y = 4.5; m.castShadow = true; outline(m, 0.8); g.add(m); [-16, 16].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(4.2, 10, 8), T(0xb0453a)); e.position.set(x * 0.95, 4.5, 0); g.add(e); }); scene.add(g); return g; } const m = new THREE.Mesh(type === 'cheese' ? cheeseGeo : crumbGeo, poison ? poisonMat : type === 'cheese' ? cheeseMat : crumbMat); m.castShadow = true; outline(m, type === 'cheese' ? 1 : 0.6); scene.add(m); return m; }
 const scentMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xf2d36a, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
 function makeWisps(col) { const arr = []; for (let i = 0; i < 5; i++) { const s = new THREE.Sprite(scentMat.clone()); if (col) s.material.color.set(col); s.scale.set(7, 7, 1); scene.add(s); arr.push({ s, ph: i / 5 }); } return arr; }
@@ -599,6 +611,11 @@ const NOISY = {
   grain: { mode: 'walk', label: 'Crunch', radius: 140, amt: 0.3, snd: 'crunch', cd: 0.5 },
   puddle: { mode: 'walk', label: 'Splash!', radius: 160, amt: 0.35, snd: 'splash', cd: 0.6 },
   cord: { mode: 'step', label: 'Bzzt!', radius: 210, amt: 0.5, snd: 'buzz', cd: 3 },
+  washer: { mode: 'step', label: 'The washing machine started!', radius: 320, amt: 0.3, snd: 'buzz', once: true, effect: 'wash' },
+  hanger: { mode: 'walk', label: 'Clink clink', radius: 180, amt: 0.35, snd: 'clink', cd: 0.8 },
+  balloon: { mode: 'step', label: 'POP!', radius: 420, amt: 0.8, big: true, snd: 'bang', once: true },
+  confetti: { mode: 'walk', label: 'Rustle', radius: 140, amt: 0.3, snd: 'crinkle', cd: 0.5 },
+  glasses: { mode: 'walk', label: 'Clink!', radius: 220, amt: 0.5, snd: 'clink', cd: 0.9 },
 };
 function addNoisy(p) {
   const def = NOISY[p.kind], s = p.surf ? null : surfaceAt(p.x, p.y);
@@ -613,6 +630,8 @@ function triggerNoisy(z) {
   z.cdT = z.cd || 1; z.used = true;
   if (Snd.fx[z.snd]) Snd.fx[z.snd]();
   noise(rat.x, rat.y, z.radius, z.label, !!z.big, z.amt);
+  if (z.mesh && z.kind === 'balloon') z.mesh.visible = false;
+  if (z.effect === 'wash') { washT = 45; L.hums.push({ x: z.x, y: z.y, r: 300, wash: true }); if (Q) Q.flags.washer = true; bubble('Rumble rumble…', z.x, z.y, 60, 2); }
   if (z.effect === 'tv' && L.tv) { L.tv.base = 1.9; L.tv.mat.color.set(0x9cc2ff); L.tvOn = true; if (cat.mode === 'sleep') wakeCat(rat.x, rat.y); }
   if (Q) Q.flags.mistakes = (Q.flags.mistakes || 0) + 1;
 }
@@ -626,6 +645,10 @@ const PROPS = {
     else if (p.kind === 'bag') { for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(8 + i * 2, 0), T(0xe8e4dc, { flatShading: true })); b.scale.y = 0.45; b.position.set(p.x + (i - 1) * 9, y0 + 3, p.y + (i % 2) * 6); b.rotation.y = i; add(b); } }
     else if (p.kind === 'grain') { const r = p.r || 26; for (let i = 0; i < 46; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; box(1.6, 1, 1.6, T(0xe0c890), p.x + Math.cos(a) * d, y0 + 0.5, p.y + Math.sin(a) * d, { block: false, line: false }); } }
     else if (p.kind === 'puddle') { const m = new THREE.Mesh(new THREE.CircleGeometry(p.r || 24, 24), new THREE.MeshBasicMaterial({ color: 0x8ab4e0, transparent: true, opacity: 0.35, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, y0 + 0.6, p.y); m.scale.y = 0.7; add(m); }
+    else if (p.kind === 'washer') { box(5, 3, 5, T(0x3ac04a, { emissive: 0x105a10 }), p.x, y0 + 1.6, p.y, { block: false, line: false }); }
+    else if (p.kind === 'hanger') { for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(6, 0.6, 4, 3), T(0xb8bcc4)); t.rotation.x = -Math.PI / 2; t.position.set(p.x + i * 10 - 10 + (p.w || 0) / 2, y0 + 0.8, p.y + (p.h || 0) / 2 + (i % 2) * 6); add(t); } }
+    else if (p.kind === 'balloon') { const b = new THREE.Mesh(new THREE.SphereGeometry(9, 14, 10), T([0xe84a5a, 0x4a9ae8, 0xf2c84a][Math.floor(Math.random() * 3)])); b.scale.y = 1.15; b.position.set(p.x, y0 + 10, p.y); b.castShadow = true; outline(b, 0.8); add(b); z.mesh = b; }
+    else if (p.kind === 'confetti') { const w = p.w || 60, h = p.h || 40; for (let i = 0; i < 40; i++) box(2, 0.4, 2, T([0xe84a5a, 0x4a9ae8, 0xf2c84a, 0x6ac46a][i % 4]), p.x + Math.random() * w, y0 + 0.4, p.y + Math.random() * h, { block: false, line: false }); }
     else if (p.kind === 'cord') { const w = p.w || 120; const c = cyl(0.9, w, T(0x1a1a1a), p.x + w / 2, 1, p.y + (p.h || 10) / 2, { line: false }); c.rotation.z = Math.PI / 2; }
   },
   gnaw(p) { // a bag you can gnaw open with F (noisy), spills food
@@ -678,7 +701,7 @@ function buildLevel(i) {
   disposeWorld();
   world = new THREE.Group(); scene.add(world); PARENT = world; camBlock = []; fadeables = [];
   const d = LEVELS[i];
-  L = { i, d, solids: [], hides: [], blockers: [], surfaces: [{ id: 'floor', h: 0, rects: [] }], fades: [], flickers: [], knocks: [], door: d.door, crackle: null, clock: null, dust: null, doorPivot: null };
+  L = { i, d, solids: [], hides: [], blockers: [], surfaces: [{ id: 'floor', h: 0, rects: [] }], fades: [], flickers: [], knocks: [], cracks: [], door: d.door, crackle: null, clock: null, dust: null, doorPivot: null };
   const p = d.pal;
   scene.background.set(p.fog); scene.fog.color.set(p.fog); hemi.color.set(p.sky); hemi.groundColor.set(p.ground); hemi.intensity = p.hemi; moon.intensity = p.moon;
   buildShell(d);
@@ -704,7 +727,7 @@ function buildLevel(i) {
   // cracks: small gaps at the bottom of the walls the rat can squeeze into
   (d.cracks || []).forEach(c => {
     const sz = 28, r = c.wall === 's' ? R(c.x - 20, H - sz, 40, sz) : c.wall === 'w' ? R(0, c.y - 20, sz, 40) : c.wall === 'e' ? R(W - sz, c.y - 20, sz, 40) : R(c.x - 20, 0, 40, sz);
-    L.hides.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'crack', land: true });
+    L.hides.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'crack', land: true }); L.cracks.push(r);
     const hm = new THREE.Mesh(new THREE.CircleGeometry(13, 20, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x050506 }));
     if (c.wall === 's') { hm.position.set(c.x, 0.2, H - 3.2); hm.rotation.y = Math.PI; }
     else if (c.wall === 'w') { hm.position.set(3.2, 0.2, c.y); hm.rotation.y = Math.PI / 2; }
@@ -809,14 +832,15 @@ function resetRun() {
   cat = { x: bed[0], y: bed[1], r: 17, a: Math.PI * 0.8, mode: 'sleep', alert: 0, lostT: 0, lastX: 0, lastY: 0, searchT: 0, watchT: 0, idleT: 0, sit: 1, path: [], repath: 0, speed: 0, step: 0, meowT: 0, zzzT: 1, sleep: 1, calmT: 0, stage: 0, peek: 0 };
   const cs = L.d.cat || (L.d.threats.includes('cat') ? 'sleep' : 'away');
   if (cs === 'away') cat.mode = 'away';
+  else if (cs === 'eating') { const b = L.d.bowl; Object.assign(cat, { mode: 'eat', x: b[0] + 26, y: b[1] + 4, eatT: L.d.eatTime || 40, sleep: 0 }); }
   else if (cs === 'awake') { Object.assign(cat, { mode: 'idle', idleT: 2.5, sit: 1, sleep: 0 }); if (L.d.catStart) { cat.x = L.d.catStart[0]; cat.y = L.d.catStart[1]; cat.a = -Math.PI / 2; } }
   graceT = 0;
   run = { catWoke: cs === 'awake', chased: false };
-  human = { mode: 'away', x: DOOR().x, y: DOOR().y, a: Math.PI, path: [], r: 20, t: 0, t2: 0, step: 0, speed: 0, seeT: 0, lostT: 0, lowT: 0, sweep: 0, known: false, lastX: 0, lastY: 0, repath: 0, stepD: 0 };
+  human = { visit: 0, plan: null, mode: 'away', x: DOOR().x, y: DOOR().y, a: Math.PI, path: [], r: 20, t: 0, t2: 0, step: 0, speed: 0, seeT: 0, lostT: 0, lowT: 0, sweep: 0, known: false, lastX: 0, lastY: 0, repath: 0, stepD: 0 };
   vac = { on: false, x: L.d.dock[0], y: L.d.dock[1], a: Math.PI, r: 17, path: [], speed: 0, bumpT: 0 };
   L.knocks.forEach(k => { k.done = false; k.fall = null; });
   Q = L.d.tasks ? { i: 0, done: new Set(), failed: new Set(), flags: {}, picked: new Set(), deliv: new Set(), delivAny: false, knocked: new Set(), recent: [], key: '', foilMsgT: 0 } : null;
-  foilV = { in: false, dist: 0, loud: false }; foilCd = 0;
+  foilV = { in: false, dist: 0, loud: false }; foilCd = 0; washT = 0; flashT = 0; thunderT = 0; stormMaskT = 0; nextBolt = 8; blackout = false;
   (L.secrets || []).forEach(sc => { sc.found = false; sc.mesh.visible = false; });
   const fd = foodDef();
   fd.spots.forEach(([type, x, y, o]) => placeItem(type, x, y, o));
@@ -829,8 +853,8 @@ function foodDef() {
   return { spots: f.spots || [], random: f.random || { crumb: open ? 12 : 4, cheese: open ? 4 : 3 }, refill: f.refill != null ? f.refill : open ? 10 : 5 };
 }
 function placeItem(type, x, y, o = {}) {
-  const s = o.floor ? null : surfaceAt(x, y), cheese = type === 'cheese' || type === 'sausage';
-  items.push({ tag: o.tag, hidden: !!o.hidden, x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, big: type === 'sausage', poison: false, w: type === 'sausage' ? 3 : cheese ? 2 : 1, v: type === 'sausage' ? 6 : cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
+  const s = o.floor ? null : surfaceAt(x, y), cheese = type === 'cheese' || type === 'sausage' || type in BIG;
+  items.push({ tag: o.tag, hidden: !!o.hidden, x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, big: type === 'sausage' || !!BIG[type], poison: false, w: type === 'sausage' || BIG[type] ? 3 : cheese ? 2 : 1, v: type === 'sausage' || BIG[type] ? 6 : cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
 }
 function spawnKitchen() { Object.assign(rat, { x: hole.x + 22, y: hole.y - 22, h: 0, surf: 'floor', a: -Math.PI / 4, inNest: false, jump: null }); camYaw = -Math.PI / 4; camPitch = 0.38; }
 function spawnItem(type) {
@@ -1153,7 +1177,39 @@ function updateProps(dt) {
   // the cat's bell: you can hear where it is
   if (L.d.catBell && cat.mode !== 'sleep' && cat.mode !== 'away' && cat.speed > 20) { bellT -= dt; if (bellT <= 0) { bellT = 0.45; Snd.fx.bell(0.06 * clamp01(1 - Math.hypot(cat.x - rat.x, cat.y - rat.y) / 700)); } }
 }
-let gnawCand = null, bellT = 0;
+let gnawCand = null, bellT = 0, tunnelCand = null, washT = 0, flashT = 0, thunderT = 0, stormMaskT = 0, nextBolt = 8, blackout = false, mudMove = 0;
+function crackAt() { for (let i = 0; i < L.cracks.length; i++) if (inRect(rat.x, rat.y, L.cracks[i], 2)) return i; return -1; }
+function updateWorld(dt) {
+  // paths inside the walls: in a linked crack, press Space to crawl to the other end
+  tunnelCand = null;
+  if (L.d.tunnels && rat.surf === 'floor' && !rat.jump) { const c = crackAt(); if (c >= 0) for (const [a, b] of L.d.tunnels) if (a === c || b === c) tunnelCand = a === c ? b : a; }
+  if (tunnelCand != null && pressed.Space) {
+    const r = L.cracks[tunnelCand]; Object.assign(rat, { x: r.x + r.w / 2, y: r.y + r.h / 2 }); fade(true); setTimeout(() => fade(false), 260);
+    Snd.fx.scrape(0.05); pressed.Space = false; if (Q) Q.flags.tunnel = (Q.flags.tunnel || 0) + 1;
+    say('…through the wall', rat.x, rat.y, 20, '#9fd27a', 16);
+  }
+  if (cat.mode === 'chase' && human.plan && (human.mode === 'patrol' || human.mode === 'look') && !human.callT) { human.callT = 4; human.mode = 'patrol'; human.path = astar(L.grid, human.x, human.y, rat.x, rat.y); human.lastX = rat.x; human.lastY = rat.y; human.known = true; bubble('What is it, kitty?', human.x, human.y, 195, 1.6); }
+  if (human.callT) human.callT = Math.max(0, human.callT - dt);
+  // the washing machine: loud to start, then its rumble hides your steps
+  if (washT > 0) { washT -= dt; if (Math.random() < dt * 3) Snd.fx.scrape(0.03); if (washT <= 0) L.hums = L.hums.filter(h => !h.wash); }
+  // storm: lightning shows you for a moment, thunder hides your noise
+  if (L.d.storm) {
+    nextBolt -= dt; flashT = Math.max(0, flashT - dt); stormMaskT = Math.max(0, stormMaskT - dt);
+    if (nextBolt <= 0) { nextBolt = 11 + Math.random() * 9; flashT = 0.35; thunderT = 1.1; if (Q && ratHidden) Q.flags.hidLightning = true;
+      if (!ratHidden && cat.mode !== 'sleep' && cat.mode !== 'away' && Math.hypot(cat.x - rat.x, cat.y - rat.y) < 420 && los(cat.x, cat.y, rat.x, rat.y, rat.h)) { cat.mode = 'investigate'; cat.lastX = rat.x; cat.lastY = rat.y; cat.path = astar(L.grid, cat.x, cat.y, rat.x, rat.y); bubble('!', cat.x, cat.y, 50, 0.8); }
+      if (!ratHidden && human.mode === 'patrol' && Math.hypot(human.x - rat.x, human.y - rat.y) < 500) { human.seeT += 0.4; human.lastX = rat.x; human.lastY = rat.y; human.known = true; } }
+    if (thunderT > 0) { thunderT -= dt; if (thunderT <= 0) { Snd.fx.bang(); Snd.fx.thud(); stormMaskT = 2.6; say('BOOM', rat.x, rat.y, 90, '#cfd8ff', 26); } }
+    if (stormMaskT > 0 && Q) { mudMove += Math.hypot(rat.x - lastRX2, rat.y - lastRY2); if (mudMove > 60) Q.flags.thunderMove = true; } else mudMove = 0;
+    lastRX2 = rat.x; lastRY2 = rat.y;
+    hemi.intensity = L.d.pal.hemi * (blackout ? 0.55 : 1) + flashT * 4;
+    if (L.d.blackout && !blackout && nightT > L.d.night * L.d.blackout) {
+      blackout = true; lightOn = false; if (L.tv) L.tv.base = 0; L.flickers.forEach(f => { if (f.type !== 'tv') f.base *= 0.25; });
+      Snd.fx.lightSwitch(); banner('The power went out!', 'It’s pitch dark. Thunder still hides your steps.', 3.5);
+      if (Q && Math.hypot(rat.x - hole.x, rat.y - hole.y) < 60) Q.flags.homeAtBlackout = true;
+    }
+  }
+}
+let lastRX2 = 0, lastRY2 = 0;
 const inHum = () => L.hums.some(h => Math.hypot(h.x - rat.x, h.y - rat.y) < h.r);
 // ---- tasks: a chain shown one step at a time, side tasks and secrets (bottom-left list)
 function checkTask(t) {
@@ -1170,6 +1226,7 @@ function checkTask(t) {
 }
 const keepBroken = t => {
   const a = t.check[1];
+  if (a === 'seenOwner') return !!run.seenOwner; if (a === 'balloon') return L.noisy.some(z => z.kind === 'balloon' && z.used);
   if (a === 'catWoke') return run.catWoke; if (a === 'chased') return run.chased; if (a === 'caught') return lives < 3; if (a === 'tv') return L.tvOn;
   const k = L.knocks.find(q => q.kind === a); return !!(k && k.done);
 };
@@ -1178,6 +1235,9 @@ function tickTasks(dt) {
   const T = L.d.tasks, dc = Math.hypot(cat.x - rat.x, cat.y - rat.y);
   if (cat.mode === 'sleep' && dc < 95) Q.flags.passCat = true;
   if (ratHidden && cat.mode !== 'sleep' && cat.mode !== 'away' && dc < 140) Q.flags.hidNearCat = true;
+  if (L.d.cat === 'eating' && cat.mode === 'sleep') Q.flags.catNapping = true;
+  if (ratHidden && human.mode !== 'away' && human.mode !== 'coming') Q.flags.hidFromOwner = true;
+  if (human.mode === 'drink') Q.flags.ownerDrinking = true;
   while (Q.i < T.chain.length && checkTask(T.chain[Q.i])) { completeTask('c' + Q.i, T.chain[Q.i].text); Q.i++; }
   T.side.forEach((t, k) => {
     const id = 's' + k; if (Q.done.has(id) || Q.failed.has(id) || (t.reveal != null && Q.i < t.reveal)) return;
@@ -1229,6 +1289,7 @@ function nightGoals(won) {
 // A noise at (x, y) heard within `radius`. `amt` is how much it disturbs a sleeping cat at point-blank range
 // (1 = wakes it instantly). Quiet footsteps (radius < 100) don't raise the wanted level.
 function noise(x, y, radius, label, big, amt) {
+  if (stormMaskT > 0 && noiseSrc !== 'knock') { addRing(x, y, false, 0.3); return; }
   if (amt == null) amt = big ? 0.9 : radius > 150 ? 0.3 : 0.4;
   addRing(x, y, big, radius < 100 ? 0.35 : 1);
   alarm += big ? 7 : radius > 150 ? 0.5 : radius > 100 ? 2 : 0;
@@ -1397,7 +1458,7 @@ function update(dt) {
   // --- food ---
   if (!rat.jump) for (let i = items.length - 1; i >= 0; i--) { const it = items[i];
     if (Math.abs(it.h - rat.h) < 10 && Math.hypot(it.x - rat.x, it.y - rat.y) < 17 && carryW() + it.w <= 3) {
-      rat.carry.push(it); items.splice(i, 1); if (Q && it.tag) Q.picked.add(it.tag); ratMesh.userData.mouth.add(it.mesh); it.mesh.visible = true; it.mesh.scale.setScalar(1); tut.picked = true; if (it.type === 'cheese') tut.cheese = true; it.wisps && it.wisps.forEach(w => scene.remove(w.s)); it.wisps = null;
+      rat.carry.push(it); items.splice(i, 1); if (Q && it.tag) { Q.picked.add(it.tag); if (human.mode === 'drink') Q.flags.underNose = true; } ratMesh.userData.mouth.add(it.mesh); it.mesh.visible = true; it.mesh.scale.setScalar(1); tut.picked = true; if (it.type === 'cheese') tut.cheese = true; it.wisps && it.wisps.forEach(w => scene.remove(w.s)); it.wisps = null;
       if (!it.poison) evidence += it.type === 'cheese' ? 9 : 3; updHud();
       if (it.type === 'cheese') { bubble('Cheeese!', rat.x, rat.y, rat.h + 30, 1.2); Snd.fx.cheese(); } else Snd.fx.pickup();
     } }
@@ -1423,7 +1484,7 @@ function update(dt) {
   updateVacuum(dt);
   if (!rat.jump && rat.surf === 'floor') for (const t of traps) { if (t.sprung) continue; if (Math.hypot(t.x - rat.x, t.y - rat.y) < 12) { t.sprung = true; t.bait.visible = false; t.wisps && t.wisps.forEach(w => scene.remove(w.s)); t.wisps = null; caught('SNAP!', t.x, t.y, 26, 'snap'); break; } }
   if (state !== 'play') return;
-  updateProps(dt);
+  updateProps(dt); updateWorld(dt);
   if (Q) { tickTasks(dt); if (state !== 'play') return; }
   for (const k of L.knocks) if (k.delay > 0) { k.delay -= dt; if (k.delay <= 0) knockOver(k); }
   for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noiseSrc = 'knock'; noise(k.to[0], k.to[1], 460, k.text, true); noiseSrc = ''; if (k.spawn) placeItem(k.spawn, k.to[0] + 14, k.to[1]); } }
@@ -1447,6 +1508,18 @@ function updateCat(dt) {
   const dx = rat.x - cat.x, dy = rat.y - cat.y, dist = Math.hypot(dx, dy);
   cat.speed = 0; cat.meowT -= dt;
   if (cat.mode === 'away') { catSees = false; return; }
+  if (cat.mode === 'eat' || cat.mode === 'tobed') {
+    const bowl = L.d.bowl;
+    if (cat.mode === 'eat') {
+      cat.a += angDiff(cat.a, Math.atan2(bowl[1] - cat.y, bowl[0] - cat.x)) * Math.min(1, dt * 4); cat.eatT -= dt;
+      cat.zzzT -= dt; if (cat.zzzT <= 0) { cat.zzzT = 2.6; bubble('Crunch crunch', cat.x, cat.y, 40, 1.2); }
+      if (cat.eatT <= 0) { cat.mode = 'tobed'; cat.path = astar(L.grid, cat.x, cat.y, L.d.catBed[0], L.d.catBed[1]); bubble('*yawn*', cat.x, cat.y, 44, 1.4); }
+    } else if (!follow(cat, 70, dt, L.catBlock)) Object.assign(cat, { mode: 'sleep', sleep: 1, stage: 0, peek: 0, sit: 1, x: L.d.catBed[0], y: L.d.catBed[1] });
+    // while eating it only notices you right next to it or right in front of it
+    const near = !ratHidden && (dist < 40 || (dist < 110 && Math.abs(angDiff(cat.a, Math.atan2(dy, dx))) < 0.5)) && los(cat.x, cat.y, rat.x, rat.y, rat.h);
+    catSees = near; if (near) { cat.mode = 'chase'; cat.alert = 1; Snd.fx.meow('angry'); }
+    return;
+  }
   if (cat.mode === 'sleep') {
     catSees = false;
     // sleep meter: noise lowers it, quiet time slowly restores it
@@ -1510,30 +1583,47 @@ function updateCat(dt) {
   cat.step += dt * cat.speed * 0.08;
   if (graceT <= 0 && !ratHidden && rat.h < 30 && !rat.jump && dist < cat.r + rat.r + 4) caught('Gotcha!', cat.x, cat.y, 58);
 }
+function startVisit() {
+  const h = human, plan = L.d.owner; h.visit++; h.plan = plan; h.planStarted = false; h.chasedThisVisit = false;
+  h.mode = 'coming'; h.t = 2.4; bubble(plan.type === 'water' ? 'Stomp… stomp… *yawn*' : 'Click. A flashlight…', DOOR().x - 30, DOOR().y, 120, 2.2);
+  [0, 0.6, 1.2, 1.8].forEach(d => setTimeout(() => Snd.fx.stomp(0.14 + d * 0.06), d * 1000));
+  if (state === 'play') banner(plan.type === 'water' ? 'The owner is coming!' : 'Flashlight patrol!', 'Hide under furniture or in a crack until he leaves.', 3.5);
+}
+function endVisit() { const h = human; h.mode = 'leaving'; h.path = astar(L.grid, h.x, h.y, DOOR().x, DOOR().y); Snd.fx.lightSwitch(); }
+const humanRange = () => { let r = 330; if (L.d.owner && L.d.owner.light === false && Q && Q.flags.battery && nightT > L.d.night * 0.5) r = 170 + Math.sin(clock * 9) * 40 * (Math.random() < 0.1 ? 1 : 0.2); return r; };
 function updateHuman(dt) {
   const h = human; humanSees = false;
-  const ownerStar = threatStar('owner'); if (ownerStar > 5) return;
+  const ownerStar = threatStar('owner'), plan = L.d.owner;
+  if (ownerStar > 5 && !plan) return;
+  if (plan && h.mode === 'away' && h.visit < plan.at.length && nightT >= plan.at[h.visit]) startVisit();
   if (h.mode === 'away') { if (stars >= ownerStar) { h.mode = 'coming'; h.t = 2.4; bubble('Stomp… stomp… stomp…', DOOR().x - 30, DOOR().y, 120, 2.2); [0, 0.6, 1.2, 1.8].forEach(d => setTimeout(() => Snd.fx.stomp(0.12 + d * 0.06), d * 1000)); } return; }
   if (h.mode === 'coming') { h.t -= dt; if (h.t <= 0) { Object.assign(h, { mode: 'patrol', x: DOOR().x, y: DOOR().y, a: Math.PI, path: [], lostT: 0, seeT: 0, lowT: 0, t: 0 }); lightOn = true; Snd.fx.door(); setTimeout(() => Snd.fx.lightSwitch(), 500); bubble(stars >= 5 ? 'That’s it, rat, you’re done!' : 'Who’s rustling in here?!', h.x, h.y, 195, 2.4); } return; }
+  if (h.mode === 'patrol' && plan && h.plan && !h.planStarted) { h.planStarted = true; if (plan.light === false) lightOn = false; h.path = []; h.wp = 0; }
   h.t += dt; h.speed = 0;
   const dx = rat.x - h.x, dy = rat.y - h.y, dist = Math.hypot(dx, dy), look = h.a + h.sweep;
-  const inCone = dist < 330 && Math.abs(angDiff(look, Math.atan2(dy, dx))) < 0.5;
+  const inCone = dist < humanRange() && Math.abs(angDiff(look, Math.atan2(dy, dx))) < 0.5;
   humanSees = h.mode !== 'leaving' && !ratHidden && (inCone || dist < 50) && los(h.x, h.y, rat.x, rat.y, 150);
-  if (humanSees) { h.seeT += dt; h.lastX = rat.x; h.lastY = rat.y; h.known = true; alarm += dt * 12; } else h.seeT = Math.max(0, h.seeT - dt * 0.5);
+  if (humanSees) { run.seenOwner = true; h.seeT += dt; h.lastX = rat.x; h.lastY = rat.y; h.known = true; alarm += dt * 12; } else h.seeT = Math.max(0, h.seeT - dt * 0.5);
   const mul = 1 + Math.max(0, stars - ownerStar) * 0.05;
   if (h.mode !== 'leaving' && h.mode !== 'chase' && h.seeT > 0.35) { h.mode = 'chase'; h.lostT = 0; h.repath = 0; alarm += 6; bubble(Math.random() < 0.5 ? 'Why, you little…!' : 'There you are!', h.x, h.y, 195, 1.6); }
   switch (h.mode) {
     case 'patrol':
       h.sweep = Math.sin(h.t * 1.3) * 0.55;
+      if (h.plan && !h.path.length) {
+        if (plan.type === 'water') { if (h.wp === 0) { h.path = astar(L.grid, h.x, h.y, plan.stand[0], plan.stand[1]); h.wp = 1; } else { h.mode = 'drink'; h.t2 = plan.stay || 14; h.a = plan.face; bubble('*glug glug*', h.x, h.y, 195, 2); } }
+        else { const r = plan.route; if (h.wp < r.length) { h.path = astar(L.grid, h.x, h.y, r[h.wp][0], r[h.wp][1]); h.wp++; } else endVisit(); }
+        if (h.mode !== 'patrol') break;
+      }
       if (!h.path.length) { let t;
         if (h.known && Math.random() < 0.55) t = freePoint(L.grid, clamp(h.lastX + (Math.random() - 0.5) * 220, 30, W - 30), clamp(h.lastY + (Math.random() - 0.5) * 220, 30, H - 30));
         else t = randomFree(L.grid, 200, h.x, h.y);
         h.path = astar(L.grid, h.x, h.y, t[0], t[1]); }
       if (!follow(h, 85 * mul, dt, L.catBlock)) { h.mode = 'look'; h.t2 = 1.6; h.path = []; }
       break;
-    case 'look': h.t2 -= dt; h.sweep = Math.sin(h.t * 2.4) * 0.9; if (h.t2 <= 0) h.mode = 'patrol'; break;
+    case 'look': h.t2 -= dt; h.sweep = Math.sin(h.t * 2.4) * 0.9; if (h.t2 <= 0) { h.mode = 'patrol'; if (h.plan && h.chasedThisVisit) endVisit(); } break;
+    case 'drink': h.t2 -= dt; h.sweep = Math.sin(h.t * 0.7) * 0.15; if (h.t2 <= 0) { bubble('Ahh. Back to bed.', h.x, h.y, 195, 1.8); endVisit(); } break;
     case 'chase': {
-      h.sweep *= Math.max(0, 1 - dt * 5);
+      h.chasedThisVisit = true; h.sweep *= Math.max(0, 1 - dt * 5);
       if (humanSees) h.lostT = 0; else h.lostT += dt;
       h.repath -= dt; if (h.repath <= 0) { h.repath = 0.3; const [px, py] = freePoint(L.grid, humanSees ? rat.x : h.lastX, humanSees ? rat.y : h.lastY); h.path = astar(L.grid, h.x, h.y, px, py); }
       if (!follow(h, 150 * mul, dt, L.catBlock) && humanSees) h.a += angDiff(h.a, Math.atan2(dy, dx)) * Math.min(1, dt * 6);
@@ -1541,11 +1631,11 @@ function updateHuman(dt) {
       break; }
     case 'leaving':
       h.sweep *= 0.95;
-      if (stars >= ownerStar) { h.mode = 'patrol'; h.path = []; break; }
-      if (!follow(h, 95, dt, L.catBlock)) { h.mode = 'away'; lightOn = false; h.known = false; Snd.fx.door(); return; }
+      if (!plan && stars >= ownerStar) { h.mode = 'patrol'; h.path = []; break; }
+      if (!follow(h, 95, dt, L.catBlock)) { const clean = h.plan && !h.chasedThisVisit; h.mode = 'away'; lightOn = false; h.known = false; h.plan = null; h.planStarted = false; Snd.fx.door(); if (Q) { Q.flags.ownerLeft = (Q.flags.ownerLeft || 0) + 1; if (clean) Q.flags.ownerClean = (Q.flags.ownerClean || 0) + 1; } return; }
       break;
   }
-  if (h.mode !== 'leaving' && h.mode !== 'chase') {
+  if (h.mode !== 'leaving' && h.mode !== 'chase' && !h.plan) {
     if (stars < ownerStar) { h.lowT += dt; if (h.lowT > 8) { h.mode = 'leaving'; h.path = astar(L.grid, h.x, h.y, DOOR().x, DOOR().y); bubble('Must be nothing… Back to bed.', h.x, h.y, 195, 2); Snd.fx.lightSwitch(); } }
     else h.lowT = 0;
   }
@@ -1634,7 +1724,8 @@ function sync(dt) {
     else { m.position.set(k.x, k.h, k.y); m.rotation.set(0, 0, 0); } }
   if (L.dust) { const D = L.dust; for (let i = 0; i < D.seeds.length; i++) { const s = D.seeds[i]; D.dp[i * 3] = s[0] + Math.sin(clock * 0.3 + s[3]) * 8; D.dp[i * 3 + 1] = s[1] + Math.sin(clock * 0.2 + s[3] * 2) * 6; D.dp[i * 3 + 2] = s[2] + Math.cos(clock * 0.25 + s[3]) * 8; } D.dg.attributes.position.needsUpdate = true; }
   L.flickers.forEach(f => {
-    if (f.type === 'tv') { f.t -= dt; if (f.t <= 0) { f.t = 0.08 + Math.random() * 0.25; const k = 0.55 + Math.random() * 0.6; f.light.intensity = f.base * k; f.mat.color.setHSL(0.6 + Math.random() * 0.06, 0.5, 0.35 + k * 0.25); } }
+    if (f.type === 'tv' && f.base === 0) { f.light.intensity = 0; f.mat.color.set(0x15171c); }
+    else if (f.type === 'tv') { f.t -= dt; if (f.t <= 0) { f.t = 0.08 + Math.random() * 0.25; const k = 0.55 + Math.random() * 0.6; f.light.intensity = f.base * k; f.mat.color.setHSL(0.6 + Math.random() * 0.06, 0.5, 0.35 + k * 0.25); } }
     else { const k = 0.85 + Math.sin(clock * 13 + f.base) * 0.08 + Math.random() * 0.07; f.light.intensity = f.base * k; f.sprites.forEach((s, i) => s.scale.setScalar((12 + i * 3) * (0.9 + Math.random() * 0.2))); }
   });
   // cat
@@ -1654,7 +1745,7 @@ function sync(dt) {
     if (vis) { humanMesh.position.set(h.x, 0, h.y); humanMesh.rotation.y = -h.a; const sw = Math.sin(h.step || 0); hu.legs[0].rotation.z = sw * 0.45; hu.legs[1].rotation.z = -sw * 0.45; hu.armL.rotation.z = -sw * 0.35; hu.armR.rotation.set(0, -(h.sweep || 0), 1.25); hu.bodyG.position.y = Math.abs(Math.cos(h.step || 0)) * 2; }
     hu.spot.intensity = lerp(hu.spot.intensity, vis ? 2.6 : 0, Math.min(1, dt * 4));
     lightCone.mesh.visible = vis && inRun;
-    if (lightCone.mesh.visible) { const la = h.a + h.sweep; updateCone(lightCone, h.x + Math.cos(la) * 20, h.y + Math.sin(la) * 20, la, 0.5, 330); lightCone.mat.color.set(h.mode === 'chase' ? 0xffb48a : 0xfff0c0); }
+    if (lightCone.mesh.visible) { const la = h.a + h.sweep; updateCone(lightCone, h.x + Math.cos(la) * 20, h.y + Math.sin(la) * 20, la, 0.5, humanRange()); lightCone.mat.color.set(h.mode === 'chase' ? 0xffb48a : 0xfff0c0); }
     const open = h.mode !== 'away' && !(h.mode === 'coming' && h.t > 0.9);
     if (L.doorPivot) L.doorPivot.rotation.y = lerp(L.doorPivot.rotation.y, open ? -1.45 : 0, Math.min(1, dt * 4));
     roomLight.intensity = lerp(roomLight.intensity, lightOn ? 0.75 : 0, Math.min(1, dt * 3));
@@ -1685,6 +1776,7 @@ function sync(dt) {
   const pr = $('prompt'); marker.visible = false; pr.hidden = true;
   if (playing) {
     if (knockCand) { const p = project(knockCand.x, knockCand.h + 22, knockCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'F'; $('promptTxt').textContent = 'Knock over ' + knockCand.word; } }
+    else if (tunnelCand != null) { const p = project(rat.x, rat.h + 34, rat.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Space'; $('promptTxt').textContent = 'Crawl through the wall'; } }
     else if (gnawCand) { const p = project(gnawCand.x, gnawCand.h + 36, gnawCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Hold F'; $('promptTxt').textContent = gnawCand.prog > 0 ? 'Gnawing… ' + Math.round(gnawCand.prog * 100) + '%' : 'Gnaw the bag open (noisy)'; } }
     else if (jumpCand) { marker.visible = true; marker.position.set(jumpCand.x, jumpCand.s.h + 0.7, jumpCand.y); const sc = 1 + Math.sin(clock * 6) * 0.12; marker.scale.set(sc, sc, sc);
       const p = project(jumpCand.x, jumpCand.s.h + 14, jumpCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = usingTouch ? 'Jump' : 'Space'; $('promptTxt').textContent = jumpCand.s.h > rat.h ? 'Jump up' : 'Jump down'; } }
@@ -1712,7 +1804,7 @@ function sync(dt) {
     let evS = 0; for (const t of STAR_AT) if (evidence >= t) evS++;
     const wv = $('wanted'); wv.classList.toggle('blink', alarm > 0.5 && unseenT > 4 && stars > evS); wv.classList.toggle('hot', human.mode === 'chase' || cat.mode === 'chase');
     const hm = human.mode, top = L.d.threats[Math.min(stars, L.d.threats.length) - 1];
-    const catTxt = sleeping ? ['The cat is fast asleep', 'The cat is stirring…', 'The cat is half awake!'][cat.stage] : cat.mode === 'chase' ? 'The cat is chasing you!' : cat.mode === 'away' ? 'All quiet' : 'The cat is prowling';
+    const catTxt = sleeping ? ['The cat is fast asleep', 'The cat is stirring…', 'The cat is half awake!'][cat.stage] : cat.mode === 'chase' ? 'The cat is chasing you!' : cat.mode === 'away' ? 'All quiet' : cat.mode === 'eat' ? 'The cat is eating' : cat.mode === 'tobed' ? 'The cat is going to bed' : 'The cat is prowling';
     $('wText').textContent = !L.d.threats.length ? catTxt : hm === 'chase' ? 'The owner is chasing you!' : hm === 'leaving' ? 'The owner is going back to bed…' : hm === 'coming' ? 'Footsteps in the hall…' : hm !== 'away' ? 'The owner is in the room' : stars === 0 ? (sleeping ? 'All quiet, even the cat is asleep' : 'All quiet') : stars > L.d.threats.length ? 'High alert!' : THREATS[top].label;
     const chip = $('chip');
     if (ratHidden) { chip.textContent = 'Hidden'; chip.className = 'chip hidden-state'; }
@@ -1777,6 +1869,7 @@ requestAnimationFrame(frame);
 // test hooks (used by automated checks; harmless in play)
 window.__kr = {
   info: () => ({ state, level: L && L.i, stars, fed, lives, cat: cat && cat.mode, human: human && human.mode, vac: vac && vac.on, traps: traps.length, items: items.length, poison: items.filter(i => i.poison).length, rat: rat && [Math.round(rat.x), Math.round(rat.y), rat.h, rat.surf] }),
+  setTime: t => { nightT = t; }, catEat: () => { cat.eatT = 0.3; }, human: () => ({ mode: human.mode, x: Math.round(human.x), y: Math.round(human.y), visit: human.visit, plan: !!human.plan, light: lightOn }), cracks: () => L.cracks,
   start: i => startLevel(i), resetProgress: () => { progress = { unlocked: 1, best: {} }; }, skip: () => skipIntro(), evidence: v => { evidence = v; },
   teleport: (x, y, h = 0, surf = 'floor', yaw) => { Object.assign(rat, { x, y, h, surf, jump: null }); if (yaw != null) camYaw = yaw; },
   preview: i => { buildLevel(i); resetRun(); state = 'menu'; showPanel(null); },

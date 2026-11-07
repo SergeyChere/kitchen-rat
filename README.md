@@ -66,6 +66,11 @@ Nights menu as "in development". The plan is in the design doc.
 | 3 | The Prowling Cat | 12 | The cat is awake. Listen for its bell, hide under the sofa and in cracks |
 | 4 | The Pantry | 14 | Food is hidden: sniff it out. Gnaw open a grain sack, push a box off the stack. Cans that fall like dominoes, rustling bags |
 | 5 | The Kitchen, Again | 16 | Knock things down to lure the cat away, then drag its sausage home. The fridge hum hides your steps |
+| 6 | A Glass of Water | 14 | The owner comes down for water three times a night. Hide, then steal a cookie while he drinks |
+| 7 | The Flashlight | 16 | Flashlight patrols through the pantry. Steal the spare battery and his flashlight starts dying |
+| 8 | Dinner Leftovers | 16 | Paths inside the walls: hide in a crack, press Space to come out of another. Drag a chicken leg home |
+| 9 | The Laundry Room | 16 | The cat eats, then naps. Start the washing machine to hide your steps |
+| 10 | The Storm | 18 | Thunder hides every sound, lightning shows you. Then the power goes out |
 
 Tasks for the night show up one at a time in the bottom-left corner. Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
 night unlocks the next one; progress and settings are saved automatically.
