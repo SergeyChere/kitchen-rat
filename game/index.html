@@ -50,7 +50,15 @@ body{font:14px var(--f-ui);padding-left:max(16px,env(safe-area-inset-left,0px));
 .chip.hidden-state{color:var(--safe);border-color:rgba(155,224,106,.5)}
 .chip.seen{color:var(--danger);border-color:rgba(232,102,74,.6)}
 .chip.hint{color:var(--cheese);border-color:rgba(242,193,78,.45);max-width:min(360px,70vw);white-space:normal;line-height:1.35}
+.tag .zz{display:block;text-align:center}
+.tag .sleepbar{display:block;width:46px;height:5px;margin:2px auto 0;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.tag .sleepbar i{display:block;height:100%;border-radius:3px;transition:width .15s}
+.chip.noise-0{color:var(--safe)}
+.chip.noise-3{color:var(--danger);border-color:rgba(232,102,74,.6)}
 .meter{display:inline-flex;gap:3px}
+.meter.n i{width:5px;height:12px}
+.meter.n i:nth-child(1){height:6px}.meter.n i:nth-child(2){height:9px}
+.meter.n i.on{background:currentColor}
 .meter i{width:7px;height:10px;border-radius:2px;background:rgba(242,193,78,.18)}
 .meter i.on{background:var(--cheese)}
 .wanted{position:absolute;right:12px;top:10px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.85)}
@@ -107,6 +115,15 @@ button:disabled{cursor:default}
 .settings select{font:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 .settings .sep{grid-column:1/-1;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
 .settings .sep:first-child{border-top:0;padding-top:0}
+.goals{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.goals li{display:flex;gap:10px;align-items:center;font-size:15px}
+.goals li i{font-style:normal;font-weight:800;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px}
+.goals li.ok i{background:var(--safe);color:#14210c}
+.goals li.no{color:var(--muted)}
+.goals li.no i{background:rgba(255,255,255,.08);color:var(--muted)}
+.lvl.soon{opacity:.38;border-style:dashed}
+.levels .act{grid-column:1/-1;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;margin-top:6px}
+.levels{max-height:min(62vh,560px);overflow-y:auto;padding-right:4px}
 .result-stats{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;font-variant-numeric:tabular-nums}
 .result-stats div{display:flex;flex-direction:column}
 .result-stats b{font-size:22px}
@@ -146,6 +163,7 @@ html.desktop .help{display:none}
     <div class="cross" id="cross" hidden></div>
     <div class="chips" id="chips" hidden>
       <div class="chip" id="chip"></div>
+      <div class="chip" id="noiseChip"><span id="noiseTxt">Quiet</span><span class="meter n" id="nMeter"><i></i><i></i><i></i></span></div>
       <div class="chip" id="smell"><span>Cheese scent</span><span class="meter" id="meter"><i></i><i></i><i></i><i></i><i></i></span></div>
       <div class="chip hint" id="hint" hidden></div>
     </div>
@@ -171,7 +189,7 @@ html.desktop .help{display:none}
           <button id="mSettings" class="btn-ghost">Settings</button>
           <button id="mQuit" class="btn-ghost" hidden>Quit</button>
         </div>
-        <p class="keys"><kbd>WASD</kbd> move · mouse look · <kbd>Space</kbd> jump · hold <kbd>E</kbd> sniff · <kbd>F</kbd> knock over · <kbd>Shift</kbd> run · <kbd>Esc</kbd> pause</p>
+        <p class="keys"><kbd>WASD</kbd> move · mouse look · <kbd>Space</kbd> jump · hold <kbd>E</kbd> sniff · <kbd>F</kbd> knock over · <kbd>Shift</kbd> run · <kbd>Ctrl</kbd>/<kbd>C</kbd> sneak · <kbd>Esc</kbd> pause</p>
       </section>
 
       <section class="panel" id="pLevels" hidden>
@@ -216,6 +234,7 @@ html.desktop .help{display:none}
       <section class="panel" id="pResult" hidden>
         <h2 id="resTitle">Night complete</h2>
         <p id="resText"></p>
+        <ul class="goals" id="resGoals"></ul>
         <div class="result-stats" id="resStats"></div>
         <div class="row">
           <button id="resNext">Next night</button>
@@ -226,7 +245,7 @@ html.desktop .help{display:none}
     </div>
   </div>
 
-  <p class="help"><kbd>WASD</kbd> move, mouse camera (click the game first), <kbd>Space</kbd> jump when the marker shows, hold <kbd>E</kbd> or the right mouse button to sniff, <kbd>F</kbd> knock things over, <kbd>Shift</kbd> run (noisy), <kbd>Esc</kbd> pause. Wanted stars rise from thefts, noise and being seen. Temporary stars fade when you hide and stay out of sight, faster in the nest.</p>
+  <p class="help"><kbd>WASD</kbd> move, mouse camera (click the game first), <kbd>Space</kbd> jump when the marker shows, hold <kbd>E</kbd> or the right mouse button to sniff, <kbd>F</kbd> knock things over, <kbd>Shift</kbd> run (noisy), <kbd>Ctrl</kbd> or <kbd>C</kbd> sneak (silent), <kbd>Esc</kbd> pause. Wanted stars rise from thefts, noise and being seen. Temporary stars fade when you hide and stay out of sight, faster in the nest.</p>
 </div>
 
 <script src="vendor/three/three.min.js"></script>

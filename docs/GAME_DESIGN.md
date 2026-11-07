@@ -54,17 +54,31 @@ n-th star unlocks the n-th threat. Stars beyond the list make everyone faster ("
 
 ## Nights
 
-| # | Room | Goal | Night length | Threat order |
-|---|---|---|---|---|
-| 1 | Kitchen | 10 | 4:00 | cat |
-| 2 | Living room | 14 | 4:30 | cat, owner |
-| 3 | Pantry | 16 | 4:45 | cat, owner, traps |
-| 4 | Dining room | 18 | 5:00 | cat, owner, traps, poison |
-| 5 | Kitchen, again | 22 | 5:00 | cat, owner, traps, poison, vacuum |
+20 nights in four acts of five (full plan: the "Kitchen Rat — план до релиза в Steam" doc).
 
-Rooms are 960 × 600 and built from furniture pieces in `game/js/levels.js`. Any surface at most 57
-higher than the current one can be jumped to, so tall pieces need a step (chair → table, crates in a
-staircase, armchair → side table).
+| Act | Nights | Theme |
+|---|---|---|
+| 1 · Silence | 1–5 | Moving quietly. Only the cat. 1 empty kitchen, 2 sleeping cat, 3 prowling cat, 4 sniffing out hidden food, 5 distractions |
+| 2 · The Owner | 6–10 | The owner, lamps and flashlight, paths inside the walls, the laundry room, a storm |
+| 3 · Traps | 11–15 | Mousetraps, sticky traps, the kids' room, a party, poison |
+| 4 · Siege | 16–20 | Robot vacuum, a dog that follows your scent, sealed cracks, the whole floor, moving out |
+
+Playable now: nights 1–3. Target length per night in the final game: 15–20 minutes.
+
+### Noise and the sleeping cat
+
+| Action | Heard within | Sleep lost at point-blank |
+|---|---|---|
+| Sneak (Ctrl / C) | silent | 0 |
+| Walk | 95 | 0.10 every 0.45 s |
+| Run | 210 | 0.30 every 0.35 s |
+| Bump into furniture while running | 170 | 0.45 |
+| Jump down from higher than 50 | 160 | 0.55 |
+| Knock something off a table | 460 | 0.90 |
+
+Sleep drops with distance (linear to zero at the edge) and faster with each wanted star. After 2.5 s of
+quiet it recovers 0.045 per second. Below 0.6 the cat stirs, below 0.3 it lifts its head and looks
+toward the last noise: if it sees the rat, it wakes. At 0 it wakes and prowls for the rest of the night.
 
 ## Sound
 

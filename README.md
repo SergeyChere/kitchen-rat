@@ -55,16 +55,17 @@ Open `game/index.html` directly. Everything it needs is in `game/vendor/`, so it
 
 ## The nights
 
-| Night | Room | Food to bring | New danger |
-|---|---|---|---|
-| 1 | The Kitchen | 10 | The cat (asleep when you arrive) |
-| 2 | The Living Room | 14 | The owner, with a flashlight |
-| 3 | The Pantry | 16 | Mousetraps that smell like cheese |
-| 4 | The Dining Room | 18 | Poisoned cheese |
-| 5 | The Kitchen, Again | 22 | A robot vacuum that goes under furniture |
+The full game will have 20 nights in four acts. Nights 1–3 are playable now; the rest show up in the
+Nights menu as "in development". The plan is in the design doc.
 
-Inside a night the dangers arrive one by one as your wanted stars rise. Finishing a night unlocks the
-next one; progress and settings are saved automatically.
+| Night | Room | Food | What's new |
+|---|---|---|---|
+| 1 | The Kitchen | 8 | Nobody is home and food is everywhere. Learn to move, jump, carry and sneak |
+| 2 | The Sleeping Cat | 12 | Food is scattered around the living room and the cat sleeps by your hole. Noise drains its sleep meter: running, bumping into things and jumping down from tables wake it up |
+| 3 | The Prowling Cat | 12 | Same room, but the cat is awake and walking around. Stay out of its sight cone and hide |
+
+Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
+night unlocks the next one; progress and settings are saved automatically.
 
 ## Settings
 
@@ -81,7 +82,8 @@ Open them from the main menu or the pause menu.
 | Jump onto furniture | `Space` when the yellow ring shows |
 | Sniff (find cheese, spot poison and traps) | `E` or right mouse button |
 | Knock something off a table (distraction) | `F` |
-| Run (noisy) | `Shift` |
+| Run (loud) | `Shift` |
+| Sneak (silent, slow) | hold `Ctrl` or press `C` |
 | Pause / release the cursor | `Esc` |
 | Fullscreen (desktop app) | `F11` |
 | Developer tools (desktop app) | `Ctrl+Shift+I` |
@@ -92,7 +94,7 @@ Open them from the main menu or the pause menu.
 game/            The game itself (three.js r128), runs offline
   index.html     Markup, styles and menus
   js/audio.js    Synthesized sound effects and adaptive music (Web Audio, no audio files)
-  js/levels.js   The five nights: furniture, threats, palettes, music. Add a night here
+  js/levels.js   The nights: furniture, food, cat, goals, palettes, music. Add a night here
   js/game.js     Room builder, rat, cat, owner, vacuum, wanted level, cutscenes, menus
   vendor/        three.js and fonts
 electron/        Desktop shell: window, fullscreen, quit button bridge

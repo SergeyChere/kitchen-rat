@@ -285,7 +285,7 @@ function makeStream() {
   return { geo, pos, alpha, mat, pts, op: 0, it: null };
 }
 const streams = [makeStream(), makeStream(), makeStream()];
-function addRing(x, z, big) { const m = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: big ? 0xf2c14e : 0xece6da, transparent: true, opacity: 0.6, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 1, z); scene.add(m); rings.push({ m, r: 4, t: big ? 1 : 0.6, sp: big ? 420 : 220 }); }
+function addRing(x, z, big, k = 1) { const m = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: big ? 0xf2c14e : 0xece6da, transparent: true, opacity: k < 1 ? 0.35 : 0.6, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 1, z); scene.add(m); rings.push({ m, r: 4, t: big ? 1 : 0.6, sp: (big ? 420 : 220) * k, k }); }
 
 // ================= LEVEL BUILDER =================
 let world = null, L = null, fid = 0;
@@ -686,7 +686,9 @@ let lightOn = false, humanSees = false, catSees = false, vacSees = false, ratHid
 let camYaw = -Math.PI / 4, camPitch = 0.38, camDist = 82;
 let jumpCand = null, knockCand = null, smell = 0, smellTarget = null, sniffCd = 0, refillT = 0, sniffTargets = [], mouseR = false, touchSniff = false;
 const tut = { picked: false, delivered: false, cheese: false, sniffed: false, hideT: 0 };
+let graceT = 0, run = { catWoke: false, chased: false }, crouchToggle = false, noiseLvl = 0, bumpT = 0, crouchAmt = 0;
 let bannerTimer = 0, lastPauseT = 0, runLevel = 0;
+const hasWanted = () => !!(L.d.wanted || L.d.threats.length);
 const threatStar = t => { const i = L.d.threats.indexOf(t); return i < 0 ? 99 : i + 1; };
 const DOOR = () => ({ x: 935, y: L.door });
 
@@ -703,17 +705,30 @@ function resetRun() {
   fed = 0; lives = 3; nightT = 0; evidence = 0; alarm = 0; unseenT = 0; stars = 0; maxStars = 0; levelDone = new Set(); lastStarsShown = -1;
   lightOn = false; humanSees = false; catSees = false; refillT = 0;
   rat = { x: nest.cx + 30, y: nest.cz - 5, h: 0, surf: 'floor', r: 9, a: 0, carry: [], step: 0, noiseT: 0, stepT: 0, inNest: true, jump: null, sniffing: false, sniffHold: 0, sniffMin: 0, sniffSnd: 0, retarget: 0, stand: 0, smelled: new Set() };
-  sniffTargets = []; streams.forEach(st => { st.op = 0; st.it = null; st.pts.visible = false; }); Object.assign(tut, { picked: false, delivered: false, cheese: false, sniffed: false, hideT: 0 });
+  sniffTargets = []; streams.forEach(st => { st.op = 0; st.it = null; st.pts.visible = false; }); Object.assign(tut, { picked: false, delivered: false, cheese: false, sniffed: false, crouched: false, hideT: 0 }); crouchToggle = false;
   const bed = L.d.catBed;
-  cat = { x: bed[0], y: bed[1], r: 17, a: Math.PI * 0.8, mode: 'sleep', alert: 0, lostT: 0, lastX: 0, lastY: 0, searchT: 0, watchT: 0, idleT: 0, sit: 1, path: [], repath: 0, speed: 0, step: 0, meowT: 0, zzzT: 1 };
-  if (!L.d.threats.length) cat.mode = 'away';
+  cat = { x: bed[0], y: bed[1], r: 17, a: Math.PI * 0.8, mode: 'sleep', alert: 0, lostT: 0, lastX: 0, lastY: 0, searchT: 0, watchT: 0, idleT: 0, sit: 1, path: [], repath: 0, speed: 0, step: 0, meowT: 0, zzzT: 1, sleep: 1, calmT: 0, stage: 0, peek: 0 };
+  const cs = L.d.cat || (L.d.threats.includes('cat') ? 'sleep' : 'away');
+  if (cs === 'away') cat.mode = 'away';
+  else if (cs === 'awake') { Object.assign(cat, { mode: 'idle', idleT: 2.5, sit: 1, sleep: 0 }); if (L.d.catStart) { cat.x = L.d.catStart[0]; cat.y = L.d.catStart[1]; cat.a = -Math.PI / 2; } }
+  graceT = 0;
+  run = { catWoke: cs === 'awake', chased: false };
   human = { mode: 'away', x: DOOR().x, y: DOOR().y, a: Math.PI, path: [], r: 20, t: 0, t2: 0, step: 0, speed: 0, seeT: 0, lostT: 0, lowT: 0, sweep: 0, known: false, lastX: 0, lastY: 0, repath: 0, stepD: 0 };
   vac = { on: false, x: L.d.dock[0], y: L.d.dock[1], a: Math.PI, r: 17, path: [], speed: 0, bumpT: 0 };
   L.knocks.forEach(k => { k.done = false; k.fall = null; });
-  const open = !!L.d.openFood;
-  for (let i = 0; i < (open ? 12 : 4); i++) spawnItem('crumb');
-  for (let i = 0; i < (open ? 4 : 3); i++) spawnItem('cheese');
+  const fd = foodDef();
+  fd.spots.forEach(([type, x, y]) => placeItem(type, x, y));
+  for (let i = 0; i < fd.random.crumb; i++) spawnItem('crumb');
+  for (let i = 0; i < fd.random.cheese; i++) spawnItem('cheese');
   updHud();
+}
+function foodDef() {
+  const f = L.d.food || {}, open = !!L.d.openFood;
+  return { spots: f.spots || [], random: f.random || { crumb: open ? 12 : 4, cheese: open ? 4 : 3 }, refill: f.refill != null ? f.refill : open ? 10 : 5 };
+}
+function placeItem(type, x, y) {
+  const s = surfaceAt(x, y), cheese = type === 'cheese';
+  items.push({ x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, poison: false, w: cheese ? 2 : 1, v: cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
 }
 function spawnKitchen() { Object.assign(rat, { x: hole.x + 22, y: hole.y - 22, h: 0, surf: 'floor', a: -Math.PI / 4, inNest: false, jump: null }); camYaw = -Math.PI / 4; camPitch = 0.38; }
 function spawnItem(type) {
@@ -798,7 +813,7 @@ function showPanel(id) {
   PANELS.forEach(p => $(p).hidden = p !== id); $('overlay').hidden = !id;
   if (id) { const b = $(id).querySelector('button:not([hidden]):not(:disabled)'); if (b) b.focus({ preventScroll: true }); }
 }
-function hudForPlay(on) { $('stats').hidden = !on; $('statWanted').hidden = !L || !L.d.threats.length; $('hudTitle').textContent = on && L ? 'Night ' + (L.i + 1) + ' · ' + L.d.name : 'Kitchen Rat'; }
+function hudForPlay(on) { $('stats').hidden = !on; $('statWanted').hidden = !L || !hasWanted(); $('hudTitle').textContent = on && L ? 'Night ' + (L.i + 1) + ' · ' + L.d.name : 'Kitchen Rat'; }
 function goMenu() {
   state = 'menu'; releaseLock(); bars(false); fade(false); $('skip').hidden = true; $('touch').hidden = true; hudForPlay(false);
   Snd.hum(0); Music.play(MENU_MUSIC, true); Music.duck(false);
@@ -809,17 +824,19 @@ function goMenu() {
 }
 function renderLevels() {
   const list = $('levelList'); list.innerHTML = '';
-  LEVELS.forEach((d, i) => {
-    const b = document.createElement('button'); b.className = 'lvl'; b.type = 'button';
-    const locked = i + 1 > progress.unlocked, best = progress.best[d.id];
-    const danger = d.threats.map(t => THREATS[t].name).join(', ');
+  const ACTS = ['Act 1 · Silence', 'Act 2 · The Owner', 'Act 3 · Traps', 'Act 4 · Siege'];
+  for (let i = 0; i < TOTAL_NIGHTS; i++) {
+    if (i % 5 === 0) { const h = document.createElement('div'); h.className = 'act'; h.textContent = ACTS[i / 5]; list.appendChild(h); }
+    const d = LEVELS[i], p = d ? null : PLANNED[i - LEVELS.length];
+    const b = document.createElement('button'); b.className = 'lvl' + (d ? '' : ' soon'); b.type = 'button';
+    const locked = !d || i + 1 > progress.unlocked, best = d && progress.best[d.id];
     b.innerHTML = '<span class="n">Night ' + (i + 1) + '</span><span class="t"></span><span class="d"></span>' + (best ? '<span class="b"></span>' : '');
-    b.querySelector('.t').textContent = d.name;
-    b.querySelector('.d').textContent = locked ? 'Finish night ' + i + ' to unlock' : d.threats.length ? 'Bring ' + d.goal + ' food. Danger: ' + danger : 'Bring ' + d.goal + ' food. Everyone is asleep.';
-    if (best) b.querySelector('.b').textContent = 'Done by ' + best.clock + ' · top wanted ' + starStr(best.stars);
-    b.disabled = locked; b.addEventListener('click', () => { Snd.fx.click(); startLevel(i); });
+    b.querySelector('.t').textContent = d ? d.name : p[0];
+    b.querySelector('.d').textContent = !d ? p[1] + ' In development.' : locked ? 'Finish night ' + i + ' to unlock' : 'Bring ' + d.goal + ' food. ' + (d.blurb || '');
+    if (best) b.querySelector('.b').textContent = 'Goals ' + (best.goals || 1) + ' / ' + (d.goals || ['fed']).length + ' · best ' + best.clock;
+    b.disabled = locked; if (d) b.addEventListener('click', () => { Snd.fx.click(); startLevel(i); });
     list.appendChild(b);
-  });
+  }
 }
 function openSettings(from) { settingsReturn = from; $('stResetMsg').hidden = true; resetArm = 0; $('stReset').textContent = 'Reset progress'; showPanel('pSettings'); }
 function closeSettings() { saveSettings(); showPanel(settingsReturn); }
@@ -892,7 +909,8 @@ function beginPlay() {
   msgs.forEach(m => m.el.remove()); msgs = []; hudForPlay(true); updHud();
   camera.position.set(rat.x - 60, 50, rat.y + 60); fade(false);
   const danger = L.d.threats.map(t => THREATS[t].name).join(' → ');
-  if (L.d.threats.length) banner('Bring ' + L.d.goal + ' food before dawn', (L.d.openFood ? '' : 'Food is hidden: hold E to sniff it out. ') + 'Tonight: ' + danger, 5);
+  if (L.d.start) banner(L.d.start.title, L.d.start.sub, 5.5);
+  else if (L.d.threats.length) banner('Bring ' + L.d.goal + ' food before dawn', (L.d.openFood ? '' : 'Food is hidden: hold E to sniff it out. ') + 'Tonight: ' + danger, 5);
   else banner('Bring ' + L.d.goal + ' food before dawn', 'Everyone is asleep and food is everywhere. Grab what you can!', 4.5);
   requestLock();
 }
@@ -936,41 +954,65 @@ function outro(dt) {
 function finishNight(won, title, text) {
   state = 'result'; phase = 'done'; bars(false); releaseLock(); $('touch').hidden = true; Snd.hum(0); hudForPlay(false);
   const id = L.d.id, last = L.i === LEVELS.length - 1;
+  const goals = nightGoals(won);
   if (won) {
     progress.unlocked = Math.max(progress.unlocked, L.i + 2);
-    const prev = progress.best[id], t = Math.round(nightT);
-    if (!prev || t < prev.time) progress.best[id] = { time: t, clock: fmtClock(), stars: Math.min(maxStars, prev ? prev.stars : 5) };
-    else prev.stars = Math.min(prev.stars, maxStars);
+    const prev = progress.best[id], t = Math.round(nightT), got = goals.filter(g => g.ok).length;
+    if (!prev || t < prev.time) progress.best[id] = { time: t, clock: fmtClock(), stars: Math.min(maxStars, prev ? prev.stars : 5), goals: Math.max(got, prev && prev.goals || 0) };
+    else { prev.stars = Math.min(prev.stars, maxStars); prev.goals = Math.max(prev.goals || 0, got); }
     saveProgress();
-    $('resTitle').textContent = last ? 'Every pup is fed' : 'Night ' + (L.i + 1) + ' complete';
-    $('resText').textContent = last ? 'You made it through every room in the house. The pups are fat and happy, and the owner is still looking for you.' : 'The pups are fed. Tomorrow night: ' + LEVELS[L.i + 1].name + ', with ' + THREATS[LEVELS[L.i + 1].threats[LEVELS[L.i + 1].threats.length - 1]].name + ' added to the mix.';
+    $('resTitle').textContent = 'Night ' + (L.i + 1) + ' complete';
+    $('resText').textContent = last ? 'The pups are fed. That’s every night built so far: nights ' + (LEVELS.length + 1) + '–' + TOTAL_NIGHTS + ' are on the way.' : 'The pups are fed. Tomorrow night: ' + (L.d.teaser || LEVELS[L.i + 1].name);
     $('resNext').hidden = last; $('resRetry').textContent = 'Replay night';
   } else {
     Snd.fx.lose(); Music.set(0, false);
     $('resTitle').textContent = title; $('resText').textContent = text;
     $('resNext').hidden = true; $('resRetry').textContent = 'Try again';
   }
+  $('resGoals').innerHTML = '';
+  goals.forEach(g => { const li = document.createElement('li'); li.className = g.ok ? 'ok' : 'no'; li.innerHTML = '<i></i><span></span>'; li.querySelector('i').textContent = g.ok ? '✔' : '✖'; li.querySelector('span').textContent = g.label; $('resGoals').appendChild(li); });
   $('resStats').innerHTML = '';
   [[won ? fmtClock() : fmtClock(), won ? 'Finished at' : 'Time'], [Math.min(fed, L.d.goal) + ' / ' + L.d.goal, 'Food'], [String(3 - Math.max(lives, 0)), 'Lives lost'], [starStr(maxStars), 'Top wanted']].forEach(([v, k]) => { const dv = document.createElement('div'); dv.innerHTML = '<b></b><span></span>'; dv.querySelector('b').textContent = v; dv.querySelector('span').textContent = k; $('resStats').appendChild(dv); });
   showPanel('pResult');
 }
 function lose(title, text) { finishNight(false, title, text); }
+function nightGoals(won) {
+  const ids = L.d.goals || ['fed'];
+  const check = { fed: won, early: won && nightT / L.d.night * 360 < 120, nocatch: lives === 3, sleep: !run.catWoke, unseen: !run.chased };
+  return ids.map(id => ({ id, label: GOALS[id], ok: !!check[id] && (id === 'fed' || won) }));
+}
 
 // ================= GAMEPLAY =================
-function noise(x, y, radius, label, big) {
-  addRing(x, y, big);
-  alarm += big ? 7 : radius > 150 ? 0.5 : 2;
+// A noise at (x, y) heard within `radius`. `amt` is how much it disturbs a sleeping cat at point-blank range
+// (1 = wakes it instantly). Quiet footsteps (radius < 100) don't raise the wanted level.
+function noise(x, y, radius, label, big, amt) {
+  if (amt == null) amt = big ? 0.9 : radius > 150 ? 0.3 : 0.4;
+  addRing(x, y, big, radius < 100 ? 0.35 : 1);
+  alarm += big ? 7 : radius > 150 ? 0.5 : radius > 100 ? 2 : 0;
   if (label) say(label, x, y, 24, '#f2c14e', 20);
   if ((human.mode === 'patrol' || human.mode === 'look') && Math.hypot(human.x - x, human.y - y) < (big ? 700 : 320)) { human.mode = 'patrol'; human.path = astar(L.grid, human.x, human.y, x, y); human.lastX = x; human.lastY = y; human.known = true; }
   if (cat.mode === 'away') return;
   const dc = Math.hypot(cat.x - x, cat.y - y);
-  if (cat.mode === 'sleep') { if (dc < radius * 0.7) wakeCat(); return; }
-  if (dc < radius && cat.mode !== 'chase' && cat.mode !== 'watch') {
-    cat.mode = 'investigate'; cat.lastX = x; cat.lastY = y; cat.alert = Math.max(cat.alert, 0.4); cat.path = astar(L.grid, cat.x, cat.y, x, y);
-    if (big) { bubble('Meow?', cat.x, cat.y, 50, 1.4); Snd.fx.meow('q'); }
+  if (cat.mode === 'sleep') {
+    if (dc >= radius) return;
+    cat.sleep -= amt * (1 - dc / radius) * (1 + stars * 0.25); cat.calmT = 2.5; cat.lastX = x; cat.lastY = y;
+    if (cat.sleep <= 0) wakeCat(x, y);
+    return;
+  }
+  const hear = radius * (L.d.catSense || 1);
+  if (dc < hear && cat.mode !== 'chase' && cat.mode !== 'watch') {
+    cat.mode = 'investigate'; cat.lastX = x; cat.lastY = y; cat.alert = Math.max(cat.alert, radius < 100 ? 0.25 : 0.4); cat.path = astar(L.grid, cat.x, cat.y, x, y); cat.sit = 0;
+    if (big || cat.meowT <= 0) { cat.meowT = 2; bubble(big ? 'Meow?' : '?', cat.x, cat.y, 50, 1.2); if (big) Snd.fx.meow('q'); }
   }
 }
-function wakeCat() { if (cat.mode !== 'sleep') return; cat.mode = 'search'; cat.searchT = 1.6; cat.sit = 0.6; bubble('Mrrr?', cat.x, cat.y, 46, 1.5); Snd.fx.meow('q'); }
+function wakeCat(x, y) {
+  if (cat.mode !== 'sleep') return;
+  cat.mode = 'search'; cat.searchT = 1.8; cat.sit = 0.6; cat.sleep = 0; alarm += 4;
+  if (x != null) cat.a = Math.atan2(y - cat.y, x - cat.x);
+  bubble('MRRAW?!', cat.x, cat.y, 46, 1.6); Snd.fx.meow('q');
+  if (state === 'play' && !run.catWoke && L.d.cat === 'sleep') banner('You woke the cat!', 'Now it prowls the room. Stay out of its sight and hide in green spots.', 4.5);
+  run.catWoke = true;
+}
 function findJump() {
   if (rat.jump) return null;
   const cur = S(rat.surf), fx = Math.cos(camYaw), fz = Math.sin(camYaw);
@@ -1030,7 +1072,8 @@ function caught(text, x, y, yy, sfx) {
   lives--; Snd.fx[sfx || 'caught'](); if (sfx) Snd.fx.caught();
   rat.carry.forEach(it => { ratMesh.userData.mouth.remove(it.mesh); scene.add(it.mesh); const p = { x: rat.x + (Math.random() - 0.5) * 30, y: rat.y + (Math.random() - 0.5) * 30, r: 8 }; resolve(p, L.solids); Object.assign(it, { x: p.x, y: p.y, h: 0, surf: 'floor' }); if (it.type === 'cheese') it.wisps = makeWisps(it.poison ? 0x8fe060 : 0); items.push(it); });
   rat.carry = []; say(text, x, y, yy, '#e8664a');
-  spawnKitchen(); if (cat.mode !== 'sleep' && cat.mode !== 'away') { cat.mode = 'search'; cat.searchT = 1.5; cat.alert = 0.3; cat.path = []; }
+  spawnKitchen(); graceT = 3;
+  if (cat.mode !== 'sleep' && cat.mode !== 'away') { const t = randomFree(L.grid, 380, hole.x, hole.y); Object.assign(cat, { mode: 'wander', alert: 0, path: astar(L.grid, cat.x, cat.y, t[0], t[1]), sit: 0 }); bubble('Hmph.', cat.x, cat.y, 50, 1.2); }
   alarm += 10; updHud();
   if (lives <= 0) lose('You got caught', 'The pups got ' + fed + ' of ' + L.d.goal + ' and are waiting for Mom. Top wanted level: ' + starStr(maxStars) + '.');
 }
@@ -1056,31 +1099,44 @@ function onStars(ns, os) {
     if (levelDone.has(s)) continue; levelDone.add(s); Snd.fx.starUp(s);
     const t = L.d.threats[s - 1];
     if (t) { triggerThreat(t); banner('★'.repeat(s) + ' ' + THREATS[t].banner, THREATS[t].tip, 5); }
+    else if (!L.d.threats.length) banner('★'.repeat(s) + ' The house is restless', L.d.starTip || 'Everyone is faster and sharper now', 3.5);
     else { banner('★'.repeat(s) + ' High alert', 'Everyone in the house is faster and sharper now', 4.5); if (L.d.threats.includes('traps') && s === 5) placeTraps(2); }
   }
 }
 function update(dt) {
   nightT += dt;
   if (nightT >= L.d.night) { updHud(); lose('Dawn', 'The owners are waking up. The pups got ' + fed + ' of ' + L.d.goal + '. Top wanted level: ' + starStr(maxStars) + '. There is always tomorrow night.'); return; }
-  sniffCd = Math.max(0, sniffCd - dt);
+  sniffCd = Math.max(0, sniffCd - dt); graceT = Math.max(0, graceT - dt);
   // --- rat ---
   if (rat.jump) {
     const j = rat.jump; j.t += dt / j.dur; const t = clamp01(j.t);
     rat.x = lerp(j.fx, j.tx, t); rat.y = lerp(j.fy, j.ty, t); rat.h = lerp(j.fh, j.th, t) + Math.sin(Math.PI * t) * j.arc;
     if (j.t >= 1) { rat.h = j.th; rat.surf = j.surf; const drop = j.fh - j.th; rat.jump = null; Snd.fx.land(drop > 50);
-      if (rat.surf === 'floor') { const e = { x: rat.x, y: rat.y, r: rat.r }; resolve(e, L.solids); rat.x = e.x; rat.y = e.y; if (drop > 50) noise(rat.x, rat.y, 110); } }
+      if (rat.surf === 'floor') { const e = { x: rat.x, y: rat.y, r: rat.r }; resolve(e, L.solids); rat.x = e.x; rat.y = e.y; if (drop > 50) noise(rat.x, rat.y, 160, 'Thud', false, 0.55); } }
   } else {
     let fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
     let str = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     if (joy) { const dx = joy.x - joy.sx, dy = joy.y - joy.sy, d = Math.hypot(dx, dy); if (d > 8) { str = dx / Math.max(d, 45); fwd = -dy / Math.max(d, 45); } }
     const fx = Math.cos(camYaw), fz = Math.sin(camYaw);
     let mx = fx * fwd - fz * str, mz = fz * fwd + fx * str; const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
-    const moving = ml > 0.1 && !rat.sniffing, sprinting = (keys.ShiftLeft || keys.ShiftRight || touchRun) && moving;
-    const spd = moving ? (sprinting ? 195 : 125) * (1 - 0.13 * carryW()) : 0;
+    if (pressed.KeyC) crouchToggle = !crouchToggle;
+    const moving = ml > 0.1 && !rat.sniffing;
+    const crouching = (keys.ControlLeft || keys.ControlRight || crouchToggle) && !(keys.ShiftLeft || keys.ShiftRight || touchRun);
+    const sprinting = (keys.ShiftLeft || keys.ShiftRight || touchRun) && moving;
+    rat.crouch = crouching; if (crouching && moving) tut.crouched = true;
+    const spd = moving ? (sprinting ? 195 : crouching ? 62 : 120) * (1 - 0.13 * carryW()) : 0;
+    const px = rat.x, py = rat.y;
     if (rat.surf === 'floor') moveFloor(rat, mx * spd, mz * spd, dt, L.solids);
     else { const s = S(rat.surf), nx = rat.x + mx * spd * dt; if (onSurf(s, nx, rat.y, 4)) rat.x = nx; const ny = rat.y + mz * spd * dt; if (onSurf(s, rat.x, ny, 4)) rat.y = ny; }
-    if (moving) { rat.a += angDiff(rat.a, Math.atan2(mz, mx)) * Math.min(1, dt * 14); rat.step += dt * spd * 0.15; rat.stepT -= dt; if (rat.stepT <= 0) { rat.stepT = sprinting ? 0.12 : 0.2; Snd.fx.step(sprinting ? 0.05 : 0.015); } }
-    if (sprinting) { rat.noiseT -= dt; if (rat.noiseT <= 0) { rat.noiseT = 0.35; noise(rat.x, rat.y, 170); } }
+    if (moving) { rat.a += angDiff(rat.a, Math.atan2(mz, mx)) * Math.min(1, dt * 14); rat.step += dt * spd * 0.15; rat.stepT -= dt; if (rat.stepT <= 0) { rat.stepT = sprinting ? 0.12 : crouching ? 0.32 : 0.2; Snd.fx.step(sprinting ? 0.05 : crouching ? 0.005 : 0.015); } }
+    // footsteps: running is loud, walking is quiet (only heard up close), sneaking is silent
+    noiseLvl = !moving ? 0 : sprinting ? 3 : crouching ? 0 : 1;
+    rat.noiseT -= dt;
+    if (sprinting && rat.noiseT <= 0) { rat.noiseT = 0.35; noise(rat.x, rat.y, 210, null, false, 0.3); }
+    else if (noiseLvl === 1 && rat.surf === 'floor' && rat.noiseT <= 0) { rat.noiseT = 0.45; noise(rat.x, rat.y, 95, null, false, 0.1); }
+    // running into furniture makes a thump
+    bumpT -= dt;
+    if (sprinting && rat.surf === 'floor' && bumpT <= 0 && Math.hypot(rat.x - px, rat.y - py) < spd * dt * 0.35) { bumpT = 0.9; Snd.fx.land(false); noise(rat.x, rat.y, 170, 'Thump!', false, 0.45); }
   }
   ratHidden = rat.surf === 'floor' && !rat.jump && (L.hides.some(h => inRect(rat.x, rat.y, h)) || Math.hypot(rat.x - hole.x, rat.y - hole.y) < hole.r);
   // --- actions ---
@@ -1101,11 +1157,11 @@ function update(dt) {
     rat.carry.forEach(it => { ratMesh.userData.mouth.remove(it.mesh); if (!it.poison) addToPile(it.type); });
     const hadCheese = rat.carry.some(i => i.type === 'cheese' && !i.poison); rat.carry = []; updHud(); tut.delivered = true; if (hadCheese) tut.cheese = true;
     if (fed >= L.d.goal) { startOutro(); return; }
-    while (items.length < (L.d.openFood ? 14 : 7)) spawnItem();
+    { const rf = foodDef().refill; while (rf && items.length < rf + 3) spawnItem(); }
     if (pz) { say('Poison! −' + pz * 4, hole.x, hole.y, 32, '#9be06a'); bubble('Ew! Tummy ache…', hole.x, hole.y + 8, 22, 2); Snd.fx.poison(); }
     else { say('+' + v, hole.x, hole.y, 32, '#f2c14e'); const left = L.d.goal - fed; bubble(hadCheese ? 'Cheese! Yay!' : left > 8 ? 'Squeak! More!' : left > 3 ? 'Almost full!' : 'Just a little more!', hole.x, hole.y + 8, 22, 1.8); Snd.fx.deliver(); }
   }
-  refillT -= dt; if (refillT <= 0) { refillT = 3; if (items.length < (L.d.openFood ? 10 : 5)) spawnItem(); }
+  refillT -= dt; if (refillT <= 0) { refillT = 3; const rf = foodDef().refill; if (rf && items.length < rf) spawnItem(); }
   // --- smell (desire) ---
   const nc = nearestCheese(true);
   smellTarget = nc && nc.it.type !== 'crumb' ? nc.it : null;
@@ -1124,28 +1180,42 @@ function update(dt) {
   const inHole = rat.surf === 'floor' && Math.hypot(rat.x - hole.x, rat.y - hole.y) < hole.r + 4;
   if (inHole && unseenT > 1) alarm -= dt * 14; else if (unseenT > 4) alarm -= dt * 5;
   alarm = clamp(alarm, 0, 60);
-  { let ns = 0; if (L.d.threats.length) for (const t of STAR_AT) if (evidence + alarm >= t) ns++; if (ns > stars) onStars(ns, stars); if (ns !== stars) { stars = ns; updHud(); } maxStars = Math.max(maxStars, stars); }
+  { let ns = 0; if (hasWanted()) for (const t of STAR_AT) if (evidence + alarm >= t) ns++; if (ns > stars) onStars(ns, stars); if (ns !== stars) { stars = ns; updHud(); } maxStars = Math.max(maxStars, stars); }
   Music.set(stars / 4, cat.mode === 'chase' || human.mode === 'chase');
-  rings.forEach(r => { r.r += dt * r.sp; r.t -= dt; r.m.scale.set(r.r, r.r, 1); r.m.material.opacity = Math.max(0, r.t) * 0.7; });
+  rings.forEach(r => { r.r += dt * r.sp; r.t -= dt; r.m.scale.set(r.r, r.r, 1); r.m.material.opacity = Math.max(0, r.t) * (r.k < 1 ? 0.45 : 0.7); });
   for (let i = rings.length - 1; i >= 0; i--) if (rings[i].t <= 0) { scene.remove(rings[i].m); rings.splice(i, 1); }
   for (const k in pressed) delete pressed[k];
   if (Math.floor(nightT * 2) !== Math.floor((nightT - dt) * 2)) updHud();
 }
 function addToPile(type) { const m = itemMesh(type); const a = Math.random() * Math.PI * 2, r = Math.random() * 14; m.position.set(nest.cx + 10 + Math.cos(a) * r, 3 + pile.length * 0.15, nest.cz + Math.sin(a) * r); m.rotation.y = Math.random() * 6; pile.push(m); }
 
+const catRange = () => (cat.mode === 'idle' && cat.sit > 0.5 ? 150 + stars * 10 : 260 + stars * 15) * (L.d.catSense || 1);
 function updateCat(dt) {
   const dx = rat.x - cat.x, dy = rat.y - cat.y, dist = Math.hypot(dx, dy);
   cat.speed = 0; cat.meowT -= dt;
   if (cat.mode === 'away') { catSees = false; return; }
   if (cat.mode === 'sleep') {
-    catSees = false; cat.zzzT -= dt; if (cat.zzzT <= 0) { cat.zzzT = 3.2; bubble('Zzz…', cat.x, cat.y, 40, 1.6); Snd.fx.purr(0.05 * clamp01(1 - dist / 400)); }
-    if (dist < 40 || stars >= threatStar('cat')) wakeCat();
+    catSees = false;
+    // sleep meter: noise lowers it, quiet time slowly restores it
+    cat.calmT -= dt; if (cat.calmT <= 0) cat.sleep = Math.min(1, cat.sleep + dt * 0.045);
+    const stage = cat.sleep > 0.6 ? 0 : cat.sleep > 0.3 ? 1 : 2;
+    if (stage > cat.stage) { bubble(stage === 1 ? 'Mrr…' : '…?', cat.x, cat.y, 44, 1.4); Snd.fx.purr(0.06); }
+    cat.stage = stage;
+    cat.peek = lerp(cat.peek, stage === 2 ? 1 : stage === 1 ? 0.35 : 0, Math.min(1, dt * 3));
+    if (stage === 0) { cat.zzzT -= dt; if (cat.zzzT <= 0) { cat.zzzT = 3.2; Snd.fx.purr(0.05 * clamp01(1 - dist / 400)); } }
+    // half awake, the cat lifts its head and looks toward the last noise: if it sees you, it wakes up
+    if (stage === 2) {
+      cat.a += angDiff(cat.a, Math.atan2(cat.lastY - cat.y, cat.lastX - cat.x)) * Math.min(1, dt * 2);
+      const peekSees = !ratHidden && dist < 170 && Math.abs(angDiff(cat.a, Math.atan2(dy, dx))) < 0.8 && los(cat.x, cat.y, rat.x, rat.y, rat.h);
+      if (peekSees) { wakeCat(rat.x, rat.y); cat.alert = 0.8; return; }
+    }
+    if (dist < 32 || stars >= threatStar('cat')) wakeCat(rat.x, rat.y);
     return;
   }
   const ratHigh = (rat.h >= 30 && !rat.jump) || (rat.jump && rat.jump.th >= 30);
-  const range = cat.mode === 'idle' && cat.sit > 0.5 ? 150 + stars * 10 : 260 + stars * 15;
+  const range = catRange();
   const inCone = dist < range && Math.abs(angDiff(cat.a, Math.atan2(dy, dx))) < 0.62;
-  catSees = !ratHidden && (inCone || dist < 34) && los(cat.x, cat.y, rat.x, rat.y, rat.h);
+  catSees = graceT <= 0 && !ratHidden && (inCone || dist < 34) && los(cat.x, cat.y, rat.x, rat.y, rat.h);
   if (catSees) { cat.alert += dt * (1.3 + (1 - dist / 260) * 3); cat.lastX = rat.x; cat.lastY = rat.y; alarm += dt * 4; }
   else if (cat.mode !== 'chase' && cat.mode !== 'watch') cat.alert -= dt * 0.45;
   cat.alert = clamp01(cat.alert);
@@ -1183,8 +1253,9 @@ function updateCat(dt) {
       if (!follow(cat, 70 * (1 + stars * 0.08), dt, L.catBlock)) { cat.mode = 'idle'; cat.idleT = cat.goingHome ? 4 : 1.5 + Math.random() * 3.5; }
     }
   }
+  if (cat.mode === 'chase') run.chased = true;
   cat.step += dt * cat.speed * 0.08;
-  if (!ratHidden && rat.h < 30 && !rat.jump && dist < cat.r + rat.r + 4) caught('Gotcha!', cat.x, cat.y, 58);
+  if (graceT <= 0 && !ratHidden && rat.h < 30 && !rat.jump && dist < cat.r + rat.r + 4) caught('Gotcha!', cat.x, cat.y, 58);
 }
 function updateHuman(dt) {
   const h = human; humanSees = false;
@@ -1266,9 +1337,10 @@ function sync(dt) {
   wagTail(ud, rat.step + clock * 1.5, 0.5);
   ud.feet.forEach((f, i) => { f.position.y = f.userData.by + (i < 2 ? st * 10 : 0) + Math.max(0, Math.sin(rat.step * 2 + (i % 2 ? Math.PI : 0))) * 1.6 * (1 - st); if (i < 2) f.position.x = 5 - st * 3; });
   if (state !== 'intro') {
-    ud.body.scale.set(11, 6.5, 7); ud.body.position.set(-st * 3, 7 + Math.abs(Math.sin(rat.step * 2)) * 1.2 * (1 - st) + st * 7, 0);
+    crouchAmt = lerp(crouchAmt, rat.crouch && !rat.jump && !rat.sniffing ? 1 : 0, Math.min(1, dt * 10)); const cr = crouchAmt * (1 - st);
+    ud.body.scale.set(11 + cr * 1.5, 6.5 - cr * 1.6, 7 + cr * 0.6); ud.body.position.set(-st * 3, 7 - cr * 2.2 + Math.abs(Math.sin(rat.step * 2)) * 1.2 * (1 - st) * (1 - cr * 0.7) + st * 7, 0);
     ud.body.rotation.z = st * 1.0 + (rat.jump ? 0.25 * Math.cos(Math.PI * clamp01(rat.jump.t)) : 0);
-    ud.headG.position.set(lerp(10, 2.5, st), lerp(8, 22, st), 0); ud.eyes.forEach(e => e.scale.y = 1);
+    ud.headG.position.set(lerp(10, 2.5, st) + cr * 1.5, lerp(8, 22, st) - cr * 2.5, 0); ud.eyes.forEach(e => e.scale.y = 1);
     let hy = 0; if (smellTarget && smell > 0.15 && playing) hy = clamp(angDiff(rat.a, Math.atan2(smellTarget.y - rat.y, smellTarget.x - rat.x)), -0.9, 0.9) * smell;
     ud.headG.rotation.y = lerp(ud.headG.rotation.y, -hy, Math.min(1, dt * 6)); ud.headG.rotation.z = st * 0.55 + Math.sin(clock * 18) * 0.06 * (st * 1.4 + smell * 0.6);
   }
@@ -1317,13 +1389,13 @@ function sync(dt) {
   catMesh.position.set(cat.x, 0, cat.y); catMesh.rotation.y = -cat.a;
   cu.legs.forEach((l, i) => l.rotation.z = Math.sin(cat.step + (i % 2 ? Math.PI : 0)) * 0.5);
   cu.bodyG.position.y = sleeping ? -9 : -cat.sit * 6; cu.bodyG.rotation.z = sleeping ? 0.05 : cat.sit * 0.28;
-  cu.headG.rotation.z = sleeping ? -0.6 : cat.mode === 'watch' ? 0.35 : cat.sit * -0.2;
-  cu.eyeMeshes.forEach(e => e.scale.y = sleeping ? 0.12 : 1);
+  cu.headG.rotation.z = sleeping ? lerp(-0.6, 0.15, cat.peek) : cat.mode === 'watch' ? 0.35 : cat.sit * -0.2;
+  cu.eyeMeshes.forEach(e => e.scale.y = sleeping ? (cat.peek > 0.7 ? 1 : 0.12 + cat.peek * 0.4) : 1);
   { const ph = clock * (cat.mode === 'watch' || cat.mode === 'chase' ? 7 : sleeping ? 0.6 : 2) + cat.step * 0.3; cu.tailPivot.rotation.y = sleeping ? 1.2 : Math.sin(ph) * 0.3; cu.ctail.forEach((t, i) => t.rotation.y = sleeping ? 0.35 : Math.sin(ph - (i + 1) * 0.7) * 0.28); }
   if (sleeping) cu.body.scale.y = 13 + Math.sin(clock * 2) * 0.6; else cu.body.scale.y = 13;
   cu.eyeM.color.set(cat.mode === 'chase' ? 0xffd84a : cat.mode === 'watch' ? 0xffb84a : 0x9be06a);
   catCone.mesh.visible = inRun && !sleeping && cat.mode !== 'away';
-  if (catCone.mesh.visible) { updateCone(catCone, cat.x, cat.y, cat.a, 0.62, cat.mode === 'idle' && cat.sit > 0.5 ? 150 + stars * 10 : 260 + stars * 15); catCone.mat.color.set(cat.mode === 'chase' ? 0xe8664a : cat.alert > 0.3 || cat.mode === 'watch' ? 0xf2c14e : 0xdcdceb); catCone.mat.opacity = cat.mode === 'chase' ? 0.24 : 0.14; }
+  if (catCone.mesh.visible) { updateCone(catCone, cat.x, cat.y, cat.a, 0.62, catRange()); catCone.mat.color.set(cat.mode === 'chase' ? 0xe8664a : cat.alert > 0.3 || cat.mode === 'watch' ? 0xf2c14e : 0xdcdceb); catCone.mat.opacity = cat.mode === 'chase' ? 0.24 : 0.14; }
   // owner
   { const h = human, hu = humanMesh.userData, vis = h.mode !== 'away' && h.mode !== 'coming'; humanMesh.visible = vis;
     if (vis) { humanMesh.position.set(h.x, 0, h.y); humanMesh.rotation.y = -h.a; const sw = Math.sin(h.step || 0); hu.legs[0].rotation.z = sw * 0.45; hu.legs[1].rotation.z = -sw * 0.45; hu.armL.rotation.z = -sw * 0.35; hu.armR.rotation.set(0, -(h.sweep || 0), 1.25); hu.bodyG.position.y = Math.abs(Math.cos(h.step || 0)) * 2; }
@@ -1362,8 +1434,14 @@ function sync(dt) {
     else if (jumpCand) { marker.visible = true; marker.position.set(jumpCand.x, jumpCand.s.h + 0.7, jumpCand.y); const sc = 1 + Math.sin(clock * 6) * 0.12; marker.scale.set(sc, sc, sc);
       const p = project(jumpCand.x, jumpCand.s.h + 14, jumpCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = usingTouch ? 'Jump' : 'Space'; $('promptTxt').textContent = jumpCand.s.h > rat.h ? 'Jump up' : 'Jump down'; } }
   }
-  const cp2 = project(cat.x, 58, cat.y);
-  if (inRun && cp2.vis && cat.mode !== 'watch' && cat.mode !== 'sleep' && (cat.mode === 'chase' || cat.mode === 'investigate' || cat.mode === 'search' || cat.alert > 0.05)) {
+  const cp2 = project(cat.x, sleeping ? 40 : 58, cat.y);
+  if (inRun && cp2.vis && sleeping) {
+    // sleep meter over the sleeping cat: Zzz + a bar that empties as you make noise
+    catTag.hidden = false; catTag.style.left = cp2.x + 'px'; catTag.style.top = cp2.y + 'px'; catTag.style.fontSize = '16px';
+    const col = cat.stage === 0 ? '#9fb4ff' : cat.stage === 1 ? '#f2c14e' : '#e8664a';
+    catTag.style.color = col;
+    catTag.innerHTML = '<span class="zz">' + (cat.stage === 0 ? 'Zzz' : cat.stage === 1 ? 'zz…' : '?!') + '</span><span class="sleepbar"><i style="width:' + Math.round(cat.sleep * 100) + '%;background:' + col + '"></i></span>';
+  } else if (inRun && cp2.vis && cat.mode !== 'watch' && cat.mode !== 'away' && (cat.mode === 'chase' || cat.mode === 'investigate' || cat.mode === 'search' || cat.alert > 0.05)) {
     catTag.hidden = false; catTag.style.left = cp2.x + 'px'; catTag.style.top = cp2.y + 'px';
     if (cat.mode === 'chase') { catTag.textContent = '!'; catTag.style.color = '#e8664a'; catTag.style.fontSize = '30px'; }
     else if (cat.mode === 'investigate' || cat.mode === 'search') { catTag.textContent = '?'; catTag.style.color = '#f2c14e'; catTag.style.fontSize = '26px'; }
@@ -1373,13 +1451,14 @@ function sync(dt) {
   for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].t <= 0) { msgs[i].el.remove(); msgs.splice(i, 1); }
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('banner').style.opacity = 0; }
   // HUD
-  $('chips').hidden = !playing; $('wanted').hidden = !playing || !L.d.threats.length;
+  $('chips').hidden = !playing; $('wanted').hidden = !playing || !hasWanted();
   if (playing) {
     if (stars !== lastStarsShown) { lastStarsShown = stars; $('wStars').innerHTML = '★'.repeat(stars) + '<span class="off">' + '★'.repeat(5 - stars) + '</span>'; }
     let evS = 0; for (const t of STAR_AT) if (evidence >= t) evS++;
     const wv = $('wanted'); wv.classList.toggle('blink', alarm > 0.5 && unseenT > 4 && stars > evS); wv.classList.toggle('hot', human.mode === 'chase' || cat.mode === 'chase');
     const hm = human.mode, top = L.d.threats[Math.min(stars, L.d.threats.length) - 1];
-    $('wText').textContent = hm === 'chase' ? 'The owner is chasing you!' : hm === 'leaving' ? 'The owner is going back to bed…' : hm === 'coming' ? 'Footsteps in the hall…' : hm !== 'away' ? 'The owner is in the room' : stars === 0 ? (sleeping ? 'All quiet, even the cat is asleep' : 'All quiet') : stars > L.d.threats.length ? 'High alert!' : THREATS[top].label;
+    const catTxt = sleeping ? ['The cat is fast asleep', 'The cat is stirring…', 'The cat is half awake!'][cat.stage] : cat.mode === 'chase' ? 'The cat is chasing you!' : cat.mode === 'away' ? 'All quiet' : 'The cat is prowling';
+    $('wText').textContent = !L.d.threats.length ? catTxt : hm === 'chase' ? 'The owner is chasing you!' : hm === 'leaving' ? 'The owner is going back to bed…' : hm === 'coming' ? 'Footsteps in the hall…' : hm !== 'away' ? 'The owner is in the room' : stars === 0 ? (sleeping ? 'All quiet, even the cat is asleep' : 'All quiet') : stars > L.d.threats.length ? 'High alert!' : THREATS[top].label;
     const chip = $('chip');
     if (ratHidden) { chip.textContent = 'Hidden'; chip.className = 'chip hidden-state'; }
     else if (humanSees) { chip.textContent = 'The owner sees you!'; chip.className = 'chip seen'; }
@@ -1387,6 +1466,10 @@ function sync(dt) {
     else if (catSees) { chip.textContent = 'The cat sees you!'; chip.className = 'chip seen'; }
     else if (rat.h >= 30) { chip.textContent = hm !== 'away' && hm !== 'coming' ? 'Up high, but the owner can still reach you' : 'Up high: the cat can’t reach you'; chip.className = 'chip'; }
     else { chip.textContent = 'Unseen'; chip.className = 'chip'; }
+    { const nc = $('noiseChip'); nc.hidden = cat.mode === 'away';
+      const lvl = rat.jump ? 1 : noiseLvl, sneaking = rat.crouch && lvl === 0 && !rat.jump;
+      nc.className = 'chip noise-' + lvl; $('noiseTxt').textContent = lvl === 3 ? 'Loud: running' : lvl === 1 ? 'Quiet: walking' : sneaking ? 'Silent: sneaking' : 'Silent';
+      [...$('nMeter').children].forEach((el, i) => el.classList.toggle('on', i < lvl)); }
     const bars5 = Math.ceil(smell * 5); [...$('meter').children].forEach((el, i) => el.classList.toggle('on', i < bars5));
     let hint = '';
     if (L.d.tutorial) hint = tutorialHint(dt);
@@ -1394,7 +1477,10 @@ function sync(dt) {
       if (cat.mode === 'chase' && !ratHidden) hint = 'Run to a green outline: under furniture or into a crack in the wall.';
       else if (rat.carry.length === 0 && smellTarget && smell > 0.45 && smellTarget.h > rat.h + 20) hint = 'Something smells good up high. Look for a place to jump: a yellow ring will appear.';
       else if (carryW() >= 3) hint = 'Mouth full. Take the loot to the nest.';
-      else if (nightT < 40 && fed === 0 && !rat.carry.length) hint = 'Food is hidden tonight. Hold E to stand up and sniff: a thin trail of scent leads to it.';
+      else if (cat.mode === 'sleep' && cat.stage >= 1) hint = cat.stage === 2 ? 'The cat is half awake and looking around! Freeze or slip out of its sight.' : 'The cat is stirring. Stop making noise and it will settle back down.';
+      else if (cat.mode === 'sleep' && nightT < 35 && !rat.crouch) hint = 'The cat is asleep. Near it, hold Ctrl (or press C) to sneak. Running, bumping into things and jumping down from tables make noise.';
+      else if (L.d.cat === 'awake' && nightT < 30) hint = 'The cat is awake. The pale cone shows where it looks. Under furniture and in cracks (green outlines) it can’t reach you.';
+      else if (!L.d.openFood && nightT < 40 && fed === 0 && !rat.carry.length) hint = 'Food is hidden tonight. Hold E to stand up and sniff: a thin trail of scent leads to it.';
     }
     const hEl = $('hint'); hEl.hidden = !hint; if (hint) hEl.textContent = hint;
     const hd = Math.hypot(hole.x - rat.x, hole.y - rat.y);
@@ -1410,7 +1496,8 @@ function tutorialHint(dt) {
   if (!tut.picked) return 'Move with WASD and look around with the mouse. Walk over food to pick it up.';
   if (!tut.delivered) return rat.carry.length ? 'Carry it home: the glowing hole in the corner. You can hold up to 3 pieces.' : 'Pick up some food. You can carry up to 3 pieces at once.';
   if (!tut.cheese) return 'Cheese is worth 5. Some sits up high: face a chair or the counter and press Space when the yellow ring appears.';
-  if (!tut.sniffed) return 'Hold E (or the right mouse button) to stand up and sniff. A thin trail of scent leads to food. From tomorrow, food is hidden.';
+  if (!tut.crouched) return 'Hold Ctrl (or press C) to sneak. It’s slow but silent. Tomorrow the cat is home, and you’ll need it.';
+  if (!tut.sniffed) return 'Hold E (or the right mouse button) to stand up and sniff. Thin trails of scent lead to the nearest food.';
   if (tut.hideT < 10) { tut.hideT += dt; return 'Green outlines mark hiding spots: under furniture and cracks in the walls. They get brighter as you get close.'; }
   return '';
 }
@@ -1438,6 +1525,9 @@ window.__kr = {
   teleport: (x, y, h = 0, surf = 'floor', yaw) => { Object.assign(rat, { x, y, h, surf, jump: null }); if (yaw != null) camYaw = yaw; },
   preview: i => { buildLevel(i); resetRun(); state = 'menu'; showPanel(null); },
   win: () => { fed = L.d.goal; startOutro(); }, pause: () => pause(),
+  cat: () => ({ mode: cat.mode, sleep: +cat.sleep.toFixed(3), stage: cat.stage, x: Math.round(cat.x), y: Math.round(cat.y), woke: run.catWoke, chased: run.chased }),
+  items: () => items.map(it => [it.type, Math.round(it.x), Math.round(it.y), it.h, it.surf]),
+  noiseLvl: () => noiseLvl, goals: () => nightGoals(true),
   feed: n => { fed = n; }, unlockAll: () => { progress.unlocked = LEVELS.length + 1; saveProgress(); },
 };
 })();
