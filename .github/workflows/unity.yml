@@ -1,14 +1,14 @@
+
 name: Build Unity game
 
-# The Unity version of the game (unity/). Builds take a while, so they run when a release is published,
-# when something in unity/ changes on main, or by hand (Actions → Build Unity game → Run workflow).
-# Needs the repository secrets UNITY_LICENSE (contents of the .ulf file), UNITY_EMAIL and UNITY_PASSWORD.
 on:
   release:
     types: [published]
   push:
     branches: [main]
-    paths: ['unity/**', '.github/workflows/unity.yml']
+    paths:
+      - 'unity/**'
+      - '.github/workflows/unity.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,66 +20,79 @@ concurrency:
 
 jobs:
   build:
-    name: Unity ${{ matrix.name }}
+    name: Unity Windows
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            target: StandaloneWindows64
-            exe: KitchenRat.exe
-          - name: Mac
-            target: StandaloneOSX
-            exe: KitchenRat.app
-          - name: Linux
-            target: StandaloneLinux64
-            exe: KitchenRat.x86_64
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
 
+    steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
 
-      - uses: actions/cache@v4
-        with:
-          path: unity/Library
-          key: Library-${{ matrix.target }}-${{ hashFiles('unity/Assets/Art/**', 'unity/Packages/**', 'unity/ProjectSettings/**') }}
-          restore-keys: Library-${{ matrix.target }}-
-
-      - uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: unity
-          targetPlatform: ${{ matrix.target }}
-          buildName: KitchenRat
-          buildsPath: build
-          buildMethod: KitchenRat.EditorTools.CIBuild.Build
-
-      - name: Pack
+      - name: Build Unity
+        shell: pwsh
         run: |
-          sudo chown -R "$USER" build
-          cd build/${{ matrix.target }}
-          ls -la
-          zip -qry "$GITHUB_WORKSPACE/KitchenRat-Unity-${{ matrix.name }}.zip" .
-          ls -la "$GITHUB_WORKSPACE"/*.zip
+          $editor = "C:\Program Files\Unity\Hub\Editor\6000.3.28f1\Editor\Unity.exe"
+          $project = Join-Path $env:GITHUB_WORKSPACE "unity"
+          $log = Join-Path $env:RUNNER_TEMP "unity-build.log"
+
+          if (!(Test-Path $editor)) {
+            throw "Unity Editor not found"
+          }
+          if (!(Test-Path (Join-Path $project "Assets"))) {
+            throw "Unity project not found: $project"
+          }
+
+          $expected = (Get-Content (Join-Path $project "ProjectSettings\ProjectVersion.txt") |
+            Select-String 'm_EditorVersion:').ToString().Split(':')[1].Trim()
+
+          if ($expected -ne "6000.3.28f1") {
+            throw "Project requires Unity $expected, but runner has 6000.3.28f1"
+          }
+
+          & $editor `
+            -batchmode `
+            -nographics `
+            -quit `
+            -projectPath $project `
+            -buildTarget StandaloneWindows64 `
+            -executeMethod KitchenRat.EditorTools.CIBuild.Build `
+            -logFile $log
+
+          $exitCode = $LASTEXITCODE
+
+          if (Test-Path $log) {
+            Get-Content $log -Tail 150
+          }
+
+          if ($exitCode -ne 0) {
+            throw "Unity failed: exit code $exitCode"
+          }
+
+      - name: Pack build
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build")) {
+            throw "Build output folder was not found"
+          }
+
+          $files = @(Get-ChildItem "build" -Recurse -File)
+          if ($files.Count -eq 0) {
+            throw "Build output is empty"
+          }
+
+          Compress-Archive -Path "build\*" `
+            -DestinationPath "KitchenRat-Unity-Windows.zip" -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KitchenRat-Unity-${{ matrix.name }}
-          path: KitchenRat-Unity-${{ matrix.name }}.zip
+          name: KitchenRat-Unity-Windows
+          path: KitchenRat-Unity-Windows.zip
           if-no-files-found: error
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: KitchenRat-Unity-${{ matrix.name }}.zip
+          files: KitchenRat-Unity-Windows.zip
+  
