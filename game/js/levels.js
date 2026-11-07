@@ -78,7 +78,7 @@
 
   window.LEVELS = [
     {
-      id: 'kitchen', name: 'The Kitchen', act: 1, goal: 15, night: 900,
+      id: 'kitchen', name: 'The Kitchen', act: 1, goal: 15, night: 900, prologue: true,
       cat: 'away', wanted: false, threats: [], openFood: true,
       food: {
         spots: [
@@ -132,24 +132,47 @@
       music: { root: 57, minor: false, bpm: 70, prog: [[0, 'M'], [-5, 'M'], [-3, 'm'], [-7, 'M']] },
     },
     {
-      id: 'living', name: 'The Sleeping Cat', act: 1, goal: 12, night: 300,
-      cat: 'sleep', catSense: 1, wanted: true, threats: [], openFood: true,
+      id: 'living', name: 'The Sleeping Cat', act: 1, goal: 12, night: 720,
+      cat: 'sleep', wanted: true, threats: [], openFood: true, tvOff: true,
       food: {
         spots: [
-          ['cheese', 440, 246], ['crumb', 472, 228], ['crumb', 506, 262],   // the plate on the coffee table
-          ['cheese', 688, 476],                                             // fell behind the sofa
-          ['crumb', 340, 308], ['crumb', 430, 312], ['crumb', 548, 310],   // crumbs in front of the sofa
-          ['cheese', 560, 28],                                              // on the TV stand
-          ['crumb', 262, 548], ['crumb', 165, 455],                         // right next to the cat bed
-          ['crumb', 80, 150], ['crumb', 760, 250], ['crumb', 900, 250],
+          ['cheese', 440, 246, { tag: 'plate' }], ['crumb', 472, 228], ['crumb', 506, 262],   // the plate on the coffee table
+          ['cheese', 688, 476],                                                               // fell behind the sofa
+          ['crumb', 340, 308, { tag: 'sofa1' }], ['crumb', 430, 312, { tag: 'sofa2' }], ['crumb', 548, 310, { tag: 'sofa3' }], ['crumb', 610, 306, { tag: 'sofa4' }],
+          ['cheese', 560, 28, { tag: 'tv' }],                                                 // on the TV stand
+          ['crumb', 262, 548, { tag: 'bed' }], ['crumb', 165, 455],                           // right next to the cat bed
+          ['crumb', 80, 150], ['crumb', 760, 250], ['crumb', 900, 250], ['crumb', 880, 540],
         ],
         random: { crumb: 0, cheese: 0 }, refill: 0,
       },
-      goals: ['fed', 'sleep', 'nocatch'],
+      tasks: {
+        goal: 'Fill the nest',
+        chain: [
+          { text: 'Sneak past the sleeping cat', hint: 'The cat sleeps right by our hole. Hold Ctrl (or press C) and sneak past. Watch the Zzz bar above it.', check: ['flag', 'passCat'] },
+          { text: 'Take the cheese from the plate', hint: 'The plate is on the coffee table. Don’t land on it or run across it: it clinks.', check: ['pick', 'plate'] },
+          { text: 'Carry the cheese home past the cat', hint: 'Sneak by the cat again. Running near it drains the Zzz bar fast.', check: ['deliver', 'plate'] },
+          { text: 'Pick up 3 crumbs in front of the sofa', hint: 'Stay on the floor: jumping onto the sofa makes your claws scratch the fabric.', check: ['pickN', 'sofa', 3] },
+          { text: 'Get the cheese from the TV stand', hint: 'Careful with the remote on the sofa. Step on it and the TV comes on.', check: ['pick', 'tv'] },
+        ],
+        side: [
+          { text: 'Don’t wake the cat', check: ['keep', 'catWoke'] },
+          { text: 'Grab the crumb right next to the cat bed', reveal: 1, check: ['pick', 'bed'] },
+          { text: 'Find a soft sock for the nest', reveal: 3, check: ['flag', 'sock'] },
+        ],
+        secret: [{ text: 'Find the toy mouse', check: ['flag', 'toy'] }],
+      },
+      props: [
+        { t: 'noisy', kind: 'plate', x: 440, y: 250, r: 16 },
+        { t: 'noisy', kind: 'sofa', surf: 'sofa', x: 300, y: 330, w: 516, h: 110 },
+        { t: 'noisy', kind: 'remote', x: 560, y: 372 },
+        { t: 'noisy', kind: 'squeaky', x: 252, y: 452 },
+        { t: 'noisy', kind: 'board', x: 52, y: 408, w: 120, h: 18 },
+      ],
+      secrets: [{ kind: 'sock', x: 768, y: 400, floor: true, always: true }, { kind: 'toy', x: 70, y: 226, floor: true }],
       blurb: 'The cat is asleep. Running and loud landings wake it up.',
       teaser: 'Same room, but the cat is up and prowling now.',
       intro: { pups: ['Mom, can we have chips?', 'Squeak!', 'We’re sooo hungry!'], mom: 'Snacks all over the living room… and the cat is asleep right by our hole. Quiet now, slow and quiet.' },
-      start: { title: 'Bring 12 food. Don’t wake the cat', sub: 'Running and jumping down make noise. Hold Ctrl (or press C) to sneak.' },
+      start: { title: 'The cat is asleep', sub: 'Don’t wake it. Follow the tasks in the bottom-left corner.' },
       starTip: 'The cat sleeps lighter now',
       pal: livingPal, lamp: 'shade', window: { x: 680, w: 200 }, door: 240,
       catBed: [215, 500], dock: [900, 330], lights: [], decor: 'living',
@@ -157,36 +180,175 @@
       music: { root: 55, minor: false, bpm: 66, prog: [[0, 'M'], [-3, 'm'], [-7, 'M'], [-5, 'M']] },
     },
     {
-      id: 'living2', name: 'The Prowling Cat', act: 1, goal: 12, night: 300,
-      cat: 'awake', catSense: 1.15, catStart: [700, 180], wanted: true, threats: [], openFood: true,
+      id: 'living2', name: 'The Prowling Cat', act: 1, goal: 12, night: 720,
+      cat: 'awake', catSense: 1.15, catStart: [700, 180], catBell: true, wanted: true, threats: [], openFood: true, tvOff: true,
       food: {
         spots: [
-          ['cheese', 420, 28],                         // TV stand
-          ['cheese', 520, 252],                        // coffee table
-          ['cheese', 175, 175],                        // ottoman
-          ['cheese', 770, 470],                        // behind the armchair
+          ['cheese', 372, 28, { tag: 'q1' }], ['cheese', 520, 252, { tag: 'q2' }], ['cheese', 175, 175, { tag: 'q3' }], ['cheese', 770, 470, { tag: 'q4' }],
+          ['cheese', 300, 562, { tag: 'treat' }],                                         // the cat's treat, by its bowl
           ['crumb', 90, 120], ['crumb', 270, 300], ['crumb', 700, 300], ['crumb', 880, 200],
           ['crumb', 620, 560], ['crumb', 360, 480], ['crumb', 900, 450], ['crumb', 230, 80],
         ],
         random: { crumb: 0, cheese: 0 }, refill: 0,
       },
-      goals: ['fed', 'unseen', 'nocatch'],
+      tasks: {
+        goal: 'Fill the nest',
+        chain: [
+          { text: 'Hide while the cat walks past', hint: 'Listen for the bell on its collar. When it comes close, get under furniture or into a crack.', check: ['flag', 'hidNearCat'] },
+          { text: 'Collect 4 cheeses from around the room', hint: 'One on the TV stand, one on the coffee table, one on the footstool and one behind the armchair.', check: ['pickN', 'q', 4] },
+          { text: 'Sneak under the sofa', hint: 'Under the sofa the cat can’t reach you. It’s also a shortcut across the room.', check: ['hide', 'sofa'] },
+          { text: 'Hide in a crack in the wall', hint: 'Cracks are the dark gaps at the bottom of the walls. The cat can’t get in.', check: ['hide', 'crack'] },
+        ],
+        side: [
+          { text: 'Never get chased', check: ['keep', 'chased'] },
+          { text: 'Steal the cat’s treat from by its bowl', reveal: 1, check: ['pick', 'treat'] },
+        ],
+        secret: [{ text: 'Find the thimble', check: ['flag', 'thimble'] }],
+      },
+      props: [
+        { t: 'noisy', kind: 'plate', x: 440, y: 250, r: 16 },
+        { t: 'noisy', kind: 'sofa', surf: 'sofa', x: 300, y: 330, w: 516, h: 110 },
+        { t: 'noisy', kind: 'remote', x: 420, y: 372 },
+        { t: 'noisy', kind: 'squeaky', x: 252, y: 452 },
+        { t: 'noisy', kind: 'board', x: 52, y: 408, w: 120, h: 18 },
+        { t: 'noisy', kind: 'cord', x: 740, y: 500, w: 120, h: 12 },
+      ],
+      secrets: [{ kind: 'thimble', x: 480, y: 240, floor: true }],
       blurb: 'The cat is awake and watching. Stay out of its sight.',
-      teaser: 'More nights are on the way.',
+      teaser: 'The pantry. Food is hidden there, so you’ll need your nose.',
       intro: { pups: ['Mom, the cat was meowing all day!', 'Squeak…', 'Be careful!'], mom: 'The cat didn’t sleep after last night. It’s walking around now. I’ll stay in the shadows and hide when it looks my way.' },
-      start: { title: 'Bring 12 food. The cat is awake', sub: 'Watch its sight cone. Hide under furniture or in a crack when it comes close.' },
+      start: { title: 'The cat is awake', sub: 'Listen for its bell. Watch its sight cone and hide when it comes close.' },
       starTip: 'The cat is faster and sharper now',
       pal: Object.assign({}, livingPal, { hemi: 0.7, moon: 0.62 }), lamp: 'shade', window: { x: 680, w: 200 }, door: 240,
-      catBed: [215, 500], dock: [900, 330], lights: [], decor: 'living',
+      catBed: [215, 500], bowl: [262, 560], dock: [900, 330], lights: [], decor: 'living',
       furn: livingFurniture, cracks: livingCracks, knocks: livingKnocks,
       music: { root: 53, minor: true, bpm: 72, prog: [[0, 'm'], [-4, 'M'], [-7, 'm'], [-5, 'M']] },
+    },
+    {
+      id: 'pantry', name: 'The Pantry', act: 1, goal: 14, night: 720,
+      cat: 'sleep', sleepSense: 1.6, wanted: true, threats: [], openFood: false,
+      food: {
+        spots: [
+          ['cheese', 560, 360, { tag: 'cache1', hidden: true }],                 // on the workbench
+          ['cheese', 350, 180, { tag: 'cache2', hidden: true }],                 // on top of the crate stairs
+          ['cheese', 680, 525, { tag: 'cache3', hidden: true, floor: true }],    // under the low shelf
+          ['crumb', 120, 300], ['crumb', 420, 520], ['crumb', 760, 300], ['crumb', 900, 250], ['crumb', 230, 470],
+        ],
+        random: { crumb: 3, cheese: 1 }, refill: 4,
+      },
+      tasks: {
+        goal: 'Fill the nest',
+        chain: [
+          { text: 'Sniff out a hidden cache', hint: 'Food is hidden tonight. Hold E to stand up and sniff: scent trails lead to it.', check: ['pickN', 'cache', 1] },
+          { text: 'Gnaw open the grain sack', hint: 'Hold F next to the sack by the washing machines. Gnawing is loud: check the cat’s Zzz bar first.', check: ['flag', 'gnaw'] },
+          { text: 'Push the box off the top of the stack', hint: 'Climb the boxes in the corner by the window. Push the top box (F) and a cheese falls out.', check: ['knock', 'carton'] },
+          { text: 'Find all 3 hidden caches', hint: 'One is on the workbench, one up the crates, one under the low shelf. Sniff to see them.', check: ['pickN', 'cache', 3] },
+        ],
+        side: [
+          { text: 'Don’t wake the cat', check: ['keep', 'catWoke'] },
+          { text: 'Don’t knock over the cans on the workbench', check: ['keep', 'can'] },
+        ],
+        secret: [{ text: 'Find the old photo', check: ['flag', 'photo'] }],
+      },
+      props: [
+        { t: 'gnaw', x: 790, y: 200, spawn: 5 },
+        { t: 'noisy', kind: 'bag', x: 580, y: 440, w: 56, h: 40 },
+        { t: 'noisy', kind: 'bag', x: 200, y: 240, w: 60, h: 36 },
+        { t: 'noisy', kind: 'grain', x: 420, y: 300, r: 26 },
+      ],
+      secrets: [{ kind: 'photo', x: 856, y: 560, floor: true }],
+      blurb: 'Food is hidden. Sniff it out, and don’t wake the light-sleeping cat.',
+      teaser: 'The kitchen again. The cat is awake and the food is hidden.',
+      intro: { pups: ['Mom, we smell something yummy downstairs!', 'Squeak?', 'Hurry back!'], mom: 'The pantry. They hide the good stuff in there. I’ll need my nose tonight… and the cat sleeps lightly.' },
+      start: { title: 'Food is hidden tonight', sub: 'Hold E to sniff. The cat sleeps lightly, so keep it quiet.' },
+      starTip: 'The cat sleeps even lighter now',
+      pal: { fog: 0x0c100f, sky: 0x6f8a7a, ground: 0x2a2620, hemi: 0.64, moon: 0.55, floor: 'concrete', floorA: '#3e4541', wall: 'brick', wallA: '#6a4636', wallB: '#3a2a24', trim: 0x2a2420, ceil: 0x1c1e1c },
+      lamp: 'bulb', window: { x: 220, w: 120, y: 205, h: 60 }, door: 300,
+      catBed: [300, 480], dock: [900, 380], lights: [], decor: 'pantry',
+      furn: [
+        { t: 'shelfUnit', x: 480, y: 0, w: 200, h: 50 },
+        { t: 'washer', x: 830, y: 12, w: 90, h: 80 },
+        { t: 'washer', x: 730, y: 12, w: 90, h: 80, dryer: true },
+        { t: 'basket', x: 700, y: 120, w: 52, h: 44, ht: 45 },
+        { t: 'box', x: 40, y: 40, w: 70, h: 60, ht: 50 },
+        { t: 'box', x: 110, y: 22, w: 60, h: 50, ht: 92 },
+        { t: 'crate', x: 200, y: 150, w: 60, h: 60, ht: 40 },
+        { t: 'crate', x: 260, y: 150, w: 60, h: 60, ht: 80 },
+        { t: 'crate', x: 320, y: 150, w: 60, h: 60, ht: 120 },
+        { t: 'bench', x: 470, y: 320, w: 180, h: 90 },
+        { t: 'stool', x: 420, y: 352 },
+        { t: 'cans', x: 130, y: 340, w: 44, h: 44 },
+        { t: 'lowShelf', x: 640, y: 500, w: 80, h: 50 },
+        { t: 'boiler', x: 870, y: 470, w: 80, h: 110 },
+      ],
+      cracks: [{ wall: 'w', y: 250 }, { wall: 's', x: 500 }, { wall: 'e', y: 180 }, { wall: 's', x: 800 }],
+      knocks: [
+        { kind: 'can', x: 500, y: 332, to: [500, 300], trap: true, group: 'cans' },   // cans on the workbench: walk past and they topple like dominoes
+        { kind: 'can', x: 522, y: 332, to: [524, 296], trap: true, group: 'cans' },
+        { kind: 'can', x: 544, y: 332, to: [548, 300], trap: true, group: 'cans' },
+        { kind: 'carton', x: 140, y: 44, to: [140, 100], spawn: 'cheese' },
+        { kind: 'bottle', x: 630, y: 340, to: [668, 352] },
+      ],
+      music: { root: 52, minor: true, bpm: 76, prog: [[0, 'm'], [-4, 'M'], [-7, 'm'], [-5, 'M']] },
+    },
+    {
+      id: 'kitchen2', name: 'The Kitchen, Again', act: 1, goal: 16, night: 720,
+      cat: 'awake', catSense: 1.2, catStart: [520, 470], catBell: true, wanted: true, threats: [], openFood: false,
+      food: {
+        spots: [
+          ['cheese', 600, 36, { tag: 'h1', hidden: true }],                // on the counter
+          ['cheese', 230, 325, { tag: 'h2', hidden: true, floor: true }],  // under the low shelf
+          ['cheese', 760, 470, { tag: 'h3', hidden: true }],               // on the table
+          ['sausage', 796, 222, { tag: 'sausage' }],                       // in the cat's bowl
+          ['crumb', 300, 200], ['crumb', 160, 520], ['crumb', 680, 560], ['crumb', 900, 520], ['crumb', 420, 420],
+        ],
+        random: { crumb: 4, cheese: 1 }, refill: 5,
+      },
+      tasks: {
+        goal: 'Fill the nest',
+        chain: [
+          { text: 'Knock something down to lure the cat away', hint: 'Push the spoon or the jar off the counter (F). The cat runs over to check the noise.', check: ['count', 'lure', 1] },
+          { text: 'Sniff out 3 hidden cheeses', hint: 'Hold E. One is up on the counter, one under the low shelf, one on the table.', check: ['pickN', 'h', 3] },
+          { text: 'Steal the sausage from the cat’s bowl', hint: 'The bowl is by the fridge. Lure the cat away first. The fridge hum hides your footsteps there.', check: ['pick', 'sausage'] },
+          { text: 'Drag the sausage home', hint: 'It’s heavy: you move slowly, can’t jump up, and it scrapes the floor. Sneak to make it quieter.', check: ['deliver', 'sausage'] },
+        ],
+        side: [
+          { text: 'Lure the cat away 3 times', check: ['count', 'lure', 3] },
+          { text: 'Don’t knock over the drying glasses', check: ['keep', 'glass'] },
+        ],
+        secret: [{ text: 'Find the glass marble', check: ['flag', 'marble'] }],
+      },
+      props: [
+        { t: 'hum', x: 885, y: 210, r: 130 },
+        { t: 'noisy', kind: 'puddle', x: 480, y: 112, r: 26 },
+        { t: 'noisy', kind: 'board', x: 250, y: 520, w: 110, h: 18 },
+        { t: 'noisy', kind: 'bag', x: 620, y: 300, w: 50, h: 36 },
+      ],
+      secrets: [{ kind: 'marble', x: 98, y: 360, floor: true }],
+      blurb: 'The cat is awake and the food is hidden. Lure it away and steal its sausage.',
+      teaser: 'The owner is starting to notice. More nights are on the way.',
+      intro: { pups: ['Mom, the cat has a big sausage!', 'Squeak squeak!', 'Get it, Mom!'], mom: 'The kitchen again. The cat is up, and it has a sausage in its bowl. A little noise in the right place should send it running.' },
+      start: { title: 'Lure the cat, steal the sausage', sub: 'Knock things down (F) to send the cat to the noise.' },
+      starTip: 'The cat is faster and sharper now',
+      pal: { fog: 0x101426, sky: 0x8a8fd0, ground: 0x2a2436, hemi: 0.76, moon: 0.86, floor: 'tile', floorA: '#383c5c', floorB: '#474c76', wall: 'stripes', wallA: '#474e70', wallB: '#50587c', trim: 0x3a2e30, ceil: 0x20243a },
+      lamp: 'shade', window: { x: 410, w: 220 }, door: 320,
+      catBed: [470, 545], bowl: [770, 215], dock: [900, 430],
+      lights: [{ x: 900, y: 560, h: 60, c: 0xffa860, i: 1.0, r: 520 }],
+      decor: 'kitchen', furn: kitchenFurniture, cracks: kitchenCracks,
+      knocks: [
+        { kind: 'spoon', x: 300, y: 44, to: [300, 102] },
+        { kind: 'jar', x: 470, y: 60, to: [470, 102] },
+        { kind: 'apple', x: 520, y: 330, to: [522, 364] },
+        { kind: 'glass', x: 700, y: 40, to: [700, 104], trap: true, group: 'dishes' },
+        { kind: 'glass', x: 724, y: 40, to: [728, 110], trap: true, group: 'dishes' },
+        { kind: 'glass', x: 748, y: 40, to: [756, 104], trap: true, group: 'dishes' },
+      ],
+      music: { root: 50, minor: true, bpm: 84, prog: [[0, 'm'], [-4, 'M'], [-9, 'M'], [-2, 'M']] },
     },
   ];
 
   // The full game will have 20 nights. Nights past the playable ones are listed as "in development".
   window.PLANNED = [
-    ['The Pantry', 'Food is hidden. Stand up and sniff it out.'],
-    ['The Kitchen, Again', 'Knock things over to lure the cat away.'],
     ['A Glass of Water', 'The owner comes down for a drink.'],
     ['The Flashlight', 'The owner patrols with a flashlight.'],
     ['Dinner Leftovers', 'Paths inside the walls.'],

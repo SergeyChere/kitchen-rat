@@ -60,9 +60,12 @@ Nights menu as "in development". The plan is in the design doc.
 
 | Night | Room | Food | What's new |
 |---|---|---|---|
-| 1 | The Kitchen | 15 | The full first chapter: nobody is home, 12 tasks that teach everything (jumping, sneaking, hiding, sniffing, knocking things over), traps that make noise (a mug on the table edge, crinkly foil), two side tasks and a secret |
-| 2 | The Sleeping Cat | 12 | Food is scattered around the living room and the cat sleeps by your hole. Noise drains its sleep meter: running, bumping into things and jumping down from tables wake it up |
-| 3 | The Prowling Cat | 12 | Same room, but the cat is awake and walking around. Stay out of its sight cone and hide |
+| Prologue | The nest | | A stormy night, a nest behind the kitchen wall, four pups |
+| 1 | The Kitchen | 15 | Nobody is home. 12 tasks teach everything: jumping, sneaking, hiding, sniffing, knocking things over. Traps: a mug on the table edge, crinkly foil |
+| 2 | The Sleeping Cat | 12 | The cat sleeps by your hole. Its Zzz bar drains with noise. Traps: a plate that clinks, a sofa that scratches, a TV remote, a squeaky toy, a creaky floorboard |
+| 3 | The Prowling Cat | 12 | The cat is awake. Listen for its bell, hide under the sofa and in cracks |
+| 4 | The Pantry | 14 | Food is hidden: sniff it out. Gnaw open a grain sack, push a box off the stack. Cans that fall like dominoes, rustling bags |
+| 5 | The Kitchen, Again | 16 | Knock things down to lure the cat away, then drag its sausage home. The fridge hum hides your steps |
 
 Tasks for the night show up one at a time in the bottom-left corner. Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
 night unlocks the next one; progress and settings are saved automatically.

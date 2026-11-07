@@ -120,6 +120,16 @@
     task() { if (!ok()) return; const t = now(); [659, 880, 1319].forEach((f, i) => tone('sine', f, t + i * 0.09, 0.35, 0.09, null, 0.005, 0.3)); },
     fail() { if (!ok()) return; const t = now(); tone('triangle', 330, t, 0.25, 0.08); tone('triangle', 262, t + 0.12, 0.3, 0.08); },
     crinkle() { if (!ok()) return; const t = now(); for (let i = 0; i < 6; i++) noise(t + i * 0.035 + Math.random() * 0.02, 0.03, 0.12, 'highpass', 3000 + Math.random() * 3000, 0.8); },
+    scratch() { if (!ok()) return; const t = now(); for (let i = 0; i < 5; i++) noise(t + i * 0.05, 0.04, 0.14, 'bandpass', 2400 + i * 300, 2); },
+    squeaky() { if (!ok()) return; const t = now(); const o = tone('square', 1400, t, 0.22, 0.09); o.frequency.exponentialRampToValueAtTime(2300, t + 0.08); o.frequency.exponentialRampToValueAtTime(1100, t + 0.2); },
+    creak() { if (!ok()) return; const t = now(); const o = tone('sawtooth', 140, t, 0.45, 0.07, null, 0.05); o.frequency.linearRampToValueAtTime(210, t + 0.2); o.frequency.linearRampToValueAtTime(120, t + 0.42); },
+    crunch() { if (!ok()) return; const t = now(); for (let i = 0; i < 4; i++) noise(t + i * 0.04 + Math.random() * 0.02, 0.03, 0.12, 'bandpass', 1800, 1.2); },
+    splash() { if (!ok()) return; const t = now(); noise(t, 0.25, 0.18, 'bandpass', 1200, 0.7); noise(t + 0.05, 0.15, 0.08, 'highpass', 3500); },
+    tv() { if (!ok()) return; const t = now(); noise(t, 1.6, 0.22, 'bandpass', 2000, 0.4); tone('square', 520, t + 0.1, 1.2, 0.05); tone('square', 660, t + 0.4, 1, 0.04); },
+    buzz() { if (!ok()) return; const t = now(); tone('sawtooth', 100, t, 0.5, 0.06); noise(t, 0.4, 0.05, 'bandpass', 900, 3); },
+    bell(vol = 0.05) { if (!ok() || vol < 0.004) return; const t = now(); [2637, 3520].forEach((f, i) => tone('sine', f, t + i * 0.03, 0.25, vol, null, 0.002, 0.2)); },
+    gnaw() { if (!ok()) return; const t = now(); for (let i = 0; i < 3; i++) noise(t + i * 0.07, 0.05, 0.16, 'bandpass', 2800, 1.5); },
+    scrape(vol = 0.08) { if (!ok()) return; noise(now(), 0.3, vol, 'bandpass', 700, 0.8); },
     crackle(vol = 0.05) { if (!ok() || vol < 0.01) return; noise(now(), 0.03, vol, 'highpass', 1800 + Math.random() * 2000); },
   };
 

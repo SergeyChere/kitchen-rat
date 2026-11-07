@@ -252,7 +252,8 @@ marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
 const crumbGeo = new THREE.SphereGeometry(3.5, 8, 6), crumbMat = T(0xe3c08e, { emissive: 0x3a2a12 });
 const cheeseGeo = new THREE.CylinderGeometry(10, 10, 8, 8, 1, false, 0, Math.PI / 3), cheeseMat = T(0xf7c64e, { emissive: 0x8a6214 });
 const poisonMat = T(0xd6d45a, { emissive: 0x2e4a10 });
-function itemMesh(type, poison) { const m = new THREE.Mesh(type === 'cheese' ? cheeseGeo : crumbGeo, poison ? poisonMat : type === 'cheese' ? cheeseMat : crumbMat); m.castShadow = true; outline(m, type === 'cheese' ? 1 : 0.6); scene.add(m); return m; }
+function itemMesh(type, poison) {
+  if (type === 'sausage') { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 30, 12), T(0xb0453a)); m.rotation.z = Math.PI / 2; m.position.y = 4.5; m.castShadow = true; outline(m, 0.8); g.add(m); [-16, 16].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(4.2, 10, 8), T(0xb0453a)); e.position.set(x * 0.95, 4.5, 0); g.add(e); }); scene.add(g); return g; } const m = new THREE.Mesh(type === 'cheese' ? cheeseGeo : crumbGeo, poison ? poisonMat : type === 'cheese' ? cheeseMat : crumbMat); m.castShadow = true; outline(m, type === 'cheese' ? 1 : 0.6); scene.add(m); return m; }
 const scentMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xf2d36a, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
 function makeWisps(col) { const arr = []; for (let i = 0; i < 5; i++) { const s = new THREE.Sprite(scentMat.clone()); if (col) s.material.color.set(col); s.scale.set(7, 7, 1); scene.add(s); arr.push({ s, ph: i / 5 }); } return arr; }
 const trapBaseM = T(0xd2ab72), metalM = T(0xbfc6d2);
@@ -558,6 +559,26 @@ const DECOR = {
     wallArt('e', 480, 160, 64, 84, (g, w, h) => { g.fillStyle = '#1a1a2a'; g.fillRect(0, 0, w, h); g.fillStyle = '#e6c88a'; g.beginPath(); g.ellipse(w / 2, h * 0.42, w * 0.22, h * 0.26, 0, 0, 7); g.fill(); g.fillStyle = '#5a2a2a'; g.fillRect(w * 0.3, h * 0.68, w * 0.4, h * 0.3); });
   },
 };
+const COLLECT = {
+  button: { label: 'A shiny button! The pups will love it.' }, sock: { label: 'A soft sock for the nest!' },
+  photo: { label: 'An old photo of the owner as a kid.' }, toy: { label: 'A tiny toy mouse for the pups!' },
+  thimble: { label: 'A thimble! A perfect cup for the pups.' }, ring: { label: 'A gold ring. The owner lost it long ago.' },
+  drawing: { label: 'A kid’s drawing… of a rat. It’s you!' }, letter: { label: 'A letter: “Exterminator, Saturday morning.” Uh-oh.' },
+  candle: { label: 'A birthday candle for the nest.' }, marble: { label: 'A glass marble! The pups can roll it around.' }, battery: { label: 'The spare battery! His flashlight will die soon.' },
+};
+function collectMesh(kind, x, h, y) {
+  const g = new THREE.Group(), P = PARENT; PARENT = g;
+  if (kind === 'sock') { box(16, 3, 7, T(0xd84a6a), 0, 1.5, 0, { block: false }); box(6, 3, 10, T(0xd84a6a), 6, 1.5, 6, { block: false }); }
+  else if (kind === 'photo' || kind === 'drawing' || kind === 'letter') { box(14, 0.8, 10, T(kind === 'drawing' ? 0xf4f0e0 : kind === 'letter' ? 0xe8e0c8 : 0xd8d0c0), 0, 0.5, 0, { block: false }); box(10, 0.9, 6, T(kind === 'photo' ? 0x6a8aa8 : 0x8a8a8a), 0, 0.6, 0, { block: false, line: false }); }
+  else if (kind === 'toy') { const b = new THREE.Mesh(new THREE.SphereGeometry(4, 10, 8), T(0x9a9aa8)); b.scale.set(1.5, 0.9, 1); b.position.y = 3.5; g.add(b); outline(b, 0.6); }
+  else if (kind === 'thimble') cyl(3, 5, T(0xc8ccd4), 0, 2.5, 0, { r2: 3.6 });
+  else if (kind === 'ring') { const r = new THREE.Mesh(new THREE.TorusGeometry(3, 1, 6, 14), T(0xf0c040, { emissive: 0x6a4a10 })); r.rotation.x = Math.PI / 2; r.position.y = 1.2; g.add(r); }
+  else if (kind === 'candle') { cyl(1.5, 10, T(0x7ac0e8), 0, 5, 0); cyl(1, 2.5, T(0xffd070, { emissive: 0xaa6a10 }), 0, 11, 0, { line: false }); }
+  else if (kind === 'marble') { const b = new THREE.Mesh(new THREE.SphereGeometry(3.4, 12, 10), T(0x4a9ae8, { emissive: 0x10305a })); b.position.y = 3.4; g.add(b); outline(b, 0.6); }
+  else if (kind === 'battery') { cyl(2.5, 11, T(0x2a2a2a), 0, 2.6, 0).rotation.z = Math.PI / 2; }
+  else cyl(4.5, 1.6, T(0xe8b84a, { emissive: 0x6a4a10 }), 0, 1.2, 0, { seg: 16 });
+  PARENT = P; g.position.set(x, h, y); add(g); g.visible = false; return g;
+}
 let foilTex = null;
 function getFoilTex() {
   if (foilTex) return foilTex;
@@ -566,7 +587,53 @@ function getFoilTex() {
   for (let i = 0; i < 70; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 6 + Math.random() * 16, l = 150 + Math.random() * 100; g.fillStyle = 'rgb(' + l + ',' + (l + 4) + ',' + (l + 12) + ')'; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { const a = k / 4 * 6.28 + Math.random(); g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.fill(); }
   foilTex = new THREE.CanvasTexture(c); foilTex.wrapS = foilTex.wrapT = THREE.RepeatWrapping; return foilTex;
 }
+// noisy things: mode walk = walking or running on it (sneaking is silent), run = only running,
+// land = jumping onto it, landrun = landing or running, step = touching it at all, even sneaking
+const NOISY = {
+  plate: { mode: 'landrun', label: 'Clink!', radius: 230, amt: 0.6, snd: 'clink', cd: 1.2 },
+  sofa: { mode: 'land', label: 'Scritch!', radius: 190, amt: 0.45, snd: 'scratch', cd: 1 },
+  remote: { mode: 'step', label: 'The TV turned on!', radius: 650, amt: 1, big: true, once: true, effect: 'tv', snd: 'tv' },
+  squeaky: { mode: 'step', label: 'Squeak!', radius: 250, amt: 0.7, snd: 'squeaky', cd: 2.5 },
+  board: { mode: 'walk', label: 'Creak…', radius: 180, amt: 0.35, snd: 'creak', cd: 0.9 },
+  bag: { mode: 'walk', label: 'Rustle!', radius: 160, amt: 0.35, snd: 'crinkle', cd: 0.45 },
+  grain: { mode: 'walk', label: 'Crunch', radius: 140, amt: 0.3, snd: 'crunch', cd: 0.5 },
+  puddle: { mode: 'walk', label: 'Splash!', radius: 160, amt: 0.35, snd: 'splash', cd: 0.6 },
+  cord: { mode: 'step', label: 'Bzzt!', radius: 210, amt: 0.5, snd: 'buzz', cd: 3 },
+};
+function addNoisy(p) {
+  const def = NOISY[p.kind], s = p.surf ? null : surfaceAt(p.x, p.y);
+  const z = Object.assign({}, def, p, { h: p.surf ? null : s ? s.h : 0, cdT: 0, used: false });
+  if (!z.r && !z.w) z.r = { plate: 16, remote: 10, squeaky: 11 }[p.kind] || 20;
+  L.noisy.push(z); return z;
+}
+const inNoisy = z => z.r ? Math.hypot(rat.x - z.x, rat.y - z.y) < z.r : inRect(rat.x, rat.y, z);
+const onNoisy = z => !rat.jump && (z.surf ? rat.surf.startsWith(z.surf) : Math.abs(rat.h - z.h) < 6) && inNoisy(z);
+function triggerNoisy(z) {
+  if (z.cdT > 0 || (z.once && z.used)) return;
+  z.cdT = z.cd || 1; z.used = true;
+  if (Snd.fx[z.snd]) Snd.fx[z.snd]();
+  noise(rat.x, rat.y, z.radius, z.label, !!z.big, z.amt);
+  if (z.effect === 'tv' && L.tv) { L.tv.base = 1.9; L.tv.mat.color.set(0x9cc2ff); L.tvOn = true; if (cat.mode === 'sleep') wakeCat(rat.x, rat.y); }
+  if (Q) Q.flags.mistakes = (Q.flags.mistakes || 0) + 1;
+}
+function onLand() { for (const z of L.noisy) if ((z.mode === 'land' || z.mode === 'landrun') && onNoisy(z)) triggerNoisy(z); }
 const PROPS = {
+  noisy(p) {
+    const z = addNoisy(p), y0 = (z.h || 0);
+    if (p.kind === 'remote') { box(5, 2, 11, T(0x1a1a1e), p.x, y0 + 1, p.y, { block: false }); box(2, 0.6, 2, T(0xd83a3a), p.x, y0 + 2.2, p.y - 3.5, { block: false, line: false }); }
+    else if (p.kind === 'squeaky') { const b = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), T(0xf2c84a)); b.position.set(p.x, y0 + 4, p.y); b.castShadow = true; outline(b, 0.8); add(b); const hd = new THREE.Mesh(new THREE.SphereGeometry(3.2, 10, 8), T(0xf2c84a)); hd.position.set(p.x + 4, y0 + 8, p.y); add(hd); box(3, 1, 2, T(0xe87a2a), p.x + 7.5, y0 + 8, p.y, { block: false, line: false }); }
+    else if (p.kind === 'board') { const w = p.w || 120, h = p.h || 18; box(w, 0.8, h, T(0x8a6444), p.x + w / 2, 0.5, p.y + h / 2, { block: false, line: false }); for (let i = 1; i < 4; i++) box(1, 0.9, h * 0.7, T(0x3a2618), p.x + w * i / 4, 0.6, p.y + h / 2, { block: false, line: false }); }
+    else if (p.kind === 'bag') { for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(8 + i * 2, 0), T(0xe8e4dc, { flatShading: true })); b.scale.y = 0.45; b.position.set(p.x + (i - 1) * 9, y0 + 3, p.y + (i % 2) * 6); b.rotation.y = i; add(b); } }
+    else if (p.kind === 'grain') { const r = p.r || 26; for (let i = 0; i < 46; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; box(1.6, 1, 1.6, T(0xe0c890), p.x + Math.cos(a) * d, y0 + 0.5, p.y + Math.sin(a) * d, { block: false, line: false }); } }
+    else if (p.kind === 'puddle') { const m = new THREE.Mesh(new THREE.CircleGeometry(p.r || 24, 24), new THREE.MeshBasicMaterial({ color: 0x8ab4e0, transparent: true, opacity: 0.35, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, y0 + 0.6, p.y); m.scale.y = 0.7; add(m); }
+    else if (p.kind === 'cord') { const w = p.w || 120; const c = cyl(0.9, w, T(0x1a1a1a), p.x + w / 2, 1, p.y + (p.h || 10) / 2, { line: false }); c.rotation.z = Math.PI / 2; }
+  },
+  gnaw(p) { // a bag you can gnaw open with F (noisy), spills food
+    const s = surfaceAt(p.x, p.y), h = s ? s.h : 0;
+    const m = box(26, 30, 18, T(0xd8c49a), p.x, h + 15, p.y, { block: false }); box(26.5, 4, 18.5, T(0xb04a3a), p.x, h + 22, p.y, { block: false, line: false });
+    L.gnaws.push({ x: p.x, y: p.y, h, surf: s ? s.id : 'floor', prog: 0, done: false, spawn: p.spawn || 4, tag: p.tag, mesh: m, sndT: 0 });
+  },
+  hum(p) { L.hums.push({ x: p.x, y: p.y, r: p.r || 120, label: p.label || 'The hum hides your steps' }); },
   foil(p) {
     L.foils.push(R(p.x, p.y, p.w, p.h));
     const tex = getFoilTex().clone(); tex.needsUpdate = true; tex.repeat.set(p.w / 60, p.h / 60);
@@ -584,6 +651,7 @@ const KNOCK_INFO = {
   vase: { word: 'the vase', text: 'Crash!', snd: 'crash' }, jar: { word: 'the jar', text: 'Bang!', snd: 'bang' },
   bottle: { word: 'the bottle', text: 'Bang!', snd: 'bang' }, apple: { word: 'the apple', text: 'Thud!', snd: 'thud' },
   book: { word: 'the book', text: 'Thud!', snd: 'thud' }, can: { word: 'the can', text: 'Clang!', snd: 'bang' },
+  carton: { word: 'the box', text: 'Thump!', snd: 'thud' }, spoon: { word: 'the spoon', text: 'Clang!', snd: 'clink' }, ball: { word: 'the ball', text: 'Bonk!', snd: 'thud' },
 };
 function knockMesh(kind) {
   const g = new THREE.Group(), P = PARENT; PARENT = g;
@@ -593,6 +661,9 @@ function knockMesh(kind) {
   else if (kind === 'vase') { cyl(5, 22, T(0x4a7ab8), 0, 11, 0, { r2: 3.5, seg: 14 }); const f = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 6), T(0xe8664a)); f.position.y = 26; g.add(f); }
   else if (kind === 'book') { box(16, 4, 22, T(0xa83a3a), 0, 2, 0, { block: false }); box(15, 3.5, 21, T(0x3a6aa8), 1, 5.5, 0, { block: false }); }
   else if (kind === 'glass') { cyl(4, 12, T(0xcfe0ee, { transparent: true, opacity: 0.6 }), 0, 6, 0, { r2: 5 }); cyl(4.6, 3, T(0x8a2a3a), 0, 3, 0, { line: false }); }
+  else if (kind === 'carton') { box(20, 16, 16, T(0xc89a5a), 0, 8, 0, { block: false }); box(20.5, 2, 16.5, T(0xa8784a), 0, 15, 0, { block: false, line: false }); }
+  else if (kind === 'spoon') { box(16, 1.2, 2.4, T(0xc8ccd4), 0, 1, 0, { block: false }); const b = new THREE.Mesh(new THREE.SphereGeometry(3, 10, 6), T(0xc8ccd4)); b.scale.y = 0.3; b.position.set(9, 1, 0); g.add(b); }
+  else if (kind === 'ball') { const b = new THREE.Mesh(new THREE.SphereGeometry(6, 14, 10), T(0xe84a5a)); b.position.y = 6; b.castShadow = true; outline(b, 1); g.add(b); }
   else if (kind === 'bottle') { cyl(5, 18, T(0x3a6a3a), 0, 9, 0); cyl(1.8, 8, T(0x3a6a3a), 0, 22, 0); }
   else { cyl(5, 12, T(0xc0c4cc), 0, 6, 0); cyl(5.1, 6, T(0xc95b4a), 0, 6, 0, { line: false }); }
   PARENT = P; add(g); return g;
@@ -623,11 +694,13 @@ function buildLevel(i) {
   const cs = (r, op) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(r.w * 1.45 + 20, r.h * 1.45 + 20), new THREE.MeshBasicMaterial({ map: softRect, transparent: true, opacity: op, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(r.x + r.w / 2, 0.55, r.y + r.h / 2); add(m); };
   L.solids.forEach(r => cs(r, 0.5)); L.hides.forEach(r => cs(r, r.kind === 'table' ? 0.35 : 0.3));
   // knockables
-  (d.knocks || []).forEach(k => { const s = surfaceAt(k.x, k.y); if (!s) return; const info = KNOCK_INFO[k.kind]; L.knocks.push({ kind: k.kind, x: k.x, y: k.y, to: k.to, h: s.h, surf: s.id, word: info.word, text: info.text, snd: info.snd, trap: !!k.trap, done: false, fall: null, mesh: knockMesh(k.kind) }); });
+  (d.knocks || []).forEach(k => { const s = surfaceAt(k.x, k.y); if (!s) return; const info = KNOCK_INFO[k.kind]; L.knocks.push({ kind: k.kind, x: k.x, y: k.y, to: k.to, h: s.h, surf: s.id, word: info.word, text: info.text, snd: info.snd, trap: !!k.trap, group: k.group, spawn: k.spawn, delay: -1, done: false, fall: null, mesh: knockMesh(k.kind) }); });
   // props: foil (crinkles under the paws unless you sneak), bread box; secrets: hidden collectibles
-  L.foils = []; L.secrets = [];
+  L.foils = []; L.secrets = []; L.noisy = []; L.gnaws = []; L.hums = []; L.tvOn = false;
   (d.props || []).forEach(p => PROPS[p.t] && PROPS[p.t](p));
-  (d.secrets || []).forEach(sc => { const m = cyl(4.5, 1.6, T(0xe8b84a, { emissive: 0x6a4a10 }), sc.x, 1.2, sc.y, { seg: 16 }); L.secrets.push({ kind: sc.kind, x: sc.x, y: sc.y, mesh: m, found: false }); });
+  (d.secrets || []).forEach(sc => { const s0 = sc.floor ? null : surfaceAt(sc.x, sc.y), h = s0 ? s0.h : 0; L.secrets.push({ kind: sc.kind, label: sc.label || COLLECT[sc.kind] && COLLECT[sc.kind].label, x: sc.x, y: sc.y, h, always: !!sc.always, mesh: collectMesh(sc.kind, sc.x, h, sc.y), found: false }); });
+  L.tv = L.flickers.find(f => f.type === 'tv') || null;
+  if (L.tv && d.tvOff) { L.tv.base = 0; L.tv.mat.color.set(0x15171c); }
   // cracks: small gaps at the bottom of the walls the rat can squeeze into
   (d.cracks || []).forEach(c => {
     const sz = 28, r = c.wall === 's' ? R(c.x - 20, H - sz, 40, sz) : c.wall === 'w' ? R(0, c.y - 20, sz, 40) : c.wall === 'e' ? R(W - sz, c.y - 20, sz, 40) : R(c.x - 20, 0, 40, sz);
@@ -711,7 +784,7 @@ let lightOn = false, humanSees = false, catSees = false, vacSees = false, ratHid
 let camYaw = -Math.PI / 4, camPitch = 0.38, camDist = 82;
 let jumpCand = null, knockCand = null, smell = 0, smellTarget = null, sniffCd = 0, refillT = 0, sniffTargets = [], mouseR = false, touchSniff = false;
 const tut = { picked: false, delivered: false, cheese: false, sniffed: false, hideT: 0 };
-let Q = null, foilV = { in: false, dist: 0, loud: false }, foilCd = 0, lastRX = 0, lastRY = 0;
+let noiseSrc = '', Q = null, foilV = { in: false, dist: 0, loud: false }, foilCd = 0, lastRX = 0, lastRY = 0;
 let graceT = 0, run = { catWoke: false, chased: false }, crouchToggle = false, noiseLvl = 0, bumpT = 0, crouchAmt = 0;
 let bannerTimer = 0, lastPauseT = 0, runLevel = 0;
 const hasWanted = () => !!(L.d.wanted || L.d.threats.length);
@@ -756,8 +829,8 @@ function foodDef() {
   return { spots: f.spots || [], random: f.random || { crumb: open ? 12 : 4, cheese: open ? 4 : 3 }, refill: f.refill != null ? f.refill : open ? 10 : 5 };
 }
 function placeItem(type, x, y, o = {}) {
-  const s = surfaceAt(x, y), cheese = type === 'cheese';
-  items.push({ tag: o.tag, hidden: !!o.hidden, x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, poison: false, w: cheese ? 2 : 1, v: cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
+  const s = o.floor ? null : surfaceAt(x, y), cheese = type === 'cheese' || type === 'sausage';
+  items.push({ tag: o.tag, hidden: !!o.hidden, x, y, h: s ? s.h : 0, surf: s ? s.id : 'floor', type, big: type === 'sausage', poison: false, w: type === 'sausage' ? 3 : cheese ? 2 : 1, v: type === 'sausage' ? 6 : cheese ? 5 : 1, rot: Math.random() * 6, mesh: itemMesh(type, false), wisps: cheese ? makeWisps(0) : null, id: Math.random() });
 }
 function spawnKitchen() { Object.assign(rat, { x: hole.x + 22, y: hole.y - 22, h: 0, surf: 'floor', a: -Math.PI / 4, inNest: false, jump: null }); camYaw = -Math.PI / 4; camPitch = 0.38; }
 function spawnItem(type) {
@@ -925,15 +998,40 @@ function startLevel(i) {
   runLevel = i; buildLevel(i); resetRun(); hudForPlay(false); showPanel(null);
   state = 'intro'; scene_t = 0; phase = 'sleep'; bars(true); $('skip').hidden = false; $('touch').hidden = true;
   Object.assign(rat, { x: nest.cx + 30, y: nest.cz - 5, h: 0, a: Math.PI * 0.85, inNest: true });
+  pups.forEach(p => p.m.visible = true);
+  if (L.d.prologue && !progress.seenPro) { progress.seenPro = true; saveProgress(); startPrologue(); return; }
+  introCues();
+}
+function introCues() {
   const it = L.d.intro;
   cues = [[0.7, 0, it.pups[0]], [1.5, 1, it.pups[1]], [2.3, 3, it.pups[2]]].map(c => ({ t: c[0], fn: () => { const p = pups[c[1]]; bubble(c[2], p.bx, p.bz, 20, 1.8); Snd.fx.squeak(1.4 + Math.random() * 0.2, 0.12); } }));
   cues.push({ t: 3.6, fn: () => bubble(it.mom, rat.x, rat.y, 30, 3) });
   camera.position.set(nest.cx + 90, 45, nest.cz + 70); fade(false);
   Music.play(L.d.music);
-  banner('Night ' + (i + 1) + ' · ' + L.d.name, '', 2.6);
+  banner('Night ' + (L.i + 1) + ' · ' + L.d.name, '', 2.6);
+}
+// Prologue before night 1: the mother rat finds the house, builds a nest, the pups are born, then they get hungry
+const proPath = [[hole.x, nest.z - 4], [hole.x + 4, nest.z + 14], [nest.cx - 10, nest.cz - 55], [nest.cx + 30, nest.cz - 5]];
+function startPrologue() {
+  phase = 'pro'; scene_t = 0; walkSeg = 0;
+  pups.forEach(p => p.m.visible = false);
+  Object.assign(rat, { x: proPath[0][0], y: proPath[0][1], h: 0, a: Math.PI / 2, inNest: true });
+  camera.position.set(nest.cx + 90, 50, nest.cz + 80); fade(false); Music.play(MENU_MUSIC, true);
+  cues = [
+    { t: 0.2, fn: () => { Snd.fx.thud(); banner('A stormy night', 'A mother rat slips into the house through a gap in the wall…', 3.4); } },
+    { t: 3.9, fn: () => banner('', 'She finds a warm spot behind the kitchen wall and builds a nest.', 3) },
+    { t: 4.2, fn: () => Snd.fx.thud() },
+    { t: 7.2, fn: () => fade(true) },
+    { t: 7.8, fn: () => { pups.forEach(p => p.m.visible = true); Object.assign(rat, { x: nest.cx + 30, y: nest.cz - 5, a: Math.PI * 0.85 }); fade(false); banner('By morning, there were four.', '', 3); Snd.fx.squeak(1.7, 0.08); } },
+    { t: 9.2, fn: () => Snd.fx.squeak(1.8, 0.07) },
+    { t: 11.2, fn: () => fade(true) },
+    { t: 11.8, fn: () => { fade(false); banner('A few days later', 'Their eyes are open. And they are very hungry.', 3.2); } },
+    { t: 15.2, fn: () => { phase = 'sleep'; scene_t = 0; introCues(); } },
+  ];
 }
 function skipIntro() { if (state !== 'intro' || phase === 'leave') return; phase = 'leave'; scene_t = 0; fade(true); }
 function beginPlay() {
+  pups.forEach(p => p.m.visible = true);
   spawnKitchen(); state = 'play'; phase = ''; bars(false); $('skip').hidden = true; $('touch').hidden = !usingTouch;
   msgs.forEach(m => m.el.remove()); msgs = []; hudForPlay(true); updHud();
   camera.position.set(rat.x - 60, 50, rat.y + 60); fade(false);
@@ -946,6 +1044,12 @@ function beginPlay() {
 function intro(dt) {
   scene_t += dt; cues = cues.filter(c => { if (scene_t >= c.t) { c.fn(); return false; } return true; });
   const ud = ratMesh.userData;
+  if (phase === 'pro') {
+    const tgt = proPath[walkSeg + 1];
+    if (scene_t < 7.2 && tgt) { const dx = tgt[0] - rat.x, dy = tgt[1] - rat.y, d = Math.hypot(dx, dy); if (d < 4) walkSeg++; else { rat.a += angDiff(rat.a, Math.atan2(dy, dx)) * Math.min(1, dt * 8); rat.x += dx / d * 30 * dt; rat.y += dy / d * 30 * dt; rat.step += dt * 6; } }
+    const a = 0.8 + scene_t * 0.05; camera.position.lerp(new THREE.Vector3(nest.cx + 10 + Math.cos(a) * 95, 48, nest.cz + Math.sin(a) * 75), Math.min(1, dt * 2)); camera.lookAt(nest.cx, 8, nest.cz);
+    ud.eyes.forEach(e => e.scale.y = 1); return;
+  }
   if (phase === 'sleep') { if (scene_t > 3.4) { phase = 'wake'; scene_t = 3.4; } }
   else if (phase === 'wake') { if (scene_t > 6.2) { phase = 'walk'; walkSeg = 0; } }
   else if (phase === 'walk') {
@@ -1005,7 +1109,10 @@ function finishNight(won, title, text) {
   showPanel('pResult');
 }
 function lose(title, text) { finishNight(false, title, text); }
-function knockOver(k) { k.done = true; k.fall = { t: 0 }; if (Q) Q.knocked.add(k.kind); }
+function knockOver(k) {
+  if (k.done) return; k.done = true; k.fall = { t: 0 }; k.delay = -1; if (Q) Q.knocked.add(k.kind);
+  if (k.group) { let n = 0; for (const o of L.knocks) if (o !== k && o.group === k.group && !o.done && o.delay < 0) o.delay = 0.22 * ++n; }
+}
 function updateProps(dt) {
   const moved = Math.hypot(rat.x - lastRX, rat.y - lastRY); lastRX = rat.x; lastRY = rat.y;
   foilCd -= dt;
@@ -1022,11 +1129,32 @@ function updateProps(dt) {
     }
   }
   for (const sc of L.secrets) {
-    if (sc.found || rat.surf !== 'floor' || rat.jump || Math.hypot(sc.x - rat.x, sc.y - rat.y) > 16) continue;
+    if (sc.found || rat.jump || Math.abs(rat.h - sc.h) > 8 || Math.hypot(sc.x - rat.x, sc.y - rat.y) > 16) continue;
     sc.found = true; sc.mesh.visible = false; if (Q) Q.flags[sc.kind] = true;
-    bubble('A shiny button! The pups will love it.', rat.x, rat.y, rat.h + 32, 2.4); Snd.fx.cheese();
+    bubble(sc.label || 'Found something!', rat.x, rat.y, rat.h + 32, 2.6); Snd.fx.cheese();
   }
+  // noisy things on the floor and furniture
+  for (const z of L.noisy) {
+    z.cdT -= dt; if (z.mode === 'land' || !onNoisy(z)) continue;
+    if (z.mode === 'step' ? moved > 0.3 : z.mode === 'run' || z.mode === 'landrun' ? noiseLvl === 3 : noiseLvl >= 1) triggerNoisy(z);
+  }
+  // gnawing: hold F next to a bag
+  gnawCand = null;
+  if (!rat.jump && !knockCand) for (const g of L.gnaws) if (!g.done && Math.abs(rat.h - g.h) < 8 && Math.hypot(g.x - rat.x, g.y - rat.y) < 30) gnawCand = g;
+  if (gnawCand && keys.KeyF) {
+    const g = gnawCand; g.prog += dt / 2.2; g.sndT -= dt;
+    if (g.sndT <= 0) { g.sndT = 0.45; Snd.fx.gnaw(); noise(g.x, g.y, 200, 'Gnaw gnaw', false, 0.3); }
+    if (g.prog >= 1) {
+      g.done = true; g.mesh.scale.y = 0.55; if (Q) Q.flags.gnaw = true;
+      for (let i = 0; i < g.spawn; i++) { const a = i / g.spawn * 6.28; placeItem(i === 0 && g.tag ? 'cheese' : 'crumb', g.x + Math.cos(a) * 26, g.y + Math.sin(a) * 26 + 18, { tag: i === 0 ? g.tag : undefined }); }
+      PARENT = world; PROPS.noisy({ kind: 'grain', x: g.x, y: g.y + 22, r: 32 }); bubble('The bag is open! Careful, the grain crunches.', rat.x, rat.y, rat.h + 30, 2.4);
+    }
+  }
+  // the cat's bell: you can hear where it is
+  if (L.d.catBell && cat.mode !== 'sleep' && cat.mode !== 'away' && cat.speed > 20) { bellT -= dt; if (bellT <= 0) { bellT = 0.45; Snd.fx.bell(0.06 * clamp01(1 - Math.hypot(cat.x - rat.x, cat.y - rat.y) / 700)); } }
 }
+let gnawCand = null, bellT = 0;
+const inHum = () => L.hums.some(h => Math.hypot(h.x - rat.x, h.y - rat.y) < h.r);
 // ---- tasks: a chain shown one step at a time, side tasks and secrets (bottom-left list)
 function checkTask(t) {
   const [type, arg] = t.check;
@@ -1036,12 +1164,20 @@ function checkTask(t) {
   if (type === 'hide') return rat.surf === 'floor' && !rat.jump && L.hides.some(h => h.kind === arg && inRect(rat.x, rat.y, h));
   if (type === 'knock') return Q.knocked.has(arg);
   if (type === 'flag') return !!Q.flags[arg];
+  if (type === 'count') return (Q.flags[arg] || 0) >= t.check[2];
+  if (type === 'pickN') return [...Q.picked].filter(x => x.startsWith(arg)).length >= t.check[2];
   return false;
 }
-const keepBroken = t => { const k = L.knocks.find(q => q.kind === t.check[1]); return !!(k && k.done); };
+const keepBroken = t => {
+  const a = t.check[1];
+  if (a === 'catWoke') return run.catWoke; if (a === 'chased') return run.chased; if (a === 'caught') return lives < 3; if (a === 'tv') return L.tvOn;
+  const k = L.knocks.find(q => q.kind === a); return !!(k && k.done);
+};
 function completeTask(id, text) { Q.done.add(id); Q.recent.push({ text, t: 2.4 }); Snd.fx.task(); }
 function tickTasks(dt) {
-  const T = L.d.tasks;
+  const T = L.d.tasks, dc = Math.hypot(cat.x - rat.x, cat.y - rat.y);
+  if (cat.mode === 'sleep' && dc < 95) Q.flags.passCat = true;
+  if (ratHidden && cat.mode !== 'sleep' && cat.mode !== 'away' && dc < 140) Q.flags.hidNearCat = true;
   while (Q.i < T.chain.length && checkTask(T.chain[Q.i])) { completeTask('c' + Q.i, T.chain[Q.i].text); Q.i++; }
   T.side.forEach((t, k) => {
     const id = 's' + k; if (Q.done.has(id) || Q.failed.has(id) || (t.reveal != null && Q.i < t.reveal)) return;
@@ -1102,12 +1238,13 @@ function noise(x, y, radius, label, big, amt) {
   const dc = Math.hypot(cat.x - x, cat.y - y);
   if (cat.mode === 'sleep') {
     if (dc >= radius) return;
-    cat.sleep -= amt * (1 - dc / radius) * (1 + stars * 0.25); cat.calmT = 2.5; cat.lastX = x; cat.lastY = y;
+    cat.sleep -= amt * (1 - dc / radius) * (1 + stars * 0.25) * (L.d.sleepSense || 1); cat.calmT = 2.5; cat.lastX = x; cat.lastY = y;
     if (cat.sleep <= 0) wakeCat(x, y);
     return;
   }
   const hear = radius * (L.d.catSense || 1);
   if (dc < hear && cat.mode !== 'chase' && cat.mode !== 'watch') {
+    if (noiseSrc === 'knock' && Q && cat.mode !== 'investigate') Q.flags.lure = (Q.flags.lure || 0) + 1;
     cat.mode = 'investigate'; cat.lastX = x; cat.lastY = y; cat.alert = Math.max(cat.alert, radius < 100 ? 0.25 : 0.4); cat.path = astar(L.grid, cat.x, cat.y, x, y); cat.sit = 0;
     if (big || cat.meowT <= 0) { cat.meowT = 2; bubble(big ? 'Meow?' : '?', cat.x, cat.y, 50, 1.2); if (big) Snd.fx.meow('q'); }
   }
@@ -1128,7 +1265,7 @@ function findJump() {
   for (const s of L.surfaces) {
     if (s.id === rat.surf) continue;
     if (s.h > cur.h) {
-      if (s.h - cur.h > 57) continue;
+      if (s.h - cur.h > 57 || rat.carry.some(i => i.big)) continue;
       if (cur.id === 'floor' && s.rects.some(r => inRect(rat.x, rat.y, r))) continue;
       for (const r of s.rects) { const px = clamp(rat.x, r.x + 10, r.x + r.w - 10), py = clamp(rat.y, r.y + 10, r.y + r.h - 10); const top = surfaceAt(px, py); if (top && top.h > s.h) continue; consider(s, px, py); }
     } else {
@@ -1219,7 +1356,7 @@ function update(dt) {
   if (rat.jump) {
     const j = rat.jump; j.t += dt / j.dur; const t = clamp01(j.t);
     rat.x = lerp(j.fx, j.tx, t); rat.y = lerp(j.fy, j.ty, t); rat.h = lerp(j.fh, j.th, t) + Math.sin(Math.PI * t) * j.arc;
-    if (j.t >= 1) { rat.h = j.th; rat.surf = j.surf; const drop = j.fh - j.th; rat.jump = null; Snd.fx.land(drop > 50);
+    if (j.t >= 1) { rat.h = j.th; rat.surf = j.surf; const drop = j.fh - j.th; rat.jump = null; Snd.fx.land(drop > 50); onLand();
       if (rat.surf === 'floor') { const e = { x: rat.x, y: rat.y, r: rat.r }; resolve(e, L.solids); rat.x = e.x; rat.y = e.y; if (drop > 50) noise(rat.x, rat.y, 160, 'Thud', false, 0.55); } }
   } else {
     let fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
@@ -1232,7 +1369,8 @@ function update(dt) {
     const crouching = (keys.ControlLeft || keys.ControlRight || crouchToggle) && !(keys.ShiftLeft || keys.ShiftRight || touchRun);
     const sprinting = (keys.ShiftLeft || keys.ShiftRight || touchRun) && moving;
     rat.crouch = crouching; if (crouching && moving) tut.crouched = true;
-    const spd = moving ? (sprinting ? 195 : crouching ? 62 : 120) * (1 - 0.13 * carryW()) : 0;
+    const dragging = rat.carry.some(i => i.big);
+    const spd = moving ? (sprinting && !dragging ? 195 : crouching ? 62 : 120) * (dragging ? 0.55 : 1 - 0.13 * carryW()) : 0;
     const px = rat.x, py = rat.y;
     if (rat.surf === 'floor') moveFloor(rat, mx * spd, mz * spd, dt, L.solids);
     else { const s = S(rat.surf), nx = rat.x + mx * spd * dt; if (onSurf(s, nx, rat.y, 4)) rat.x = nx; const ny = rat.y + mz * spd * dt; if (onSurf(s, rat.x, ny, 4)) rat.y = ny; }
@@ -1241,7 +1379,8 @@ function update(dt) {
     noiseLvl = !moving ? 0 : sprinting ? 3 : crouching ? 0 : 1;
     rat.noiseT -= dt;
     if (sprinting && rat.noiseT <= 0) { rat.noiseT = 0.35; noise(rat.x, rat.y, 210, null, false, 0.3); }
-    else if (noiseLvl === 1 && rat.surf === 'floor' && rat.noiseT <= 0) { rat.noiseT = 0.45; noise(rat.x, rat.y, 95, null, false, 0.1); }
+    else if (noiseLvl === 1 && rat.surf === 'floor' && rat.noiseT <= 0 && !inHum()) { rat.noiseT = 0.45; noise(rat.x, rat.y, 95, null, false, 0.1); }
+    if (dragging && moving && rat.noiseT <= 0) { rat.noiseT = 0.6; Snd.fx.scrape(crouching ? 0.04 : 0.09); noise(rat.x, rat.y, crouching ? 60 : 120, null, false, crouching ? 0.05 : 0.15); }
     // running into furniture makes a thump
     bumpT -= dt;
     if (sprinting && rat.surf === 'floor' && bumpT <= 0 && Math.hypot(rat.x - px, rat.y - py) < spd * dt * 0.35) { bumpT = 0.9; Snd.fx.land(false); noise(rat.x, rat.y, 170, 'Thump!', false, 0.45); }
@@ -1286,7 +1425,8 @@ function update(dt) {
   if (state !== 'play') return;
   updateProps(dt);
   if (Q) { tickTasks(dt); if (state !== 'play') return; }
-  for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noise(k.to[0], k.to[1], 460, k.text, true); } }
+  for (const k of L.knocks) if (k.delay > 0) { k.delay -= dt; if (k.delay <= 0) knockOver(k); }
+  for (const k of L.knocks) if (k.fall && k.fall.t < 1) { k.fall.t += dt / 0.55; if (k.fall.t >= 1) { k.fall.t = 1; Snd.fx[k.snd](); noiseSrc = 'knock'; noise(k.to[0], k.to[1], 460, k.text, true); noiseSrc = ''; if (k.spawn) placeItem(k.spawn, k.to[0] + 14, k.to[1]); } }
   if (L.crackle && Math.random() < dt * 7) Snd.fx.crackle(0.06 * clamp01(1 - Math.hypot(rat.x - L.crackle.x, rat.y - L.crackle.y) / 500));
   // --- wanted level ---
   if (catSees || humanSees) unseenT = 0; else unseenT += dt;
@@ -1536,7 +1676,7 @@ function sync(dt) {
     const inside = d === 0 && rat.surf === 'floor' && !rat.jump;
     const target = !inRun ? 0 : inside ? 0.9 : 0.6 * clamp01(1 - (d - 15) / 230);
     mk.m.material.opacity = lerp(mk.m.material.opacity, target * (0.85 + Math.sin(clock * 3 + r.x) * 0.15), Math.min(1, dt * 6)); mk.m.visible = mk.m.material.opacity > 0.01; }
-  if (L.secrets) for (const sc of L.secrets) { sc.mesh.visible = inRun && !sc.found && Math.hypot(sc.x - rat.x, sc.y - rat.y) < 75; sc.mesh.rotation.y = clock * 2; }
+  if (L.secrets) for (const sc of L.secrets) { sc.mesh.visible = inRun && !sc.found && (sc.always || Math.hypot(sc.x - rat.x, sc.y - rat.y) < 75); sc.mesh.rotation.y = clock * 2; }
   holeLight.intensity = 0.65 + Math.sin(clock * 3) * 0.15; nestLight.intensity = 1.25 + Math.sin(clock * 1.7) * 0.08;
   // camera
   if (inRun || (state === 'result' && !rat.inNest)) followCam(dt, camYaw, camPitch);
@@ -1545,6 +1685,7 @@ function sync(dt) {
   const pr = $('prompt'); marker.visible = false; pr.hidden = true;
   if (playing) {
     if (knockCand) { const p = project(knockCand.x, knockCand.h + 22, knockCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'F'; $('promptTxt').textContent = 'Knock over ' + knockCand.word; } }
+    else if (gnawCand) { const p = project(gnawCand.x, gnawCand.h + 36, gnawCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = 'Hold F'; $('promptTxt').textContent = gnawCand.prog > 0 ? 'Gnawing… ' + Math.round(gnawCand.prog * 100) + '%' : 'Gnaw the bag open (noisy)'; } }
     else if (jumpCand) { marker.visible = true; marker.position.set(jumpCand.x, jumpCand.s.h + 0.7, jumpCand.y); const sc = 1 + Math.sin(clock * 6) * 0.12; marker.scale.set(sc, sc, sc);
       const p = project(jumpCand.x, jumpCand.s.h + 14, jumpCand.y); if (p.vis) { pr.hidden = false; pr.style.left = p.x + 'px'; pr.style.top = p.y + 'px'; $('promptKey').textContent = usingTouch ? 'Jump' : 'Space'; $('promptTxt').textContent = jumpCand.s.h > rat.h ? 'Jump up' : 'Jump down'; } }
   }
@@ -1636,13 +1777,14 @@ requestAnimationFrame(frame);
 // test hooks (used by automated checks; harmless in play)
 window.__kr = {
   info: () => ({ state, level: L && L.i, stars, fed, lives, cat: cat && cat.mode, human: human && human.mode, vac: vac && vac.on, traps: traps.length, items: items.length, poison: items.filter(i => i.poison).length, rat: rat && [Math.round(rat.x), Math.round(rat.y), rat.h, rat.surf] }),
-  start: i => startLevel(i), skip: () => skipIntro(), evidence: v => { evidence = v; },
+  start: i => startLevel(i), resetProgress: () => { progress = { unlocked: 1, best: {} }; }, skip: () => skipIntro(), evidence: v => { evidence = v; },
   teleport: (x, y, h = 0, surf = 'floor', yaw) => { Object.assign(rat, { x, y, h, surf, jump: null }); if (yaw != null) camYaw = yaw; },
   preview: i => { buildLevel(i); resetRun(); state = 'menu'; showPanel(null); },
   win: () => { fed = L.d.goal; startOutro(); }, pause: () => pause(),
   cat: () => ({ mode: cat.mode, sleep: +cat.sleep.toFixed(3), stage: cat.stage, x: Math.round(cat.x), y: Math.round(cat.y), woke: run.catWoke, chased: run.chased }),
   items: () => items.map(it => [it.type, Math.round(it.x), Math.round(it.y), it.h, it.surf]),
   noiseLvl: () => noiseLvl, goals: () => nightGoals(true),
+  gnaws: () => [L.gnaws.map(g => [g.x, g.y, g.h, g.prog, g.done]), gnawCand && 1, knockCand && knockCand.kind],
   knocks: () => L.knocks.map(k => [k.kind, k.x, k.y, k.surf, k.done, !!k.trap]),
   tasks: () => Q && { i: Q.i, done: [...Q.done], failed: [...Q.failed], flags: Q.flags, picked: [...Q.picked] },
   onSurf: (prefix, x, y) => { const s = L.surfaces.find(q => q.id.startsWith(prefix)); const r = s.rects[0]; Object.assign(rat, { x: x != null ? x : r.x + r.w / 2, y: y != null ? y : r.y + r.h / 2, h: s.h, surf: s.id, jump: null }); return s.id; },
