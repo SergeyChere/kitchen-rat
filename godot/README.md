@@ -8,8 +8,9 @@ reference.
 Every push to `main` that touches `godot/` builds the game on GitHub:
 
 1. Open **Actions → Build Godot game** and pick the latest green run.
-2. Under **Artifacts**, download `KitchenRat-Godot`.
-3. Unzip it. Then unzip `KitchenRat-Windows.zip` (or Linux/Mac) and run `KitchenRat.exe`.
+2. Under **Artifacts**, download `KitchenRat-Windows` (or `KitchenRat-Linux` / `KitchenRat-Mac`; `KitchenRat-Demo-…`
+   is the demo).
+3. Unzip it and run `KitchenRat.exe` (Mac: unzip the `KitchenRat.zip` inside).
 
 When a release is published, the same zips are attached to it automatically. The artifact also has
 `KitchenRat-Demo-*.zip`: the demo with Act 1 only (nights 1–5), for the Steam demo page and Next Fest.

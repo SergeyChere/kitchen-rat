@@ -9,25 +9,26 @@ cheese and a robot vacuum.
 
 ## Download and play
 
-No installation, no setup. Download one file and run it.
+The game is made in Godot 4. Every push to `main` builds it for Windows, Mac and Linux:
 
-| System | Download | How to run |
-|---|---|---|
-| **Windows** | [KitchenRat-Windows.exe](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Windows.exe) | Double-click. If Windows shows "Windows protected your PC", click **More info → Run anyway** |
-| **Mac (Apple Silicon)** | [KitchenRat-Mac-arm64.dmg](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Mac-arm64.dmg) | Open the .dmg, then right-click Kitchen Rat → **Open** |
-| **Mac (Intel)** | [KitchenRat-Mac-x64.dmg](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Mac-x64.dmg) | Same as above |
-| **Linux** | [KitchenRat-Linux.AppImage](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Linux.AppImage) | `chmod +x KitchenRat-Linux.AppImage`, then run it |
+1. Open [Actions → Build Godot game](https://github.com/SergeyChere/kitchen-rat/actions/workflows/godot.yml) and click the newest green run.
+2. Under **Artifacts**, download **KitchenRat-Windows** (or **KitchenRat-Mac** / **KitchenRat-Linux**). The
+   `KitchenRat-Demo-…` downloads are the demo (nights 1–5).
+3. Unzip it and run `KitchenRat.exe` (Mac: unzip `KitchenRat.zip` inside and open the app). If Windows shows
+   "Windows protected your PC", click **More info → Run anyway**.
 
-These links always point to the newest release. All versions: [Releases](https://github.com/SergeyChere/kitchen-rat/releases).
+**Скачать и играть (RU):** открой [Actions → Build Godot game](https://github.com/SergeyChere/kitchen-rat/actions/workflows/godot.yml),
+выбери последний зелёный запуск и внизу в **Artifacts** скачай **KitchenRat-Windows**. Распакуй и запусти `KitchenRat.exe`.
+Если появится окно «Windows защитила ваш компьютер», нажми **Подробнее → Выполнить в любом случае**.
 
-**Скачать и играть (RU):** для Windows скачай [KitchenRat-Windows.exe](https://github.com/SergeyChere/kitchen-rat/releases/latest/download/KitchenRat-Windows.exe) и запусти двойным кликом. Ничего устанавливать не нужно. Если появится окно «Windows защитила ваш компьютер», нажми **Подробнее → Выполнить в любом случае**.
+The old browser prototype (three.js) is still in `game/` for trying ideas; it is no longer built as a desktop app.
 
 ## For developers
 
-> **The game is being ported to Godot 4.** This is now the main version. See [godot/README.md](godot/README.md).
-> Test builds are under **Actions → Build Godot game → Artifacts**.
+> **The game is in Godot 4:** see [godot/README.md](godot/README.md). The rest of this section is about the
+> browser prototype in `game/`.
 
-### Run from source
+### Run the prototype from source
 
 You need [Node.js](https://nodejs.org) 20 or newer.
 
@@ -46,11 +47,7 @@ npm start
 | macOS | `npm run dist:mac` | `.dmg` |
 | Linux | `npm run dist:linux` | `.AppImage` |
 
-Build each platform on that platform. GitHub also builds all of them on every push to `main`
-(downloads on the workflow run page). To publish a new downloadable version, bump `version` in
-`package.json`, push, then on GitHub open **Releases → Draft a new release**, type a new tag such as
-`v0.2.0` and click **Publish release**. The workflow builds the game and attaches the files to that
-release (takes about 10 minutes), and the download links above switch to it automatically.
+Build each platform on that platform (GitHub no longer builds the prototype).
 
 ### In a browser
 
@@ -124,7 +121,7 @@ tools/blender/   Scripts that generate every model into godot/assets/models (Ble
 tools/make_audio.py  Renders the sound effects and music for Godot
 art/             Model previews and the list of models
 docs/            Game design notes and roadmap
-.github/         CI that builds the desktop app for Windows, macOS and Linux
+.github/         CI that builds the Godot game (and the demo) for Windows, macOS and Linux
 ```
 
 The HTML version is where new gameplay ideas get tried first. Features that stick get ported to

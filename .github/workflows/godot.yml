@@ -72,10 +72,36 @@ jobs:
           cp mac/KitchenRat-Demo.zip ../../KitchenRat-Demo-Mac.zip
           ls -la ../../*.zip
 
+      # one download per platform (the full game and the demo); the folder is zipped by GitHub
       - uses: actions/upload-artifact@v4
         with:
-          name: KitchenRat-Godot
-          path: KitchenRat-*.zip
+          name: KitchenRat-Windows
+          path: build/godot/windows
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Linux
+          path: build/godot/linux
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Mac
+          path: build/godot/mac
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Demo-Windows
+          path: build/godot-demo/windows
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Demo-Linux
+          path: build/godot-demo/linux
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Demo-Mac
+          path: build/godot-demo/mac
           if-no-files-found: error
 
       - name: Attach to release
