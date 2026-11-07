@@ -694,7 +694,7 @@ namespace KitchenRat.EditorTools
 
         static AutoBuild()
         {
-            if (File.Exists(KitchenBuilder.FirstScene)) return;
+            if (File.Exists(KitchenBuilder.FirstScene) || Application.isBatchMode) return; // CI builds the scenes itself
             EditorApplication.update += Tick;
         }
 

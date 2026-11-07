@@ -1,0 +1,85 @@
+name: Build Unity game
+
+# The Unity version of the game (unity/). Builds take a while, so they run when a release is published,
+# when something in unity/ changes on main, or by hand (Actions → Build Unity game → Run workflow).
+# Needs the repository secrets UNITY_LICENSE (contents of the .ulf file), UNITY_EMAIL and UNITY_PASSWORD.
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths: ['unity/**', '.github/workflows/unity.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unity ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            target: StandaloneWindows64
+            exe: KitchenRat.exe
+          - name: Mac
+            target: StandaloneOSX
+            exe: KitchenRat.app
+          - name: Linux
+            target: StandaloneLinux64
+            exe: KitchenRat.x86_64
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/cache@v4
+        with:
+          path: unity/Library
+          key: Library-${{ matrix.target }}-${{ hashFiles('unity/Assets/Art/**', 'unity/Packages/**', 'unity/ProjectSettings/**') }}
+          restore-keys: Library-${{ matrix.target }}-
+
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          targetPlatform: ${{ matrix.target }}
+          buildName: KitchenRat
+          buildsPath: build
+          buildMethod: KitchenRat.EditorTools.CIBuild.Build
+
+      - name: Pack
+        run: |
+          sudo chown -R "$USER" build
+          cd build/${{ matrix.target }}
+          ls -la
+          zip -qry "$GITHUB_WORKSPACE/KitchenRat-Unity-${{ matrix.name }}.zip" .
+          ls -la "$GITHUB_WORKSPACE"/*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Unity-${{ matrix.name }}
+          path: KitchenRat-Unity-${{ matrix.name }}.zip
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: KitchenRat-Unity-${{ matrix.name }}.zip
