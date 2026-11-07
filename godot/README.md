@@ -41,6 +41,14 @@ Food is picked up by walking into it. Bring it to the nest to drop it off.
 
 ## What works now
 
+The game runs like the prototype: main menu (Continue · Night N, Nights, Settings, Quit), a nest scene with the
+pups before every night (the prologue before night 1 the first time), the night itself, a nest scene after a win,
+and a results screen with Next night. Finishing a night opens the next one; progress and the best result on each
+night are saved. Settings: mouse sensitivity, invert Y, field of view, music and sound volume, quality, fullscreen,
+VSync, hints, Calm mode, reset progress. On screen: green outlines show hiding spots, a pale cone shows where the
+cat looks, Zzz / ? / ! over the cat, the owner and the dog, noise rings, "Hidden / Unseen / The cat sees you!",
+and an arrow to the nest while you carry food.
+
 All 20 nights are playable:
 
 | Nights | Room | What's new |

@@ -22,6 +22,7 @@ var marker: Node3D
 var cam_yaw := 0.0  # set by the camera every frame
 
 var frozen := true
+var scripted := false  # a cutscene moves her and picks her animation
 var sneaking := false
 var running := false
 var sniffing := false
@@ -99,6 +100,9 @@ func teleport(p: Vector3, yaw: float) -> void:
 
 func _physics_process(dt: float) -> void:
 	noise_level = move_toward(noise_level, 0.0, dt * 1.5)
+	if scripted:
+		_show_marker(false)
+		return
 	if frozen:
 		move_speed = 0.0
 		sniffing = false

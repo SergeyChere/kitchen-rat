@@ -8,6 +8,8 @@ var min_distance := 0.3
 var max_distance := 1.8
 var height := 0.12
 var sensitivity := 0.25
+var invert_y := false
+var fov := 60.0
 var yaw := PI  # 0 looks toward +Z (south)
 var pitch := -16.0
 var arm: SpringArm3D
@@ -40,7 +42,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseMotion:
 		yaw -= deg_to_rad(e.relative.x * sensitivity)
-		pitch = clampf(pitch - e.relative.y * sensitivity, -70.0, 20.0)
+		pitch = clampf(pitch - e.relative.y * sensitivity * (-1.0 if invert_y else 1.0), -70.0, 20.0)
 	elif e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
 			distance = clampf(distance - 0.08, min_distance, max_distance)
@@ -56,6 +58,7 @@ func _process(_dt: float) -> void:
 		yaw -= look.x * 2.6 * _dt
 		pitch = clampf(pitch - look.y * 120.0 * _dt, -70.0, 20.0)
 	global_position = target.global_position + Vector3.UP * height
+	cam.fov = fov
 	rotation = Vector3(deg_to_rad(pitch), yaw + PI, 0.0)  # the camera looks along -Z; +PI makes yaw 0 look toward +Z
 	arm.spring_length = distance
 	if target is Rat:

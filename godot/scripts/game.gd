@@ -36,6 +36,18 @@ var pups: Array[Pup] = []
 var sleepers: Array[Sleeper] = []
 var pup_warn_t := 0.0
 var prompt := ""
+var fx: WorldFx
+var nest_pups: Array = []
+var cut_bars := false
+var fade := 0.0  # 0…1 black
+var _fade_to := 0.0
+var _cut_t := 0.0
+var _cut_phase := ""
+var _cues: Array = []
+var _cut_cam: Camera3D
+var _walk: Array = []
+var _panel: Control
+var _best_clock := ""
 var _rain: Node
 const KNOCK_SND := {"cup": "clink", "glass": "clink", "spoon": "clink", "vase": "crash", "jar": "bang", "bottle": "bang",
 	"can": "bang", "apple": "thud", "book": "thud", "carton": "thud", "ball": "thud"}
@@ -77,6 +89,7 @@ var _wash_t := 0.0
 var _wash_zone: Zone
 var _light_t := 0.0
 var _bell_t := 0.0
+var _call_t := 0.0
 var _next_bolt := 8.0
 var _flash_t := 0.0
 var _thunder_t := 0.0
@@ -95,9 +108,13 @@ func _init(id := "kitchen") -> void:
 func _ready() -> void:
 	I = self
 	night = Nights.load_night(night_id)
+	if Settings.calm:
+		night.seconds = float(night.get("seconds", 900)) * 1.3
+		night.catSense = float(night.get("catSense", 1.0)) * 0.8
+		night.sleepSense = float(night.get("sleepSense", 1.0)) * 0.7
 	tasks = TaskTracker.new(night.get("tasks", {}))
-	tasks.completed.connect(func(t): toast("✓ " + t); Sfx.play("task"))
-	tasks.failed.connect(func(t): toast("✗ " + t); Sfx.play("fail"))
+	tasks.completed.connect(func(t): hud.task_done(t, true); Sfx.play("task"))
+	tasks.failed.connect(func(t): hud.task_done(t, false); Sfx.play("fail"))
 	tasks.on_surface = func(a): return not rat.jumping and rat.surface_id.begins_with(a)
 	tasks.hidden_in = func(a): return rat.hide_kind() == a
 	tasks.keep_broken = _keep_broken
@@ -123,6 +140,9 @@ func _ready() -> void:
 		if z is HideSpot and (z as HideSpot).id != "crack":
 			no_go.append(z)
 	grid = NavGrid.new(self, no_go)
+	fx = WorldFx.new(self)
+	fx.name = "World fx"
+	add_child(fx)
 	cat.setup(night)
 	var door := float(night.get("door", 300))
 	owner_ai.setup(night, Nights.world(935, door if door > 0 else 300))
@@ -143,11 +163,18 @@ func _ready() -> void:
 	_moon_e = moon.light_energy if moon else 0.5
 	_last_rp = rat.global_position
 	print_verbose("night ready: ", foods.size(), " food, ", zones.size(), " zones")
+	if not Settings.shadows():
+		for l in find_children("*", "Light3D", true, false):
+			(l as Light3D).shadow_enabled = false
+	for i in nest_pups.size():
+		nest_pups[i].visible = i < 4 - pups.size()
 	Sfx.music_night(night.get("music", {}))
 	Sfx.music_duck(false)
 	if bool(night.get("storm", false)):
 		_rain = Sfx.loop("rain_loop")
 	rat.frozen = true
+	if state == "intro" and not Main.I._args.has("auto"):
+		_start_intro()
 
 
 func _make_rat() -> void:
@@ -189,6 +216,9 @@ func _make_rat() -> void:
 	cam.target = rat
 	add_child(cam)
 	cam.snap(PI)
+	cam.sensitivity = 0.25 * Settings.sens
+	cam.invert_y = Settings.invert_y
+	cam.fov = Settings.fov
 
 
 func _make_agents() -> void:
@@ -344,6 +374,8 @@ func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, fr
 			if pp.kind == "shy" and not pp.lost() and pp.global_position.distance_to(at) < 3.5:
 				pp.freeze_t = 3.0
 				pp.force_say("Eek! I can’t move!", 1.8)
+	if fx:
+		fx.ring(at, radius, big)
 	if amt < 0.0:
 		amt = 0.9 if big else (0.3 if radius > 1.5 else 0.4)
 	_alarm += 7.0 if big else (0.5 if radius > 1.5 else (2.0 if radius > 1.0 else 0.0))
@@ -439,6 +471,16 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 		bubble_at("Snap! Disarmed", t.global_position + Vector3.UP * 0.3, 1.4, Color(0.62, 0.82, 0.48))
 
 
+## Things standing in a row fall like dominoes (the prototype's knock groups).
+func knock_group(k: Knockable) -> void:
+	var n := 0
+	for o in knockables:
+		if o != k and o.group == k.group and not o.knocked:
+			n += 1
+			var other := o
+			get_tree().create_timer(0.22 * n).timeout.connect(func(): if is_instance_valid(other): other.knock(k.push_dir))
+
+
 func _on_landed(drop: float) -> void:
 	Sfx.play("land_big" if drop > 0.5 else "land", rat.global_position)
 	if drop > 0.5 and rat.surface_id == "floor":
@@ -451,20 +493,30 @@ func _on_landed(drop: float) -> void:
 # ---------- loop ----------
 
 func _unhandled_input(e: InputEvent) -> void:
+	if state == "intro":
+		var skip := e.is_action_pressed("jump") or e.is_action_pressed("pause") or e.is_action_pressed("ui_accept")
+		if skip or (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):
+			_skip_intro()
+			get_viewport().set_input_as_handled()
+		return
 	if e.is_action_pressed("pause"):
 		if state == "play": _set_paused(true)
-		elif state == "pause": _set_paused(false)
+		elif state == "pause" and _panel and _panel.has_meta("pause"): _set_paused(false)
+		get_viewport().set_input_as_handled()
 	elif e.is_action_pressed("restart") and state in ["pause", "won", "lost"]:
 		_restart()
-	elif e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
-		if state == "intro": begin()
-		elif state == "pause": _set_paused(false)
-		elif state == "won" or state == "lost": _restart()
-	elif e.is_action_pressed("jump") and state == "intro":
-		begin()
+	elif e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT and state == "play" and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _process(dt: float) -> void:
+	fade = move_toward(fade, _fade_to, dt / 0.35)
+	if state == "intro":
+		_tick_intro(dt)
+		return
+	if state == "outro":
+		_tick_outro(dt)
+		return
 	if state != "play" or grid == null:
 		return
 	night_time += dt
@@ -865,6 +917,12 @@ func _tick_world(dt: float) -> void:
 				bubble_on("♪ ding", cat, 0.42, 0.8)
 	if bool(night.get("storm", false)):
 		_tick_storm(dt, rp)
+	# a chasing cat calls the owner over
+	_call_t = maxf(0.0, _call_t - dt)
+	if cat.mode == CatAI.Mode.CHASE and owner_ai.mode == OwnerAI.Mode.PATROL and _call_t <= 0.0:
+		_call_t = 4.0
+		owner_ai.hear(rp, 20.0, true)
+		bubble_on("What is it, kitty?", owner_ai, 1.95, 1.6)
 	if exit_point != Vector3.ZERO and Vector2(rp.x - exit_point.x, rp.z - exit_point.z).length() < 0.45:
 		tasks.set_flag("exitMom")
 		if not pups.is_empty():
@@ -1108,14 +1166,213 @@ func place_traps(n: int) -> void:
 		placed += 1
 
 
-# ---------- states ----------
+# ---------- states: cutscenes, pause, results ----------
 
 func begin() -> void:
 	if grid == null:
 		return
+	_cut_phase = ""
+	cut_bars = false
+	_fade_to = 0.0
+	rat.scripted = false
+	if is_instance_valid(_cut_cam):
+		_cut_cam.queue_free()
+	cam.cam.current = true
+	var p := Nights.world(180, 640, 1)
+	rat.teleport(p, PI)
+	cam.snap(PI)
+	for i in pups.size():
+		pups[i].global_position = Nights.world(150 + i * 20, 660)
 	state = "play"
 	rat.frozen = false
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	var st := str(night.get("startTitle", ""))
+	if st != "":
+		banner(st, str(night.get("startSub", "")), 5.5)
+	else:
+		banner("Bring %d food before dawn" % int(night.goal), "", 4.5)
+
+
+func _cut_camera() -> void:
+	if not is_instance_valid(_cut_cam):
+		_cut_cam = Camera3D.new()
+		_cut_cam.fov = 55.0
+		_cut_cam.near = 0.02
+		add_child(_cut_cam)
+	_cut_cam.current = true
+
+
+## The nest scene before a night (and the prologue before night 1, the first time).
+func _start_intro() -> void:
+	state = "intro"
+	cut_bars = true
+	_cut_camera()
+	rat.scripted = true
+	rat.frozen = true
+	rat.global_position = Nights.world(150, 700, 1)
+	rat.rotation.y = Nights.yaw_to(Vector3(0.5, 0, 1))
+	rat.anim.play("sleep")
+	for i in pups.size():
+		pups[i].global_position = Nights.world(120 + i * 22, 735)
+	fade = 1.0
+	_fade_to = 0.0
+	Sfx.music_night(night.get("music", {}))
+	if bool(night.get("prologue", false)) and not Progress.seen_prologue:
+		Progress.seen_prologue = true
+		Progress.save()
+		_prologue()
+		return
+	_night_intro()
+
+
+func _night_intro() -> void:
+	_cut_phase = "nest"
+	_cut_t = 0.0
+	rat.global_position = Nights.world(150, 700, 1)
+	for p in nest_pups: p.visible = nest_pups.find(p) < 4 - pups.size()
+	var lines: Array = night.get("introPups", [])
+	var talkers := _talkers()
+	_cues = []
+	for i in mini(lines.size(), 3):
+		var who = talkers[i % talkers.size()] if not talkers.is_empty() else null
+		_cues.append([0.7 + i * 0.8, func(): if who: bubble_on(str(lines[i]), who, 0.2, 1.8); Sfx.play("squeak", null, -6.0, randf_range(1.3, 1.5))])
+	var mom := str(night.get("introMom", ""))
+	_cues.append([3.4, func(): rat.anim.play("idle"); if mom != "": bubble_on(mom, rat, 0.3, 3.0)])
+	_cues.append([6.4, func(): _cut_phase = "walk"; _walk = [Nights.world(170, 650, 1), Nights.world(180, 612, 1)]])
+	banner("Night %d · %s" % [int(night.number), str(night.name)], "", 2.6)
+
+
+func _talkers() -> Array:
+	var out := []
+	for p in nest_pups:
+		if p.visible: out.append(p)
+	for p in pups:
+		out.append(p)
+	return out
+
+
+func _prologue() -> void:
+	_cut_phase = "prologue"
+	_cut_t = 0.0
+	for p in nest_pups: p.visible = false
+	for p in pups: p.visible = false
+	rat.global_position = Nights.world(180, 612, 1)
+	rat.anim.play("walk")
+	_walk = [Nights.world(170, 660, 1), Nights.world(150, 700, 1)]
+	Sfx.music_menu()
+	_cues = [
+		[0.2, func(): Sfx.play("thunder"); banner("A stormy night", "A mother rat slips into the house through a gap in the wall…", 3.4)],
+		[3.9, func(): banner("", "She finds a warm spot behind the kitchen wall and builds a nest.", 3.0)],
+		[7.2, func(): _fade_to = 1.0],
+		[7.8, func(): _fade_to = 0.0; rat.anim.play("sleep"); for p in nest_pups: p.visible = true
+			],
+		[7.9, func(): banner("By morning, there were four.", "", 3.0); Sfx.play("squeak", null, -6.0, 1.7)],
+		[9.2, func(): Sfx.play("squeak", null, -8.0, 1.8)],
+		[11.2, func(): _fade_to = 1.0],
+		[11.8, func(): _fade_to = 0.0; banner("A few days later", "Their eyes are open. And they are very hungry.", 3.2)],
+		[15.2, func(): Sfx.music_night(night.get("music", {})); _night_intro()],
+	]
+
+
+func _skip_intro() -> void:
+	if _cut_phase == "leave":
+		return
+	_cut_phase = "leave"
+	_cut_t = 0.0
+	_fade_to = 1.0
+
+
+func _run_cues() -> void:
+	while not _cues.is_empty() and _cut_t >= float(_cues[0][0]):
+		var c: Callable = _cues.pop_front()[1]
+		c.call()
+
+
+## Walk the rat along _walk; true when she got there.
+func _walk_rat(dt: float, spd: float) -> bool:
+	if _walk.is_empty():
+		return true
+	var t: Vector3 = _walk[0]
+	var d := t - rat.global_position
+	d.y = 0.0
+	if d.length() < 0.03:
+		_walk.pop_front()
+		return _walk.is_empty()
+	rat.global_position += d.normalized() * minf(d.length(), spd * dt)
+	rat.rotation.y = lerp_angle(rat.rotation.y, Nights.yaw_to(d), minf(1.0, dt * 8.0))
+	rat.anim.play("walk")
+	return false
+
+
+func _orbit(dt: float, center: Vector3, a: float, r: float, h: float) -> void:
+	var want := center + Vector3(cos(a) * r, h, sin(a) * r * 0.75)
+	_cut_cam.global_position = _cut_cam.global_position.lerp(want, minf(1.0, dt * 3.0)) if _cut_t > 0.05 else want
+	_cut_cam.look_at(center + Vector3.UP * 0.05)
+
+
+func _tick_intro(dt: float) -> void:
+	dt = minf(dt, 0.05)  # the first frame after loading can be seconds long
+	_cut_t += dt
+	_run_cues()
+	var nest_c := Nights.world(140, 705, 2)
+	match _cut_phase:
+		"prologue":
+			if _cut_t < 7.2: _walk_rat(dt, 0.3)
+			_orbit(dt, nest_c, 0.8 + _cut_t * 0.05, 0.95, 0.45)
+		"nest":
+			_orbit(dt, nest_c, 0.5 + _cut_t * 0.09, lerpf(0.95, 0.7, clampf(_cut_t / 5.0, 0.0, 1.0)), lerpf(0.5, 0.32, clampf(_cut_t / 5.0, 0.0, 1.0)))
+		"walk":
+			_orbit(dt, rat.global_position, PI * 0.45, 0.7, 0.3)
+			if _walk_rat(dt, 0.8):
+				_skip_intro()
+		"leave":
+			if _cut_t > 0.4:
+				begin()
+
+
+## The nest scene after a won night: the pups eat and thank Mom.
+func _start_outro() -> void:
+	state = "outro"
+	_cut_phase = "in"
+	_cut_t = 0.0
+	_fade_to = 1.0
+	cut_bars = true
+	rat.frozen = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Sfx.music_layers(0.0, false)
+
+
+func _tick_outro(dt: float) -> void:
+	dt = minf(dt, 0.05)
+	_cut_t += dt
+	if _cut_phase == "in" and _cut_t > 0.45:
+		_cut_phase = "eat"
+		_cut_t = 0.0
+		_cut_camera()
+		rat.scripted = true
+		rat.global_position = Nights.world(165, 700, 1)
+		rat.rotation.y = Nights.yaw_to(Vector3.LEFT)
+		rat.anim.play("idle")
+		for p in nest_pups: p.visible = true
+		for i in pups.size():
+			pups[i].global_position = Nights.world(110 + i * 25, 690)
+			pups[i].mode = Pup.Mode.STAY
+			pups[i].target = pups[i].global_position
+		_fade_to = 0.0
+		var lines := [["We’re free!", "Mom, we found food for YOU!", "Here, Mom!", "We love you!"]] if bool(night.get("finale", false)) else [["Nom!", "Thanks, Mom!", "Cheeese!", "I’m full!"]]
+		var talkers := _talkers()
+		_cues = []
+		for i in 4:
+			var who = talkers[i % talkers.size()]
+			var line: String = lines[0][i]
+			_cues.append([0.6 + i * 0.8, func(): bubble_on(line, who, 0.2, 1.8); Sfx.play("squeak", null, -6.0, randf_range(1.3, 1.6))])
+	if _cut_phase == "eat":
+		_run_cues()
+		_orbit(dt, Nights.world(140, 705, 2), 0.4 + _cut_t * 0.12, 0.8, 0.36)
+		if _cut_t > 4.6:
+			_cut_phase = ""
+			cut_bars = false
+			_show_result(true)
 
 
 func _set_paused(on: bool) -> void:
@@ -1124,28 +1381,123 @@ func _set_paused(on: bool) -> void:
 	get_tree().paused = false
 	rat.frozen = on
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if on else Input.MOUSE_MODE_CAPTURED
+	if is_instance_valid(_panel):
+		_panel.queue_free()
+		_panel = null
+	if on:
+		_pause_panel()
+
+
+func _pause_panel() -> void:
+	var sc := UI.screen(hud, 0.55, false, 440.0)
+	_panel = sc[0]
+	_panel.set_meta("pause", true)
+	var box: VBoxContainer = sc[1]
+	box.add_child(UI.label("Paused", 32, UI.ACCENT, true))
+	box.add_child(UI.label("Night %d · %s. The pups are waiting." % [int(night.number), str(night.name)], 16, UI.DIM, true))
+	box.add_child(UI.button("Resume", func(): _set_paused(false)))
+	box.add_child(UI.button("Settings", func(): _panel.hide(); UI.settings_panel(hud, func(): _apply_settings(); if is_instance_valid(_panel): _panel.show())))
+	box.add_child(UI.button("Restart night", _restart))
+	box.add_child(UI.button("Main menu", func(): Main.I.show_menu()))
+	UI.focus_first(box)
+
+
+func _apply_settings() -> void:
+	cam.sensitivity = 0.25 * Settings.sens
+	cam.invert_y = Settings.invert_y
+	cam.fov = Settings.fov
+	for l in find_children("*", "Light3D", true, false):
+		if l is DirectionalLight3D or (l is OmniLight3D and l != tv_light):
+			(l as Light3D).shadow_enabled = Settings.shadows()
 
 
 func _end(won: bool, title: String, text: String) -> void:
+	if state != "play":
+		return
 	if won:
 		tasks.finish_night()
-	state = "won" if won else "lost"
-	Sfx.play("win" if won else "lose")
-	Sfx.music_layers(0.0, false)
 	end_title = title
 	end_text = text
 	rat.frozen = true
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Sfx.play("win" if won else "lose")
+	Sfx.music_layers(0.0, false)
 	ended.emit(won)
+	if won:
+		_start_outro()
+	else:
+		state = "lost"
+		_show_result(false)
+
+
+func goal_rows(won: bool) -> Array:
+	var rows := []
+	if tasks.has_tasks():
+		rows.append(["Main tasks %d / %d" % [mini(tasks.step, tasks.chain.size()), tasks.chain.size()], won and tasks.chain_done()])
+		for i in tasks.side.size():
+			rows.append(["Side: " + str(tasks.side[i].text), won and tasks.side_done.has(i)])
+		for i in tasks.secret.size():
+			rows.append([("Secret: " + str(tasks.secret[i].text)) if tasks.secret_done.has(i) else "Secret: ???", tasks.secret_done.has(i)])
+	else:
+		rows.append(["Fill the nest", won])
+	return rows
+
+
+func _show_result(won: bool) -> void:
+	state = "won" if won else "lost"
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var rows := goal_rows(won)
+	var got := 0
+	for r in rows:
+		if r[1]: got += 1
+	var last := int(night.number) >= Nights.files().size()
+	if won:
+		Progress.record(night, night_time, hud.clock_text(), got, rows.size(), max_stars)
+	else:
+		Progress.losses[night_id] = int(Progress.losses.get(night_id, 0)) + 1
+	var sc := UI.screen(hud, 0.7, false, 620.0)
+	_panel = sc[0]
+	var box: VBoxContainer = sc[1]
+	var title := end_title
+	if won:
+		title = "The End" if bool(night.get("finale", false)) else "Night %d complete" % int(night.number)
+	box.add_child(UI.label(title, 34, UI.ACCENT if won else UI.BAD, true))
+	var text := end_text
+	if won and bool(night.get("finale", false)):
+		text = "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom for the first time. Thank you for playing!"
+	box.add_child(UI.label(text, 16, UI.TEXT, true))
+	for r in rows:
+		box.add_child(UI.label(("✔  " if r[1] else "✖  ") + str(r[0]), 16, UI.GOOD if r[1] else UI.DIM))
+	var stats := HBoxContainer.new()
+	stats.alignment = BoxContainer.ALIGNMENT_CENTER
+	stats.add_theme_constant_override("separation", 28)
+	box.add_child(stats)
+	var st := [[hud.clock_text(), "Finished at" if won else "Time"], ["%d / %d" % [mini(fed, int(night.goal)), int(night.goal)], "Food"], [str(3 - maxi(lives, 0)), "Lives lost"]]
+	if bool(night.get("wanted", false)):
+		st.append([_star_text(max_stars), "Top wanted"])
+	for s2 in st:
+		var v := VBoxContainer.new()
+		for k in 2:
+			var l := UI.label(str(s2[k]), 22 if k == 0 else 13, UI.TEXT if k == 0 else UI.DIM, true)
+			l.autowrap_mode = TextServer.AUTOWRAP_OFF
+			v.add_child(l)
+		stats.add_child(v)
+	if not won and int(Progress.losses.get(night_id, 0)) >= 2:
+		var tip := str(tasks.current().get("hint", "")) if tasks.current() != null else ""
+		box.add_child(UI.label("Tip: " + (tip if tip != "" else "sneak (Ctrl) near the cat and hide under furniture when it comes close.") + ("" if Settings.calm else " You can also turn on Calm mode in Settings."), 15, UI.ACCENT, true))
+	if won and not last:
+		box.add_child(UI.button("Next night", func(): Main.I.start_number(int(night.number) + 1)))
+	box.add_child(UI.button("Replay night" if won else "Try again", _restart))
+	box.add_child(UI.button("Main menu", func(): Main.I.show_menu()))
+	UI.focus_first(box)
+
+
+func _restart() -> void:
+	Main.I.start_night(night_id)
 
 
 func _exit_tree() -> void:
 	if is_instance_valid(_rain):
 		_rain.queue_free()
-
-
-func _restart() -> void:
-	Main.I.start_night(night_id)
 
 
 func _notification(what: int) -> void:

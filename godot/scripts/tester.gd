@@ -34,6 +34,13 @@ func _run(host: Node) -> void:
 	if name == "hides":
 		await _hides(host)
 		return
+	if name == "watchvac":
+		for i in 10:
+			await _wait(host, 2.0)
+			var v := g.vacuum
+			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
+		host.get_tree().quit()
+		return
 	if name == "probe":
 		await _wait(host, 0.3)
 		for zi in range(0, 14):

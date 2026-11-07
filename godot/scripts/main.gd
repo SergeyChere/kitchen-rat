@@ -18,6 +18,8 @@ func _init() -> void:
 
 func _ready() -> void:
 	Sfx.setup(self)
+	Settings.load_all()
+	Progress.load_all()
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
@@ -25,12 +27,21 @@ func _ready() -> void:
 		start_night(_args.night)
 	else:
 		show_menu()
+		if _args.get("screen", "") == "nights": show_nights()
+		elif _args.get("screen", "") == "settings": UI.settings_panel(self, show_menu)
 
 
 func _process(_dt: float) -> void:
 	_frames += 1
 	if _args.has("auto") and game and game.state == "intro" and game.grid != null:
 		game.begin()
+		if _args.has("at"):
+			var p := str(_args.at).split(",")
+			game.rat.teleport(Nights.world(float(p[0]), float(p[1]), 1), deg_to_rad(float(p[2])) if p.size() > 2 else PI)
+			game.cam.snap(game.rat.rotation.y)
+		if _args.get("screen", "") == "pause": game._set_paused(true)
+		elif _args.get("screen", "") == "won": game.state = "play"; game._end(true, "", "")
+		elif _args.get("screen", "") == "lost": game._end(false, "You got caught", "The pups got 3 of 12 and are waiting for Mom.")
 		if _args.has("test"):
 			_tester = Tester.new(game, _args.test)
 			_tester.start(self)
@@ -53,6 +64,8 @@ func _process(_dt: float) -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("menu") and game and game.state in ["pause", "won", "lost"]:
 		show_menu()
+	elif e.is_action_pressed("pause") and menu and game == null and not menu.has_meta("main"):
+		show_menu()
 
 
 func start_night(id: String) -> void:
@@ -63,80 +76,113 @@ func start_night(id: String) -> void:
 	add_child(game)
 
 
+const ACTS := ["Act 1 · Silence", "Act 2 · The Owner", "Act 3 · Traps", "Act 4 · Siege"]
+
+
 func show_menu() -> void:
 	_clear()
 	Sfx.music_menu()
 	Sfx.music_duck(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	menu = Control.new()
-	menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(menu)
-	var bg := ColorRect.new()
-	bg.color = Color(0.055, 0.07, 0.125)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	menu.add_child(bg)
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.custom_minimum_size = Vector2(760, 0)
-	box.position = Vector2(-380, -300)
-	box.add_theme_constant_override("separation", 14)
-	menu.add_child(box)
+	var s := UI.screen(self, 0.0, true, 520.0)
+	menu = s[0]
+	menu.set_meta("main", true)
+	var box: VBoxContainer = s[1]
 	var logo := TextureRect.new()
 	logo.texture = load("res://icon.png")
-	logo.custom_minimum_size = Vector2(120, 120)
+	logo.custom_minimum_size = Vector2(140, 140)
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(logo)
-	var title := Label.new()
-	title.text = "Kitchen Rat"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
-	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Twenty nights. One hungry family. Choose a night:"
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	box.add_child(grid)
-	for f in Nights.files():
-		var num := int(f.get_slice("_", 0))
-		var id := f.substr(f.find("_") + 1)
+	box.add_child(UI.label("Kitchen Rat", 48, UI.ACCENT, true))
+	box.add_child(UI.label("A mother rat. Twenty nights. One hungry family.", 17, UI.DIM, true))
+	var files := Nights.files()
+	var next := clampi(Progress.unlocked, 1, files.size())
+	var play_text := "Play"
+	if Progress.unlocked > files.size():
+		play_text = "Play again · Night 1"
+		next = 1
+	elif Progress.unlocked > 1:
+		play_text = "Continue · Night %d" % next
+	box.add_child(UI.button(play_text, start_number.bind(next)))
+	box.add_child(UI.button("Nights", show_nights))
+	box.add_child(UI.button("Settings", func(): menu.hide(); UI.settings_panel(self, func(): if is_instance_valid(menu): menu.show())))
+	box.add_child(UI.button("Quit", get_tree().quit))
+	UI.focus_first(box)
+
+
+## Night number (1…20) → start it.
+func start_number(n: int) -> void:
+	var files := Nights.files()
+	if n < 1 or n > files.size():
+		show_menu()
+		return
+	var f: String = files[n - 1]
+	start_night(f.substr(f.find("_") + 1))
+
+
+func show_nights() -> void:
+	_clear()
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = UI.theme()
+	add_child(root)
+	menu = root
+	var bg := ColorRect.new()
+	bg.color = UI.BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(bg)
+	var outer := VBoxContainer.new()
+	outer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	outer.offset_left = 40
+	outer.offset_right = -40
+	outer.offset_top = 24
+	outer.offset_bottom = -24
+	outer.add_theme_constant_override("separation", 10)
+	root.add_child(outer)
+	outer.add_child(UI.label("Choose a night", 34, UI.ACCENT, true))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	scroll.add_child(list)
+	var grid: GridContainer
+	var files := Nights.files()
+	for i in files.size():
+		if i % 5 == 0:
+			list.add_child(UI.label(ACTS[i / 5], 22, UI.ACCENT))
+			grid = GridContainer.new()
+			grid.columns = 5
+			grid.add_theme_constant_override("h_separation", 8)
+			grid.add_theme_constant_override("v_separation", 8)
+			list.add_child(grid)
+		var id: String = files[i].substr(files[i].find("_") + 1)
 		var d := Nights.load_night(id)
+		var open := Progress.is_open(i + 1)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(184, 44)
-		b.text = "%d · %s" % [num, str(d.get("name", id))]
-		b.clip_text = true
-		if Nights.BUILT.has(id):
-			b.pressed.connect(start_night.bind(id))
+		b.custom_minimum_size = Vector2(228, 118)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		var best: Dictionary = Progress.best.get(id, {})
+		var txt := "Night %d\n%s\n" % [i + 1, str(d.get("name", id))]
+		if not open:
+			txt += "🔒 Finish night %d to unlock" % i
+		elif not best.is_empty():
+			txt += "✓ Tasks %d / %d · %s" % [int(best.get("goals", 0)), int(best.get("of", 0)), str(best.get("clock", ""))]
 		else:
-			b.disabled = true
-			b.tooltip_text = "This room is not built in Godot yet"
+			txt += "Bring %d food" % int(d.get("goal", 10))
+		b.text = txt
+		b.disabled = not open
+		b.tooltip_text = str(d.get("blurb", ""))
+		b.add_theme_font_size_override("font_size", 15)
+		b.pressed.connect(func(): Sfx.play("click"); start_night(id))
 		grid.add_child(b)
-	var vol := HBoxContainer.new()
-	vol.alignment = BoxContainer.ALIGNMENT_CENTER
-	vol.add_theme_constant_override("separation", 12)
-	box.add_child(vol)
-	for which in ["Music", "Sound"]:
-		var l := Label.new()
-		l.text = which
-		vol.add_child(l)
-		var sl := HSlider.new()
-		sl.min_value = 0.0
-		sl.max_value = 1.0
-		sl.step = 0.05
-		sl.custom_minimum_size = Vector2(200, 24)
-		sl.value = Sfx.music_volume if which == "Music" else Sfx.sfx_volume
-		sl.value_changed.connect(_on_volume.bind(which))
-		vol.add_child(sl)
-	var quit := Button.new()
-	quit.text = "Quit"
-	quit.custom_minimum_size = Vector2(160, 40)
-	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	quit.pressed.connect(get_tree().quit)
-	box.add_child(quit)
+	outer.add_child(UI.button("Back", show_menu, 220))
+	UI.focus_first(list)
 
 
 func _on_volume(v: float, which: String) -> void:

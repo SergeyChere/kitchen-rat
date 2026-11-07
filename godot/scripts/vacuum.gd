@@ -13,6 +13,7 @@ var grid: NavGrid
 var _stun := 0.0
 var _bump := 0.0
 var _ride := 0.0
+var _led: OmniLight3D
 
 
 func start() -> void:
@@ -24,6 +25,12 @@ func start() -> void:
 	path.clear()
 	Sfx.play("beep", global_position)
 	Sfx.loop("hum_loop", self)
+	_led = OmniLight3D.new()
+	_led.light_color = Color(0.4, 1.0, 0.5)
+	_led.light_energy = 0.8
+	_led.omni_range = 0.6
+	add_child(_led)
+	_led.position = Vector3(0, 0.16, 0)
 	G.bubble_on("Beep boop!", self, 0.3, 1.6)
 
 
@@ -42,6 +49,9 @@ func _process(dt: float) -> void:
 		return
 	speed = 0.0
 	_bump = maxf(0.0, _bump - dt)
+	if _led:
+		_led.light_color = Color(1.0, 0.4, 0.3) if _stun > 0.0 else Color(0.4, 1.0, 0.5)
+		_led.visible = fmod(Time.get_ticks_msec() / 1000.0, 1.0) < 0.6
 	if _stun > 0.0:
 		_stun -= dt
 		_carry_rat()

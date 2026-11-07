@@ -408,7 +408,7 @@ func _decor() -> void:
 	spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # no collision: the cat lies in it
 	if (night.get("bowl", []) as Array).size() >= 2:
 		collide(spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor))
-	if (night.get("dock", []) as Array).size() >= 2:
+	if (night.get("dock", []) as Array).size() >= 2 and (bool(night.get("vacuumStart", false)) or (night.get("threats", []) as Array).has("vacuum")):
 		collide(spawn("props/vacuum_dock", Nights.pos(night.dock), -90.0, decor))
 
 
@@ -550,6 +550,7 @@ func _knockables() -> void:
 		body.kind = str(k.kind)
 		body.trap = bool(k.get("trap", false))
 		body.spawn = str(k.get("spawn", ""))
+		body.group = str(k.get("group", ""))
 		body.push_dir = (W(float(k.toX), float(k.toY)) - W(float(k.x), float(k.y))).normalized()
 		body.mass = 0.25
 		body.collision_layer = 1
@@ -626,5 +627,6 @@ func _nest() -> void:
 		if pup:
 			var cp := ClipPlayer.new(pup)
 			cp.play(p[3], 0.0)
+			g.nest_pups.append(pup)
 	add_zone(NestZone, "Nest", W(130, 692), Vector3(2.4, 0.9, 1.75))
 	g.hole = W(180, 585)

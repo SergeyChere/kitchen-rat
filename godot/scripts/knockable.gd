@@ -7,6 +7,7 @@ var kind := "cup"
 var trap := false
 var push_dir := Vector3.FORWARD
 var spawn := ""
+var group := ""
 var knocked := false
 var _landed := false
 var _speed := 0.0
@@ -40,6 +41,8 @@ func knock(d: Vector3) -> void:
 	apply_central_impulse((d.normalized() * 0.9 + Vector3.UP * 0.5) * mass)
 	apply_torque_impulse(Vector3(randf() - 0.5, randf() - 0.5, randf() - 0.5) * 0.01)
 	Game.I.tasks.knocked[kind] = true
+	if group != "":
+		Game.I.knock_group(self)
 
 
 func _physics_process(_dt: float) -> void:

@@ -5,7 +5,7 @@ extends Node
 ##   Sfx.loop("hum_loop", node)       a looping sound that follows a node (the robot vacuum); returns the player
 ##   Sfx.music_night(def) / music_menu() and Sfx.music_layers(tension, chase): three synced layers per night —
 ##   base, the "wanted" layer (ticking hats, pulsing bass) and the chase drums — blended like Music.set().
-## Volumes (0…1) are saved in user://settings.cfg.
+## Volumes (0…1) live in Settings (user://settings.cfg).
 
 const SND := "res://assets/sounds/"
 const MUS := "res://assets/music/"
@@ -99,22 +99,14 @@ func _exit_tree() -> void:
 # ---------- settings ----------
 
 func _load_settings() -> void:
-	var c := ConfigFile.new()
-	if c.load(SETTINGS) == OK:
-		music_volume = float(c.get_value("audio", "music", music_volume))
-		sfx_volume = float(c.get_value("audio", "sfx", sfx_volume))
+	Settings.load_all()
 	apply_volumes()
 
 
 static func set_volumes(music: float, sfx: float) -> void:
-	music_volume = clampf(music, 0.0, 1.0)
-	sfx_volume = clampf(sfx, 0.0, 1.0)
-	apply_volumes()
-	var c := ConfigFile.new()
-	c.load(SETTINGS)
-	c.set_value("audio", "music", music_volume)
-	c.set_value("audio", "sfx", sfx_volume)
-	c.save(SETTINGS)
+	Settings.music = clampf(music, 0.0, 1.0)
+	Settings.sfx = clampf(sfx, 0.0, 1.0)
+	Settings.save()
 
 
 static func apply_volumes() -> void:
