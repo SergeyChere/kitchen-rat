@@ -55,8 +55,7 @@ Open `game/index.html` directly. Everything it needs is in `game/vendor/`, so it
 
 ## The nights
 
-The full game will have 20 nights in four acts. Nights 1–3 are playable now; the rest show up in the
-Nights menu as "in development". The plan is in the design doc.
+All 20 nights in four acts are playable. Graphics are still placeholders; real models come with the Unity version.
 
 | Night | Room | Food | What's new |
 |---|---|---|---|
@@ -76,6 +75,11 @@ Nights menu as "in development". The plan is in the design doc.
 | 13 | The Kids’ Room | 18 | Don’t wake the kid. Squeaky toys, Lego, a music box, a night light. Shy freezes at loud noises but warns you of danger |
 | 14 | The Party | 18 | Guests sleep over (snoring stops = waking up). Greedy runs for food. Steal the cake |
 | 15 | Poison | 20 | Green scent means poison. Curious and Greedy both come along |
+| 16 | The Robot Vacuum | 20 | It eats the crumbs and bumps into you. Drop things in its way, or sneak onto it and ride it. Brave and Shy come along |
+| 17 | The Dog | 20 | It follows your scent for 30 seconds. Puddles and the litter box wash your trail away. A ball distracts it |
+| 18 | The Basement | 22 | The cracks are sealed: find a way through the pipes. Cage traps guard the food |
+| 19 | The Whole Floor | 24 | Dining room, living room and kitchen in one night. All four pups, every danger |
+| 20 | Moving Out | | The finale: scout the way, spring the traps, lead all four pups out under the front door |
 
 Tasks for the night show up one at a time in the bottom-left corner. Each night has three goals (for example "Don't wake the cat" or "Never get caught"). Finishing a
 night unlocks the next one; progress and settings are saved automatically.
