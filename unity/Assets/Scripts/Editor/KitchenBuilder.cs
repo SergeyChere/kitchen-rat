@@ -41,9 +41,19 @@ namespace KitchenRat.EditorTools
 
         static Vector3 W(float x, float y, float h = 0f) => Nights.World(x, y, h);
 
+        /// <summary>The game icon (art/reference/logo_icon.png, made square with transparent corners).</summary>
+        public static void SetIcon()
+        {
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Icons/icon.png");
+            if (!icon) return;
+            PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            PlayerSettings.productName = "Kitchen Rat";
+        }
+
         public static void BuildAll()
         {
             if (!ArtUsesToon()) ReimportArt();
+            SetIcon();
             var scenes = new List<EditorBuildSettingsScene>();
             foreach (var id in KitchenNights)
             {
@@ -329,7 +339,7 @@ namespace KitchenRat.EditorTools
             {
                 var mats = r.sharedMaterials;
                 for (int i = 0; i < mats.Length; i++)
-                    if (mats[i] && mats[i].name.StartsWith("c8a96b0")) mats[i] = wallMat;
+                    if (mats[i] && mats[i].name.StartsWith("ce8dcc6")) mats[i] = wallMat;
                 r.sharedMaterials = mats;
             }
         }

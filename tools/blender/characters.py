@@ -28,7 +28,7 @@ def eye(x, y, z, r, iris=BLACK, white=False, k=1.0):
 
 
 # ======================= RODENTS (mother and pup) =======================
-def rodent(name, k, fur, belly, dark, head_k=1.0, pup=False):
+def rodent(name, k, fur, belly, dark, head_k=1.0, pup=False, gear=False):
     """k: overall scale (1 = the 25 cm mother). head_k: pups have bigger heads."""
     q = lambda *v: tuple(a * k for a in v)
     pink, nose = mat(0xe89aa4, 0.6), mat(0xd85a6a, 0.35)
@@ -77,6 +77,24 @@ def rodent(name, k, fur, belly, dark, head_k=1.0, pup=False):
     for lb, x, y in [('leg_fl', -3, -6), ('leg_fr', 3, -6), ('leg_bl', -3.5, 5), ('leg_br', 3.5, 5)]:
         parts[lb] = [box(2.6 * k, 2.8 * k, 4.4 * k, x * k, y * k, 0.8 * k, F, bevel=0.7 * k),
                      box(2.2 * k, 3 * k, 0.9 * k, x * k, (y - 0.6) * k, 0, pink, bevel=0.3 * k)]
+    if gear:  # the mother's outfit from art/reference/key_art.png: goggles, red scarf, leather backpack
+        leather, brass, lens = mat(0x5a3420, 0.75), mat(0xc8903a, 0.3, 0.8), mat(0x6a8ab0, 0.1, 0.2)
+        scarf, buckle = mat(0xc8302e, 0.9), mat(0xd8b050, 0.3, 0.8)
+        parts['head'] += [box(hw + 0.8 * k, hd * 0.5, 1.2 * k, 0, hy + 0.4 * k, hz + hh / 2 - 0.6 * k, leather, bevel=0.3 * k)]          # strap over the head
+        for sx in (-1, 1):
+            gx = sx * 1.9 * k
+            parts['head'] += [cyl(1.7 * k, 1.6 * k, gx, front + 0.9 * k, hz + hh / 2 + 0.9 * k, brass, verts=12, rot=(70, 0, 0)),
+                              cyl(1.25 * k, 1.8 * k, gx, front + 0.8 * k, hz + hh / 2 + 0.95 * k, lens, verts=12, rot=(70, 0, 0)),
+                              box(1 * k, hd * 0.9, 1 * k, sx * (hw / 2 + 0.2 * k), hy, hz + hh * 0.2, leather)]                              # side straps
+        parts['chest'] += [torus(4.4 * k, 1.3 * k, 0, -7.2 * k, 7.6 * k, scarf, seg=12, rseg=5, rot=(65, 0, 0)),                        # scarf round the neck
+                           box(4 * k, 1.2 * k, 3.6 * k, 0.8 * k, -9.4 * k, 4.2 * k, scarf, bevel=0.5 * k, rot=(10, 0, 20)),               # knot and tail
+                           box(2.6 * k, 1 * k, 3 * k, 2.6 * k, -9 * k, 2.4 * k, scarf, bevel=0.4 * k, rot=(15, 0, 35))]
+        parts['hips'] += [box(7.6 * k, 7 * k, 5.4 * k, 0, 1.6 * k, 10 * k, leather, bevel=1 * k),                                      # backpack
+                          box(6 * k, 2 * k, 3.6 * k, 0, -2.2 * k, 10.6 * k, mat(0x4a2a18, 0.8), bevel=0.6 * k),                        # front pocket
+                          box(1.4 * k, 1 * k, 1.2 * k, 0, -3.3 * k, 13 * k, buckle),
+                          box(8 * k, 2.4 * k, 1 * k, 0, 1.6 * k, 15.2 * k, mat(0x4a2a18, 0.8), bevel=0.3 * k),                          # flap
+                          cyl(0.8 * k, 7 * k, -4.6 * k, 4 * k, 12 * k, mat(0x2a2a2a, 0.4, 0.4), verts=8, rot=(90, 0, 0))]              # little flashlight
+        parts['chest'] += [box(1 * k, 8 * k, 1 * k, x * k, -3 * k, 10.4 * k, leather) for x in (-3.2, 3.2)]                               # shoulder straps
     mesh = bind(arm, parts, name)
     rodent_clips(arm, k, pup)
     return finish(arm, mesh, C, name)
@@ -125,7 +143,7 @@ def rodent_clips(a, k, pup=False):
 
 
 def rat_mother():
-    return rodent('rat_mother', 1.0, 0x7e7a82, 0xbcb6ba, 0x6a666e)
+    return rodent('rat_mother', 1.0, 0x8a868e, 0xc4bec2, 0x74707a, gear=True)
 
 
 def rat_pup():

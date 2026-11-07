@@ -8,7 +8,7 @@ from lib import box, cyl, sphere, ico, torus, seg, plane, mat, model, ROOT
 
 random.seed(5)
 C = 'rooms'
-WALL, TRIM = 0x8a96b0, 0x3a2e30
+WALL, TRIM = 0xe8dcc6, 0x7a4a2a
 
 
 def wall(name, extra=None, cut=None):
@@ -23,44 +23,52 @@ def wall(name, extra=None, cut=None):
         parts.append(box(x1 - x0, 10, 250 - z1, (x0 + x1) / 2, 0, z1, W))
     else:
         parts.append(box(120, 10, 250, 0, 0, 0, W))
-    parts += [box(120, 2, 12, 0, -6, 0, T), box(120, 2, 3, 0, -6, 247, T)]
+    parts += [box(120, 3, 14, 0, -6.5, 0, T, bevel=0.4), box(120, 4, 6, 0, -7, 244, T, bevel=0.6)]
     if extra:
         extra(parts, mov)
     return model(C, name, parts, mov or None)
 
 
 def wall_mousehole():
-    """A real 22 × 22 cm opening at the bottom, with an arched trim: the rat walks through it to the nest."""
+    """A real 22 × 22 cm opening at the bottom, with an arched wooden trim: the rat walks through it to the nest."""
     def ex(parts, mov):
-        T = mat(TRIM)
-        parts += [torus(11.5, 1.4, 0, -6, 11, T, seg=16, rseg=4, rot=(90, 0, 0)), box(3, 2.4, 11, -12.5, -6, 0, T), box(3, 2.4, 11, 12.5, -6, 0, T)]
+        T = mat(TRIM, 0.6)
+        parts += [torus(12, 1.8, 0, -6, 11, T, seg=16, rseg=4, rot=(90, 0, 0)), box(3.6, 3, 11, -13, -6.2, 0, T), box(3.6, 3, 11, 13, -6.2, 0, T)]
     return wall('wall_mousehole', ex, cut=(-11, 11, 0, 22))
 
 
 def wall_crack():
     def ex(parts, mov):
-        parts += [box(40, 12, 15, 0, -5, 0, mat(0x0a0806)), box(42, 2.5, 2, 0, -7, 15, mat(0x2a2020))] + [box(4, 2.2, 1, x, -6.5, 15.5 + abs(x) * 0.1, mat(0x5a4a4a)) for x in (-14, 6)]
+        dark = mat(0x4a3a30, 0.9)
+        parts += [box(40, 12, 15, 0, -5, 0, mat(0x0a0806)), box(42, 2.5, 2, 0, -7, 15, mat(0x5a4a3a))]
+        pts = [(0, 17), (3, 40), (-4, 62), (2, 85), (-6, 108), (-2, 130), (5, 150)]
+        for (x0, z0), (x1, z1) in zip(pts, pts[1:]):  # a crack running up the wall
+            parts.append(seg((x0, -5.2, z0), (x1, -5.2, z1), 0.6, 0.4, dark, verts=4))
+        parts += [seg((-4, -5.2, 62), (-14, -5.2, 74), 0.5, 0.2, dark, verts=4), seg((2, -5.2, 85), (12, -5.2, 96), 0.5, 0.2, dark, verts=4)]
     return wall('wall_crack', ex)
 
 
 def wall_window():
     def ex(parts, mov):
-        F = mat(0xe8e4dc, 0.6)
+        F = mat(0xf0e8da, 0.6)
         parts += [box(104, 14, 6, 0, -2, 94, F), box(104, 14, 6, 0, -2, 214, F), box(6, 14, 126, -50, -2, 94, F), box(6, 14, 126, 50, -2, 94, F), box(4, 8, 120, 0, -1, 97, F),
-                  box(110, 20, 4, 0, -10, 90, F)]
-        parts += [box(92, 1, 112, 0, 0, 100, mat(0x8ab4e0, 0.05, 0, 0.35))]
-        mov['curtain_l'] = [box(24, 4, 150, -66, -14, 75, mat(0xa84a5a, 0.95), bevel=1)]
-        mov['curtain_r'] = [box(24, 4, 150, 66, -14, 75, mat(0xa84a5a, 0.95), bevel=1)]
-        parts.append(cyl(1.2, 170, 0, -14, 228, mat(0x5a4436), verts=8, rot=(0, 90, 0)))
+                  box(92, 4, 4, 0, -1, 156, F), box(112, 22, 4, 0, -10, 90, mat(TRIM, 0.6))]
+        parts += [box(92, 1, 112, 0, 0, 100, mat(0x9ac4e8, 0.05, 0, 0.35))]
+        mov['curtain_l'] = [box(24, 4, 150, -66, -14, 75, mat(0xc0302e, 0.95), bevel=1)] + [box(3, 4.4, 150, -66 + x, -14.2, 75, mat(0xa02626, 0.95)) for x in (-6, 4)]
+        mov['curtain_r'] = [box(24, 4, 150, 66, -14, 75, mat(0xc0302e, 0.95), bevel=1)] + [box(3, 4.4, 150, 66 + x, -14.2, 75, mat(0xa02626, 0.95)) for x in (-4, 6)]
+        gold = mat(0xd8a840, 0.3, 0.5)
+        parts += [cyl(1.4, 170, 0, -14, 228, gold, verts=8, rot=(0, 90, 0))] + [sphere(2.6, x, -14, 228, gold, seg=8, rings=6) for x in (-86, 86)]
+        parts += [cyl(6, 8, 18, -12, 94, mat(0xc8683a, 0.8), verts=10, r2=7)] + [sphere(4, 18 + dx, -14 + dy, 104 + dz, mat(0x4a9a3a, 0.7), seg=8, rings=4, scale=(1.3, 0.7, 0.6))
+                                                                                 for dx, dy, dz in [(-4, 0, 0), (4, 1, 2), (0, -2, 4), (-6, -3, -6), (6, -2, -8)]]
     return wall('wall_window', ex, cut=(-50, 50, 94, 220))
 
 
 def wall_door():
     def ex(parts, mov):
-        T = mat(0x5a4436, 0.7)
+        T = mat(0x6a4024, 0.7)
         parts += [box(6, 14, 214, -48, -2, 0, T), box(6, 14, 214, 48, -2, 0, T), box(102, 14, 6, 0, -2, 211, T), box(8, 2, 12, 56, -6, 110, mat(0xf0ece2)), box(3, 2.4, 5, 56, -7, 113, mat(0xd8d0c0))]
-        door = [box(90, 4, 208, 0, 0, 2, mat(0x7a5a3a, 0.7), bevel=0.8)] + [box(30, 1, 70, x, -2.4, z, mat(0x6a4a2e, 0.7)) for x in (-20, 20) for z in (20, 115)]
-        door.append(sphere(2.5, 36, -5, 100, mat(0xd8b040, 0.3, 0.8), seg=8, rings=6))
+        door = [box(90, 4, 208, 0, 0, 2, mat(0x8a5430, 0.7), bevel=0.8)] + [box(30, 1, 70, x, -2.4, z, mat(0x7a4626, 0.7), bevel=0.4) for x in (-20, 20) for z in (20, 115)]
+        door.append(sphere(2.5, 36, -5, 100, mat(0xd8b040, 0.3, 0.6), seg=8, rings=6))
         mov['door'] = door
     return wall('wall_door', ex, cut=(-45, 45, 0, 210))
 
@@ -88,12 +96,19 @@ def chandelier():
 
 
 def nest():
-    parts = [cyl(60, 4, 0, 0, 0, mat(0xb08a5a, 0.95), verts=16)]
+    parts = [cyl(60, 4, 0, 0, 0, mat(0x8a6a44, 0.95), verts=16)]
     for i in range(26):  # shredded paper, cloth and cardboard
-        a, d = random.uniform(0, 6.28), random.uniform(10, 55)
+        a, d = random.uniform(0, 6.28), random.uniform(10, 46)
         parts.append(box(random.uniform(10, 26), random.uniform(3, 8), random.uniform(1, 3), math.cos(a) * d, math.sin(a) * d, random.uniform(2, 8),
                          mat(random.choice([0xf4f0e0, 0xd8c8a8, 0xc89a5a, 0xa8b8d8, 0xe8a0a0]), 0.95), rot=(random.uniform(-20, 20), random.uniform(-20, 20), random.uniform(0, 180))))
-    parts += [torus(48, 9, 0, 0, 6, mat(0xc8a878, 0.95), seg=18, rseg=6)]
+    twig = [0x7a4a24, 0x8a5a2e, 0x6a3e1e]
+    for i in range(40):  # woven twigs round the rim
+        a = i * 6.28 / 40
+        r = 50 + random.uniform(-4, 4)
+        x0, y0 = math.cos(a) * r, math.sin(a) * r
+        x1, y1 = math.cos(a + 0.5) * r, math.sin(a + 0.5) * r
+        parts.append(seg((x0, y0, 3 + (i % 3) * 3), (x1, y1, 5 + ((i + 1) % 3) * 3), 2, 1.6, mat(twig[i % 3], 0.95), verts=5))
+    parts += [sphere(5, math.cos(a) * 54, math.sin(a) * 54, 13, mat(0x5aaa44, 0.7), seg=8, rings=4, scale=(1.5, 0.6, 0.3)) for a in (0.6, 2.4, 4.1, 5.4)]
     return model(C, 'nest', parts)
 
 
@@ -105,49 +120,73 @@ def rug(name, w, d, base, border, pattern):
         parts += [box(40, 40, 1, x, 0, 0, mat(border, 0.95), rot=(0, 0, 45)) for x in (-w / 4, 0, w / 4)]
     else:
         parts += [cyl(r, 1 + r * 0.001, 0, 0, 0, mat(c, 0.95), verts=24) for r, c in [(min(w, d) / 2 - 20, border), (min(w, d) / 2 - 34, base)]]
+        parts += [sphere(14, x, y, 1, mat(0x5a8a3a, 0.9), seg=8, rings=4, scale=(0.5, 1.2, 0.08)) for x, y in [(-14, 0), (14, 0), (0, 16)]]
+    if pattern != 'round':  # fringe on the short ends
+        parts += [box(2, 6, 0.6, x, sy * (d / 2 + 3), 0, mat(0xe8d8b0, 0.95)) for sy in (-1, 1) for x in range(int(-w / 2) + 6, int(w / 2) - 4, 10)]
     return model(C, name, parts)
 
 
 def wall_art(name, kind):
-    F = mat(0x5a4436, 0.6)
+    F, G = mat(0x7a4626, 0.6), mat(0xd8a840, 0.3, 0.6)
     if kind == 'clock':
         parts = [cyl(16, 4, 0, 0, 0, F, verts=20, rot=(90, 0, 0)), cyl(14, 4.5, 0, -0.3, 0, mat(0xf4f0e8), verts=20, rot=(90, 0, 0)),
-                 box(1, 1, 10, 0, -2.6, 0, mat(0x1a1a1a)), box(7, 1, 1, 3.5, -2.6, 0, mat(0x1a1a1a))]
+                 box(1, 1, 10, 0, -2.6, 0, mat(0x1a1a1a)), box(7, 1, 1, 3.5, -2.6, 0, mat(0x1a1a1a))] + \
+                [box(0.8, 1, 2, math.sin(a) * 12, -2.5, math.cos(a) * 12 - 1, mat(0x3a3a3a)) for a in [i * math.pi / 6 for i in range(12)]]
         return model(C, name, parts)
-    cols = {'landscape': [0x8ab4e0, 0x6ac46a, 0x4a8a4a], 'flowers': [0xf4f0e0, 0xe84a5a, 0xf2c84a], 'portrait': [0x8a6a5a, 0xe8b896, 0x4a3020]}[kind]
-    parts = [box(60, 3, 45, 0, 0, 0, F, bevel=0.5), box(52, 3.4, 37, 0, -0.2, 4, mat(cols[0], 0.9))]
+    cols = {'landscape': [0x8ac4e8, 0x6ac46a, 0x4a8a4a], 'flowers': [0xf4f0e0, 0xe84a5a, 0xf2c84a], 'portrait': [0xd8a870, 0xc8302e, 0x6a4a2a]}[kind]
+    parts = [box(60, 3, 45, 0, 0, 0, F, bevel=0.5), box(52, 3.4, 37, 0, -0.2, 4, mat(cols[0], 0.9)), sphere(1.5, 0, 0, 58, G, seg=8, rings=6),
+             seg((0, 0, 58), (-24, 0, 44), 0.25, 0.25, mat(0x5a5a5a), verts=4), seg((0, 0, 58), (24, 0, 44), 0.25, 0.25, mat(0x5a5a5a), verts=4)]
     if kind == 'landscape':
-        parts += [box(52, 3.6, 12, 0, -0.4, 4, mat(cols[1])), ico(8, -10, -1.8, 20, mat(cols[2]), sub=1, scale=(1, 0.2, 1)), sphere(4, 14, -1.8, 32, mat(0xf2c84a), seg=8, rings=6, scale=(1, 0.2, 1))]
+        parts += [box(52, 3.6, 12, 0, -0.4, 4, mat(cols[1])), ico(8, -10, -1.8, 20, mat(cols[2]), sub=1, scale=(1, 0.2, 1)), ico(10, 8, -1.7, 18, mat(0x5a7a9a), sub=1, scale=(1.2, 0.2, 1)),
+                  sphere(4, 16, -1.8, 32, mat(0xf2c84a), seg=8, rings=6, scale=(1, 0.2, 1))]
     elif kind == 'flowers':
-        parts += [cyl(5, 12, 0, -2, 6, mat(0x4a7ab8), verts=8)] + [sphere(3.5, x, -2, z, mat(cols[1 + i % 2]), seg=8, rings=6, scale=(1, 0.3, 1)) for i, (x, z) in enumerate([(-6, 24), (0, 28), (6, 24), (-3, 32), (4, 33)])]
-    else:
-        parts += [sphere(8, 0, -2, 24, mat(cols[1]), seg=10, rings=8, scale=(0.85, 0.2, 1)), box(26, 3.8, 10, 0, -0.6, 4, mat(cols[0]))]
+        parts += [cyl(5, 12, 0, -2, 6, mat(0x3a5aa8), verts=8)] + [sphere(3.5, x, -2, z, mat(cols[1 + i % 2]), seg=8, rings=6, scale=(1, 0.3, 1)) for i, (x, z) in enumerate([(-6, 24), (0, 28), (6, 24), (-3, 32), (4, 33)])]
+    else:  # an apple still life
+        parts += [box(52, 3.6, 10, 0, -0.4, 4, mat(cols[2])), sphere(8, 0, -2, 22, mat(cols[1], 0.5), seg=12, rings=8, scale=(1, 0.3, 0.95)), box(1, 3.8, 4, 0, -2.2, 30, mat(0x4a2a14)),
+                  sphere(2.4, 3, -2.3, 31, mat(0x5ab04a), seg=6, rings=4, scale=(1.6, 0.3, 0.6))]
     return model(C, name, parts)
 
 
 def kettle():
-    M = mat(0xc8ccd4, 0.25, 0.8)
-    return model(C, 'kettle', [cyl(10, 18, 0, 0, 0, M, verts=16, r2=7), cyl(4, 2, 0, 0, 18, mat(0x1a1a1a), verts=10), torus(6, 1.2, -9, 0, 15, mat(0x1a1a1a), seg=12, rseg=4, rot=(90, 0, 0)),
-                                seg((8, 0, 8), (15, 0, 16), 2, 1, M, verts=8)])
+    M, G = mat(0x2a3048, 0.35, 0.3), mat(0xd8a840, 0.3, 0.6)
+    return model(C, 'kettle', [cyl(10, 18, 0, 0, 0, M, verts=12, r2=7), cyl(4, 2, 0, 0, 18, M, verts=10), sphere(1.8, 0, 0, 21, G, seg=8, rings=6), torus(6, 1.4, -9, 0, 15, M, seg=8, rseg=4, rot=(90, 0, 0)),
+                               seg((8, 0, 8), (15, 0, 16), 2, 1, M, verts=8), torus(9.6, 0.5, 0, 0, 3, G, seg=12, rseg=4), cyl(2, 0.4, 0, -8.6, 9, G, verts=5, rot=(80, 0, 0))])
 
 
 def pot():
-    M = mat(0x3a3a40, 0.35, 0.7)
-    return model(C, 'pot', [cyl(13, 14, 0, 0, 0, M, verts=18), cyl(13.5, 1.5, 0, 0, 14, M, verts=18), sphere(2, 0, 0, 16.5, mat(0x1a1a1a), seg=8, rings=6)] + [box(6, 2, 2, x, 0, 10, mat(0x1a1a1a)) for x in (-16, 16)])
+    M, G = mat(0x2a2a30, 0.35, 0.3), mat(0xd8a840, 0.3, 0.6)
+    return model(C, 'pot', [cyl(13, 14, 0, 0, 0, M, verts=18), cyl(13.5, 1.5, 0, 0, 14, M, verts=18), cyl(2, 1.5, 0, 0, 15.5, G, verts=10), sphere(2.2, 0, 0, 18, G, seg=8, rings=6)] +
+                 [box(6, 3, 2.4, x, 0, 10, M, bevel=0.6) for x in (-16, 16)])
 
 
 def stove_top():
-    parts = [box(60, 60, 2, 0, 0, 0, mat(0x1a1a1e, 0.2))] + [torus(9 if i % 2 else 7, 0.8, x, y, 2, mat(0x6a6a74, 0.3, 0.6), seg=16, rseg=4) for i, (x, y) in enumerate([(-14, -14), (14, -14), (-14, 14), (14, 14)])]
+    parts = [box(60, 60, 2, 0, 0, 0, mat(0x1a1a1e, 0.2), bevel=0.6)] + [torus(9 if i % 2 else 7, 0.8, x, y, 2, mat(0x8a8a94, 0.3, 0.4), seg=16, rseg=4) for i, (x, y) in enumerate([(-14, -10), (14, -10), (-14, 14), (14, 14)])]
+    parts += [cyl(2.2, 2, x, -25, 2, mat(0xc8ccd4, 0.3, 0.5), verts=10) for x in (-12, 0, 12)]
     return model(C, 'stove_top', parts)
 
 
 def utensil_holder():
-    parts = [cyl(5, 14, 0, 0, 0, mat(0xd8d0c0, 0.5), verts=12)] + [cyl(0.6, 22, x, y, 4, mat(c), verts=5) for x, y, c in [(-2, 0, 0x5a3a20), (1, 1.5, 0xc8ccd4), (1.5, -1.5, 0x5a3a20)]]
+    cer, blue, wood = mat(0xeee6d4, 0.5), mat(0x3a5aa8, 0.5), mat(0xb07a44, 0.7)
+    parts = [cyl(6, 14, 0, 0, 0, cer, verts=12), torus(6, 0.6, 0, 0, 14, cer, seg=12, rseg=4)]
+    parts += [sphere(1.4, math.cos(a) * 6, math.sin(a) * 6, 7, blue, seg=6, rings=4, scale=(1, 1, 1.6)) for a in (-1.9, -1.2, -2.6)]
+    parts += [cyl(0.7, 22, -2, 1, 6, wood, verts=6), box(4, 1, 6, -2, 1, 27, wood, bevel=0.5), cyl(0.7, 22, 2, -1, 6, wood, verts=6), sphere(2.4, 2, -1, 29, wood, seg=8, rings=6, scale=(1, 0.5, 1.4)),
+              cyl(0.5, 20, 1, 2.5, 6, mat(0xc8ccd4, 0.3, 0.5), verts=6)] + [torus(2, 0.25, 1, 2.5, 28, mat(0xc8ccd4, 0.3, 0.5), seg=8, rseg=3, rot=(90, 0, a)) for a in (0, 60, 120)]
     return model(C, 'utensil_holder', parts)
 
 
 def floor_panel():
-    return model(C, 'floor_panel', [box(120, 120, 1, 0, 0, -1, mat(0x9a9aa8, 0.8))])
+    cols = [0x9a5a30, 0x8a4e28, 0xa8683a]
+    parts = []
+    for r in range(6):
+        off = 30 if r % 2 else 0
+        for c in range(-1, 3):
+            x0 = -60 + c * 60 + off
+            x1 = min(60, x0 + 60)
+            x0 = max(-60, x0)
+            if x1 - x0 < 2:
+                continue
+            parts.append(box(x1 - x0 - 0.8, 19.2, 1, (x0 + x1) / 2, -50 + r * 20, -1, mat(cols[(r + c) % 3], 0.7)))
+    return model(C, 'floor_panel', parts)
 
 
 def textures():
