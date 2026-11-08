@@ -31,3 +31,12 @@ SOFTWARE.
 ## Models and sounds
 
 CC0 (public domain): see `art/library/README.md` and `godot/assets/sounds/real/CREDITS.md`.
+
+## Kenney Starter Kit 3D Platformer (MIT)
+https://github.com/KenneyNL/Starter-Kit-3D-Platformer — squash & stretch on jump/landing and dust particles
+(rat.gd) follow its player script. Copyright (c) 2023 Kenney. MIT License. No art from the kit is used.
+
+## Godot TPS demo (MIT code)
+https://github.com/godotengine/tps-demo — turning on the spot, rate-limited turning and speed-matched walk/run
+for the cat, owner and dog (agent.gd) follow its player/robot scripts. Copyright (c) Godot Engine contributors.
+MIT License. None of its models, textures or sounds (CC-BY 3.0) are used.
