@@ -288,6 +288,10 @@ func _run(host: Node) -> void:
 			_check("side task: push the mug off the table", g.tasks.side_done.has(0))
 		host.get_tree().quit()
 		return
+	if name == "bugs":  # regressions checked on CI
+		await _bugs(host)
+		host.get_tree().quit()
+		return
 	if name == "mech":
 		await _mech(host)
 		print("DONE")
@@ -606,3 +610,42 @@ func _mech(host: Node) -> void:
 		await _wait(host, 0.3)
 		_check("Mom at the exit", g.tasks.flag_value("exitMom") > 0)
 		_check("the whole family is out", g.tasks.flag_value("allOut") > 0)
+
+
+## A mug pushed off the table breaks on the floor; picking the same food up twice counts as evidence once.
+func _bugs(host: Node) -> void:
+	await _wait(host, 0.5)
+	var cup: Knockable = null
+	for k in g.find_children("*", "Knockable", true, false):
+		if (k as Knockable).kind == "cup":
+			cup = k
+			break
+	_check("there is a mug to knock", cup != null)
+	if cup:
+		var to := Vector3(0.6, 0.0, 0.4)  # push it toward the nearest edge of whatever it stands on
+		var p := cup.global_position
+		for d in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK]:
+			if g.ray(p + Vector3.UP * 0.05 + d * 0.3, p + d * 0.3 + Vector3.DOWN * 0.2).is_empty():
+				to = d
+				break
+		cup.knock(to * 3.0)
+		await _wait(host, 3.0)
+		_check("the mug fell and broke", cup._landed and not cup.visible, "landed %s at %s" % [cup._landed, str(cup.global_position)])
+		_check("the broken mug no longer collides", cup.collision_layer == 0 and cup.freeze)
+	var r := g.rat
+	var cheese: Food = null
+	for f in g.find_children("*", "Food", true, false):
+		if (f as Food).is_cheese() and not (f as Food).poison:
+			cheese = f
+			break
+	if cheese:
+		r.teleport(cheese.global_position + Vector3(0.0, 0.02, -0.05), 0.0)
+		await _wait(host, 0.6)
+		var e1 := g._evidence
+		r.drop_one()
+		await _wait(host, 1.5)
+		cheese.remove_meta("dropped_at") if cheese.has_meta("dropped_at") else null
+		r.teleport(cheese.global_position + Vector3(0.0, 0.02, -0.05), 0.0)
+		await _wait(host, 0.6)
+		_check("picked the cheese up again", r.carried.has(cheese), "carrying %d" % r.carried.size())
+		_check("evidence counted once per piece", is_equal_approx(g._evidence, e1) and e1 >= 9.0, "%.0f then %.0f" % [e1, g._evidence])

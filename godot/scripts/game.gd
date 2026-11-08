@@ -547,9 +547,11 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 	if breaks:
 		var shards := _builder.spawn("props/mug_broken", Vector3(k.global_position.x, 0.0, k.global_position.z), randf() * 360.0, _builder.decor)
 		if shards:
+			# called from the mug's own collision signal: physics state may only change after the physics step
 			k.visible = false
-			k.collision_layer = 0
-			k.process_mode = Node.PROCESS_MODE_DISABLED
+			k.set_deferred("collision_layer", 0)
+			k.set_deferred("freeze", true)
+			k.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
 	if vacuum and vacuum.on and vacuum.global_position.distance_to(at) < 0.8:
 		vacuum.stun()
 	if dog:
@@ -747,7 +749,8 @@ func _pick_up(rp: Vector3) -> void:
 			tasks.picked[f.id] = true
 			if owner_ai.mode == OwnerAI.Mode.DRINK:
 				tasks.set_flag("underNose")
-		if not f.poison:
+		if not f.poison and not f.has_meta("evidence"):  # once per piece: dropping it (G) and picking it up again adds nothing
+			f.set_meta("evidence", true)
 			_evidence += 9.0 if f.is_cheese() else 3.0
 		if f.is_cheese():
 			bubble_at("Cheeese!", rp + Vector3.UP * 0.3, 1.2)

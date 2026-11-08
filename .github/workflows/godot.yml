@@ -48,6 +48,13 @@ jobs:
       - name: Import assets
         run: ~/godot/godot --headless --path godot --import || true
 
+      - name: Regression tests
+        run: |
+          out=$(timeout 180 ~/godot/godot --headless --path godot -- --night=1 --auto --test=bugs 2>&1 || true)
+          echo "$out"
+          if echo "$out" | grep -qE "^FAIL|SCRIPT ERROR|during a physics callback|while flushing queries"; then exit 1; fi
+          echo "$out" | grep -q "^PASS evidence counted once" || exit 1
+
       - name: Export Windows, Linux, Mac
         run: |
           mkdir -p build/godot/windows build/godot/linux build/godot/mac

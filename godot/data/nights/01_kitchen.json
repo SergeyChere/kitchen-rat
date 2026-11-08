@@ -131,7 +131,7 @@
    },
    {
     "text": "Jump onto a chair",
-    "hint": "Walk up to a chair and face it. When the yellow ring appears, press Space.",
+    "hint": "Walk up to a chair, face it and press Space.",
     "type": "surf",
     "arg": "chair",
     "n": 0,
@@ -139,7 +139,7 @@
    },
    {
     "text": "Climb from the chair onto the table",
-    "hint": "From the chair, face the table and press Space when the ring appears.",
+    "hint": "From the chair, face the table and press Space.",
     "type": "surf",
     "arg": "table",
     "n": 0,
