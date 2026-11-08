@@ -58,7 +58,17 @@ def counter_section(sink=False, corner=False):
     body, top, door, handle = mat(0xeee2c8, 0.7), mat(0x8a5a34, 0.5), mat(0xe6d8bc, 0.6), mat(0x3a2a20, 0.5)
     w = 72 if corner else 60
     # the body stops under the top slab (a shared top face flickered)
-    parts = [box(w, 72, 81, 0, 0, 6, body), box(w - 4, 66, 6, 0, 2, 0, mat(0x3a2a20)), box(w + 1, 74, 4, 0, -1, 88, top, bevel=0.6)]
+    if sink:
+        # a real basin: the top and the body leave a 42 × 38 cm hole, a steel bowl 18 cm deep sits in it
+        # (the game fills it with water; the rat can fall in)
+        parts = [box(w, 72, 66, 0, 0, 6, body), box(w - 4, 66, 6, 0, 2, 0, mat(0x3a2a20))]
+        # (the pieces keep 2 mm apart: touching corners would make the game treat them as one solid block)
+        for (sx, sy, x, y) in ((w, 17, 0, -27.5), (w, 16, 0, 28), ((w - 44) / 2, 37.6, -(w + 44) / 4, 0), ((w - 44) / 2, 37.6, (w + 44) / 4, 0)):
+            parts.append(box(sx, sy, 14.8, x, y, 72.2, body))
+        for (sx, sy, x, y) in ((w + 1, 19, 0, -28.5), (w + 1, 17, 0, 27.5), ((w + 1 - 42) / 2, 37.6, -(w + 1 + 42) / 4, 0), ((w + 1 - 42) / 2, 37.6, (w + 1 + 42) / 4, 0)):
+            parts.append(box(sx, sy, 4, x, y, 88, top))
+    else:
+        parts = [box(w, 72, 81, 0, 0, 6, body), box(w - 4, 66, 6, 0, 2, 0, mat(0x3a2a20)), box(w + 1, 74, 4, 0, -1, 88, top, bevel=0.6)]
     parts += [box(w / 2 - 3, 1, 70, x, -36.5, 12, door, bevel=0.4) for x in ((-w / 4, w / 4) if not corner else (0,))]
     parts += [box(1.5, 1.5, 12, x, -37.5, 66, handle) for x in ((-3, 3) if not corner else (8,))]
     name = 'counter_corner' if corner else 'counter_section'
@@ -66,7 +76,10 @@ def counter_section(sink=False, corner=False):
         parts += potted(-22, 22, 92, 0.9) + [box(18, 2, 26, 14, 34, 92, mat(0xc8904a, 0.6), bevel=1, rot=(-12, 0, 0))]
     if sink:
         steel = mat(STEEL, 0.25, 0.5)
-        parts += [box(44, 40, 0.5, 0, 0, 92, steel), cyl(1.5, 24, 0, 22, 92, steel, verts=8), cyl(1.3, 14, 0, 16, 115, steel, verts=8, rot=(80, 0, 0)),
+        bowl = [box(42, 1, 18, 0, -19, 74, steel), box(42, 1, 18, 0, 19, 74, steel), box(1, 38, 18, -21, 0, 74, steel), box(1, 38, 18, 21, 0, 74, steel),
+                box(42, 38, 1, 0, 0, 73, steel), cyl(2.2, 0.4, 0, 0, 74, mat(0x6a7078), verts=12)]  # the drain
+        rim = [box(46, 2, 0.6, 0, -20, 92, steel), box(46, 2, 0.6, 0, 20, 92, steel), box(2, 42, 0.6, -22, 0, 92, steel), box(2, 42, 0.6, 22, 0, 92, steel)]
+        parts += bowl + rim + [cyl(1.5, 24, 0, 25, 92, steel, verts=8), cyl(1.3, 14, 0, 19, 115, steel, verts=8, rot=(80, 0, 0)),
                   box(12, 1, 30, 10, -37.6, 52, mat(0x3a7ac8, 0.95), bevel=0.4), cyl(2.6, 9, -22, 26, 92, mat(0xf2d06a, 0.3, 0, 0.8), verts=10)]
         name = 'counter_sink'
     return model(C, name, parts)

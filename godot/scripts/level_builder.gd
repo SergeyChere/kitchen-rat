@@ -235,6 +235,15 @@ static func _soft(n: String) -> bool:
 	return l.contains("cloth") or l.contains("blanket") or l.contains("pillow") or l.contains("teddy") or l.contains("screen")
 
 
+## Water in the sink's basin (the model's bowl: 40 × 36 cm inside, bottom at 74 cm, water up to 84 cm).
+func _sink_water(n: Node3D) -> void:
+	var bottom := n.to_global(Vector3(0, 0.74, 0))
+	var surface := n.to_global(Vector3(0, 0.84, 0))
+	var sz := Vector3(0.40 * n.scale.x, 0.14, 0.36 * n.scale.z)
+	var z := add_zone(SinkWater, "Sink water", bottom, sz, rad_to_deg(n.rotation.y)) as SinkWater
+	z.setup(surface.y)
+
+
 func furn_piece(path: String, x: float, y: float, rot: float, surface: String, w := 0.0, d := 0.0, h := 0.0) -> Node3D:
 	var n := spawn(path, W(x, y), rot, furn)
 	if n == null:
@@ -500,7 +509,9 @@ func _furniture() -> void:
 	var n := 12
 	var w := (830.0 - 72.0) / n
 	for i in n:
-		furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
+		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
+		if i == 6 and piece:
+			_sink_water(piece)
 	for j in 4:
 		furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72)
 	furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)

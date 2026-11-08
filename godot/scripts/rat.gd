@@ -52,6 +52,7 @@ var brake := 24.0         # and a short stop
 const COYOTE := 0.12      # s after leaving an edge that Space still hops
 const JUMP_BUFFER := 0.15 # s before landing that Space is remembered
 var _coyote := 0.0
+var _low_roof := false  # hopping under something: no higher hop for holding Space
 var _jump_buf := 0.0
 var air_acceleration := 2.0
 var rotation_speed := 12.0
@@ -169,6 +170,156 @@ var tail: TailSway
 
 
 func stunned() -> bool: return _stun > 0.0
+
+
+# ---------- swimming (the kitchen sink) ----------
+
+const BREATH := 8.0      # s she can paddle before it counts as caught
+var water: SinkWater
+var _air := 0.0
+var _air_shown := -1
+var _paddle := 0.0
+
+
+func start_swim(w: SinkWater) -> void:
+	water = w
+	_air = BREATH
+	_air_shown = -1
+	velocity = Vector3.ZERO
+	_hopping = false
+	_set_crouch(false)
+	global_position.y = w.level - 0.045
+	Sfx.play("splash", global_position)
+	add_noise(0.4)
+	if Game.I:
+		Game.I.noise(global_position, 1.4, "Splash!", false, 0.3)
+		Game.I.toast("In the sink! Face the edge and press %s to climb out" % Keys.label("jump"))
+
+
+func stop_swim() -> void:
+	water = null
+	if model:
+		model.position.y = 0.018
+		model.rotation.x = 0.0
+
+
+func _tick_swim(dt: float) -> void:
+	_air -= dt
+	var mv := Input.get_vector("left", "right", "back", "forward")
+	var fwd := Vector3(sin(cam_yaw), 0, cos(cam_yaw))
+	var right := Vector3(-fwd.z, 0, fwd.x)
+	var d := fwd * mv.y + right * mv.x
+	if d.length() > 0.2:
+		_last_strong_dir = d.normalized()
+		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(_last_strong_dir), clampf(dt * 8.0, 0.0, 1.0))
+	var want := d * 0.3  # paddling: slow
+	var h := Vector3(velocity.x, 0.0, velocity.z).lerp(want, clampf(dt * 4.0, 0.0, 1.0))
+	velocity = Vector3(h.x, 0.0, h.z)
+	var before := global_position
+	move_and_slide()
+	global_position.y = water.level - 0.045
+	move_speed = Vector2(global_position.x - before.x, global_position.z - before.z).length() / maxf(dt, 0.0001)
+	_paddle += dt * (6.0 + move_speed * 20.0)
+	if model:
+		model.position.y = 0.018 + sin(_paddle) * 0.006  # bobbing, head just above the water
+		model.rotation.x = lerp_angle(model.rotation.x, deg_to_rad(-12.0), clampf(dt * 8.0, 0.0, 1.0))
+	if anim:
+		anim.play("run", 0.2)
+		anim.set_speed(0.6 + move_speed * 2.0)
+	noise_level = maxf(noise_level, 0.2)
+	if Input.is_action_just_pressed("jump") and _climb_out():
+		return
+	var left := ceili(_air)
+	if left != _air_shown and left <= 5 and left > 0 and Game.I:
+		_air_shown = left
+		Game.I.bubble_at("Glub… %d" % left, global_position + Vector3.UP * 0.18, 0.9, Color(0.6, 0.85, 1.0))
+		Sfx.play("splash", global_position, -14.0, 1.4)
+	if _air <= 0.0:
+		stop_swim()
+		if Game.I:
+			Game.I.caught("Glub! Too long in the water", global_position)
+			if global_position.distance_to(Game.I.hole_point()) > 0.6:
+				teleport(Game.I.hole_point() + Vector3(0.22, 0.02, -0.22), PI * 0.75)  # (caught right after being caught)
+
+
+## Space while swimming: grab the edge she faces (or the nearest one) and climb out onto it.
+func _climb_out() -> bool:
+	var face := global_transform.basis.z
+	face.y = 0.0
+	var dirs: Array[Vector3] = [face.normalized()]
+	for k in 8:
+		dirs.append(Vector3(cos(k * TAU / 8.0), 0.0, sin(k * TAU / 8.0)))
+	for i in dirs.size():
+		var dir: Vector3 = dirs[i]
+		for reach in ([0.1, 0.16, 0.22] if i == 0 else [0.1, 0.14]):
+			var o: Vector3 = global_position + dir * float(reach) + Vector3.UP * 0.3
+			var hit := _ray(o, o + Vector3.DOWN * 0.4)
+			if hit.is_empty() or hit.normal.y < 0.75 or hit.position.y < water.level + 0.03:
+				continue
+			stop_swim()
+			rotation.y = Nights.yaw_to(dir)
+			Sfx.play("splash", global_position, -6.0, 1.2)
+			_start_kind("grab", _inward(hit.position, dir), hit.position, 0.6)
+			return true
+	Sfx.play("splash", global_position, -10.0, 1.3)  # just splashing about
+	return false
+
+
+## Wedged: she is trying to walk, hasn't moved for a moment and her body is touching furniture (squeezed under a
+## low shelf, between legs and a crossbar…). She slips out to the nearest spot where she fits, the way she was
+## heading if she can.
+var _wedged_t := 0.0
+
+
+## Is her body (either collider) pushed into furniture right now?
+func overlapping() -> bool:
+	return _overlap_shape(stand_shape) or _overlap_shape(body_shape)
+
+
+func _overlap_shape(cs: CollisionShape3D) -> bool:
+	if cs == null or not is_inside_tree():
+		return false
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sh: Shape3D = cs.shape.duplicate()
+	if sh is CapsuleShape3D:
+		(sh as CapsuleShape3D).radius *= 0.92  # touching is fine, sunk in is not
+	q.shape = sh
+	q.transform = cs.global_transform
+	q.collision_mask = 1
+	q.exclude = [get_rid()]
+	return not get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
+func _unwedge(d: Vector3, dt: float) -> void:
+	if d.length() < 0.1 or move_speed > 0.03 or jumping or not is_on_floor() or Game.I == null:
+		_wedged_t = 0.0
+		return
+	var gm := Game.I
+	_wedged_t = _wedged_t + dt if overlapping() else 0.0
+	if _wedged_t < 0.6:
+		return
+	_wedged_t = 0.0
+	var dir := d.normalized()
+	var best := Vector3.INF
+	var best_score := INF
+	for k in 16:
+		var a := k * TAU / 16.0
+		var v := Vector3(cos(a), 0.0, sin(a))
+		for r in [0.08, 0.14, 0.22, 0.32]:
+			var p: Vector3 = global_position + v * float(r)
+			if not gm.sphere_free(p + Vector3.UP * 0.07, 0.06) or not gm.sphere_free(p + Vector3.UP * 0.07 + dir * 0.09, 0.045) and not gm.sphere_free(p + Vector3.UP * 0.07 - dir * 0.09, 0.045):
+				continue
+			var ground := _ray(p + Vector3.UP * 0.1, p + Vector3.DOWN * 0.15)
+			if ground.is_empty():
+				continue
+			var score: float = float(r) - v.dot(dir) * 0.1
+			if score < best_score:
+				best_score = score
+				best = ground.position
+			break
+	if best != Vector3.INF:
+		global_position = best + Vector3.UP * 0.005
+		velocity = Vector3.ZERO
 
 
 # ---------- body language ----------
@@ -368,6 +519,8 @@ func drop_one() -> Food:
 
 ## Put her somewhere instantly (after being caught).
 func teleport(p: Vector3, yaw: float) -> void:
+	if water:
+		stop_swim()
 	jumping = false
 	carrier = null
 	stuck_t = 0.0
@@ -412,6 +565,10 @@ func _physics_process(dt: float) -> void:
 		if anim: anim.play("sneak")
 		return
 
+	if water:
+		_tick_swim(dt)
+		return
+
 	var mv := Input.get_vector("left", "right", "back", "forward")
 	if stuck_t > 0.0:
 		mv = Vector2.ZERO
@@ -453,7 +610,13 @@ func _physics_process(dt: float) -> void:
 	if d.length() > 0.01:
 		# dragging something big she walks backwards, pulling it after her
 		var face := -_last_strong_dir if dragging() else _last_strong_dir
+		# she is long: turning beside a wall would swing her body into it (and she'd sink in), so a turn that
+		# pushes her into something waits until she has stepped away
+		var was_in := _overlap_shape(body_shape)
+		var old_yaw := rotation.y
 		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(face), clampf(dt * rotation_speed, 0.0, 1.0))
+		if not was_in and _overlap_shape(body_shape):
+			rotation.y = old_yaw
 
 	if _land_t > 0.0:
 		spd *= 0.4  # getting up after a landing (longer after a big drop)
@@ -476,7 +639,7 @@ func _physics_process(dt: float) -> void:
 		velocity.y = -0.5
 	_hold_edge(dt)
 	velocity.y -= gravity * dt
-	if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump"):
+	if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump") and not _low_roof:
 		velocity.y += hop_hold_force * dt  # hold Space: a higher hop
 	_pre_slide = Vector3(velocity.x, 0.0, velocity.z)
 	move_and_slide()
@@ -501,10 +664,12 @@ func _physics_process(dt: float) -> void:
 	if is_on_floor():
 		_grabbed = false
 		_hopping = false
+		_low_roof = false
 	var moved := global_position - before
 	moved.y = 0.0
 	move_speed = moved.length() / dt if dt > 0.0 else 0.0
 	blocked = d.length() > 0.1 and move_speed < spd * 0.35
+	_unwedge(d, dt)
 	if moving():
 		add_noise(0.8 if running else (0.0 if sneaking else 0.25))
 	_tick_carry(dt)
@@ -552,6 +717,12 @@ func _physics_process(dt: float) -> void:
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			_coyote = 0.0
 			velocity.y = hop_impulse
+			# under a table or a sofa: a lower hop, so she bumps her head instead of going through the top
+			var roof := _ray(global_position + Vector3.UP * 0.1, global_position + Vector3.UP * 0.5)
+			if not roof.is_empty():
+				var room: float = roof.position.y - (global_position.y + 0.13)
+				velocity.y = minf(hop_impulse, sqrt(2.0 * gravity * maxf(room, 0.0)))
+				_low_roof = true
 			_hopping = true
 			_pop(Vector3(0.9, 1.16, 0.95))
 			var fw := global_transform.basis.z
@@ -781,7 +952,10 @@ func _try_ledge_grab() -> void:
 		if hit.is_empty():
 			continue
 		var dy: float = hit.position.y - p0.y
-		if dy > 0.1 and dy < 0.42 and hit.normal.y > 0.75 and hit.position.y < CEILING - 0.25 and _clear(hit.position):
+		# and nothing over her head on the way up (on a chair under the table she must not grab the top through it)
+		if dy > 0.1 and dy < 0.42 and hit.normal.y > 0.75 and hit.position.y < CEILING - 0.25 and _clear(hit.position) \
+				and _ray(p0 + Vector3.UP * 0.1, Vector3(p0.x, hit.position.y + 0.12, p0.z)).is_empty() \
+				and _ray(Vector3(p0.x, hit.position.y + 0.1, p0.z), hit.position + Vector3.UP * 0.1).is_empty():
 			_grabbed = true
 			_edge = hit.position
 			_start_kind("grab", _inward(hit.position, f), hit.position, 0.5 + maxf(dy, 0.0) * 0.8)

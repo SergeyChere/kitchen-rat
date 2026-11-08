@@ -50,7 +50,7 @@ jobs:
 
       - name: Regression tests
         run: |
-          for t in bugs rules physics juice; do
+          for t in bugs rules physics juice sink under; do
             out=$(timeout 180 ~/godot/godot --headless --path godot -- --night=1 --auto --test=$t 2>&1 || true)
             echo "$out"
             if echo "$out" | grep -qE "^FAIL|SCRIPT ERROR|during a physics callback|while flushing queries"; then exit 1; fi

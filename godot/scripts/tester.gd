@@ -326,6 +326,50 @@ func _run(host: Node) -> void:
 		await _juice(host)
 		host.get_tree().quit()
 		return
+	if name == "under":
+		await _under(host)
+		host.get_tree().quit()
+		return
+	if name == "stuck":
+		await _stuck(host)
+		host.get_tree().quit()
+		return
+	if name == "shelves":
+		for n in g.find_children("*", "Node3D", true, false):
+			var nm := str(n.name).to_lower()
+			if nm.contains("shelf") or nm.contains("bracket"):
+				var p := (n as Node3D).global_position
+				var cx := (p.x + 4.8) * 100.0
+				var cy := (p.z + 3.0) * 100.0
+				print("SHELF %s at cm (%.0f, %.0f) h %.0f  wall dist %.0f  parent %s" % [n.name, cx, cy, p.y * 100.0, minf(minf(cx, 960.0 - cx), minf(cy, 600.0 - cy)), n.get_parent().name])
+		host.get_tree().quit()
+		return
+	if name == "spot":  # dev: --test=spot with SPOT=x,z (m): can she walk out in any direction?
+		var v := OS.get_environment("SPOT").split(",")
+		var r := g.rat
+		await _wait(host, 0.5)
+		for d in [Vector3.FORWARD, Vector3.BACK, Vector3.LEFT, Vector3.RIGHT]:
+			r.teleport(Vector3(float(v[0]), 0.0, float(v[1])), Nights.yaw_to(d))
+			g.cam.snap(r.rotation.y)
+			await _wait(host, 0.2)
+			var p0 := r.global_position
+			Input.action_press("forward")
+			await _wait(host, 1.6)
+			Input.action_release("forward")
+			print("SPOT overlapping %s wedged %.2f crouched %s" % [r.overlapping(), r._wedged_t, r.crouched])
+			print("SPOT dir %s moved %.2f to %s" % [str(d), (r.global_position - p0).length(), str(r.global_position)])
+		var hits := []
+		for b in g.find_children("*", "StaticBody3D", true, false):
+			var bb := b as StaticBody3D
+			if bb.global_position.distance_to(Vector3(float(v[0]), 0, float(v[1]))) < 0.9:
+				hits.append(str(bb.get_parent().name) + "/" + str(bb.name))
+		print("SPOT near: ", hits)
+		host.get_tree().quit()
+		return
+	if name == "sink":
+		await _sink(host)
+		host.get_tree().quit()
+		return
 	if name == "mech":
 		await _mech(host)
 		print("DONE")
@@ -951,3 +995,138 @@ func _juice(host: Node) -> void:
 				break
 		await _wait(host, 1.2)
 		_check("hiding muffles the room", not r.hidden() or g.feel._lp.cutoff_hz < 3000.0, "hidden %s cutoff %.0f" % [r.hidden(), g.feel._lp.cutoff_hz])
+
+
+## Hopping and pressing Space under tables and sofas never puts her on top of them.
+func _under(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	var n := 0
+	var bad := 0
+	for z in g.zones:
+		if not (z is HideSpot) or (z as HideSpot).id == "crack":
+			continue
+		for yaw in [0.0, PI * 0.5, PI, PI * 1.5]:
+			r.teleport((z as Zone).global_position + Vector3(0, 0.01, 0), yaw)
+			r._sneak_toggle = false
+			g.cam.snap(yaw)
+			await _wait(host, 0.25)
+			# Space pressed while something is right over her head: she must not end up on top of it
+			var roof := g.ray(r.global_position + Vector3.UP * 0.1, r.global_position + Vector3.UP * 0.9)
+			if roof.is_empty():
+				continue
+			await _press(host, "jump")
+			var hi := 0.0
+			for i in 60:
+				await host.get_tree().physics_frame
+				hi = maxf(hi, r.global_position.y)
+			n += 1
+			if hi > roof.position.y - 0.02:
+				bad += 1
+				_check("Space under %s (%.2f m over her) keeps her under it" % [(z as HideSpot).id, roof.position.y], false, "rose to %.2f" % hi)
+	_check("Space under furniture never puts her on top of it (%d tries, %d bad)" % [n, bad], n > 0 and bad == 0)
+
+
+## A long run with the cat awake and the rat scurrying about at random (walking, running, hopping, sneaking):
+## reports every time the cat stands still while it should be moving, or the rat is stuck inside furniture.
+func _stuck(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	if g.cat and g.cat.mode in [CatAI.Mode.SLEEP, CatAI.Mode.AWAY]:
+		g.cat.wake_up()
+	g.grace_t = 9999.0  # she is not caught, the cat keeps looking
+	Engine.time_scale = 3.0
+	var secs := float(OS.get_environment("STUCK_SECS")) if OS.has_environment("STUCK_SECS") else 90.0
+	var t := 0.0
+	var cat_last := g.cat.global_position if g.cat else Vector3.ZERO
+	var cat_still := 0.0
+	var rat_last := r.global_position
+	var rat_still := 0.0
+	var keys := ["forward", "back", "left", "right"]
+	var hold := ""
+	var hold_t := 0.0
+	var cat_events := 0
+	var rat_events := 0
+	var inside := 0
+	while t < secs:
+		await host.get_tree().physics_frame
+		var dt := host.get_physics_process_delta_time()
+		t += dt
+		# the rat: pick a direction now and then, sometimes run, sneak or hop
+		hold_t -= dt
+		if hold_t <= 0.0:
+			if hold != "": Input.action_release(hold)
+			Input.action_release("run"); Input.action_release("sneak")
+			hold = keys[randi() % 4]
+			Input.action_press(hold)
+			g.cam.yaw += randf_range(-1.5, 1.5)
+			var m := randf()
+			if m < 0.3: Input.action_press("run")
+			elif m < 0.45: Input.action_press("sneak")
+			hold_t = randf_range(0.6, 2.0)
+		if randf() < 0.012:
+			Input.action_press("jump")
+		elif Input.is_action_pressed("jump"):
+			Input.action_release("jump")
+		var rp := r.global_position
+		if not r.jumping and Vector2(rp.x - rat_last.x, rp.z - rat_last.z).length() < 0.004:
+			rat_still += dt
+		else:
+			rat_still = 0.0
+		rat_last = rp
+		if rat_still > 2.5 and r.overlapping():  # not moving AND squeezed into something (pushing a wall is fine)
+			rat_events += 1
+			print("RAT STUCK at %s surface %s floor %s blocked %s hold %s" % [str(rp), r.surface_id, r.is_on_floor(), r.blocked, hold])
+			rat_still = -10.0
+		if r.overlapping() and not r.jumping:
+			inside += 1
+			if inside == 30:
+				print("RAT INSIDE geometry at %s surface %s" % [str(rp), r.surface_id])
+		else:
+			inside = 0
+		# the cat: should move in wander / search / investigate / chase / home
+		if g.cat and g.cat.visible:
+			var cp := g.cat.global_position
+			var moving_mode: bool = g.cat.mode in [CatAI.Mode.WANDER, CatAI.Mode.SEARCH, CatAI.Mode.INVESTIGATE, CatAI.Mode.CHASE, CatAI.Mode.TO_BED]
+			if moving_mode and cp.distance_to(cat_last) < 0.003:
+				cat_still += dt
+			else:
+				cat_still = 0.0
+			cat_last = cp
+			if cat_still > 3.0:
+				cat_events += 1
+				print("CAT STUCK mode %s at %s path %d speed %.2f turning %s" % [CatAI.Mode.keys()[g.cat.mode], str(cp), g.cat.path.size(), g.cat.speed, g.cat.turning])
+				cat_still = -10.0
+	for k in keys + ["run", "sneak", "jump"]:
+		Input.action_release(k)
+	Engine.time_scale = 1.0
+	_check("the cat never froze (%.0f s)" % secs, cat_events == 0, "%d times" % cat_events)
+	_check("the rat never got stuck (%.0f s)" % secs, rat_events == 0, "%d times" % rat_events)
+
+
+## The kitchen sink: she falls in, swims, climbs out with Space; staying in too long counts as caught.
+func _sink(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	var w: SinkWater = null
+	for z in g.zones:
+		if z is SinkWater:
+			w = z
+	_check("there is water in the sink", w != null)
+	if w == null:
+		return
+	r.teleport(Vector3(w.global_position.x, w.level + 0.25, w.global_position.z), 0.0)
+	await _wait(host, 0.8)
+	_check("dropped in, she swims", r.water == w and absf(r.global_position.y - (w.level - 0.045)) < 0.01, "water %s y %.3f level %.3f" % [r.water != null, r.global_position.y, w.level])
+	Input.action_press("forward")
+	await _wait(host, 0.6)
+	Input.action_release("forward")
+	_check("she paddles about", r.water != null and r.move_speed >= 0.0)
+	await _press(host, "jump")
+	await _wait(host, 1.2)
+	_check("Space at the edge: she climbs out", r.water == null and r.global_position.y > w.level + 0.04 and not r.jumping, "y %.3f surface %s" % [r.global_position.y, r.surface_id])
+	var lives := g.lives
+	r.teleport(Vector3(w.global_position.x, w.level + 0.2, w.global_position.z), 0.0)
+	g.grace_t = 0.0
+	await _wait(host, r.BREATH + 1.5)
+	_check("too long in the water counts as caught", g.lives == lives - 1 and r.water == null, "lives %d -> %d" % [lives, g.lives])

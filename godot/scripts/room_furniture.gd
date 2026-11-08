@@ -302,18 +302,32 @@ func dress(kind: String) -> void:
 			ei += 1
 
 
+## How far the wall's inside face is from the room's edge (cm). Several rays along the wall, from near it, and the
+## nearest hit wins: one ray from the middle of the room can hit a tall bookcase instead, and the shelves then
+## hung in mid-air in the middle of the room (night 4).
 func _probe_inner(wall: String) -> float:
-	var from := W(480, 300, 100)
-	var to: Vector3 = {"n": W(480, -60, 100), "s": W(480, 660, 100), "w": W(-60, 300, 100), "e": W(1020, 300, 100)}[wall]
-	var hit := g.ray(from, to)
-	if hit.is_empty():
-		return 0.0
-	var p: Vector3 = hit.position
-	match wall:
-		"n": return (p.z + 3.0) * 100.0
-		"s": return 600.0 - (p.z + 3.0) * 100.0
-		"w": return (p.x + 4.8) * 100.0
-		_: return 960.0 - (p.x + 4.8) * 100.0
+	var best := INF
+	var length := 600.0 if wall in ["w", "e"] else 960.0
+	for k in 7:
+		var along := length * (k + 1) / 8.0
+		var from: Vector3; var to: Vector3
+		match wall:
+			"n": from = W(along, 60, 150); to = W(along, -60, 150)
+			"s": from = W(along, 540, 150); to = W(along, 660, 150)
+			"w": from = W(60, along, 150); to = W(-60, along, 150)
+			_: from = W(900, along, 150); to = W(1020, along, 150)
+		var hit := g.ray(from, to)
+		if hit.is_empty():
+			continue
+		var p: Vector3 = hit.position
+		var d: float
+		match wall:
+			"n": d = (p.z + 3.0) * 100.0
+			"s": d = 600.0 - (p.z + 3.0) * 100.0
+			"w": d = (p.x + 4.8) * 100.0
+			_: d = 960.0 - (p.x + 4.8) * 100.0
+		best = minf(best, d)
+	return clampf(best, 0.0, 20.0) if best < INF else 0.0
 
 
 ## A point on a wall: `along` cm along it, `out` cm into the room from its inside face, h cm up. And the rotation

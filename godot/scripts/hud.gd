@@ -382,6 +382,9 @@ func _draw_tasks(g: Game, H: float) -> void:
 			rows.append(["✔", SAFE, SAFE, "Side", Keys.text(str(t.side[i].text)), SAFE, 1.0, ""])
 		elif t.side_failed.has(i):
 			rows.append(["✖", none, BAD, "Side", Keys.text(str(t.side[i].text)), MUTED, 1.0, ""])
+		elif t.side[i].type == "keep":
+			# a rule for the whole night: nothing to wait for, it counts when the night ends
+			rows.append(["…", none, SAFE, "Side · counts when you finish the night", Keys.text(str(t.side[i].text)) + " (so far, so good)", Color(0.78, 0.92, 0.7), 1.0, ""])
 		else:
 			rows.append(["", none, SAFE, "Side", Keys.text(str(t.side[i].text)), Color(0.78, 0.92, 0.7), 1.0, ""])
 	for i in t.secret.size():
