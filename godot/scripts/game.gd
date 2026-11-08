@@ -1604,7 +1604,7 @@ func _pause_panel() -> void:
 	UI.focus_first(box)
 
 
-## Effects for the cel-shaded look (the Compatibility renderer on old graphics cards ignores them): only a soft glow
+## Effects for the cel-shaded look (Compatibility renderer: runs on any graphics card): only a soft glow
 ## on lamps and bright spots at medium and high. No realistic ambient occlusion or global illumination: they muddy the
 ## clean flat colours.
 func apply_fx() -> void:
