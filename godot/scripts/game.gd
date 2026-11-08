@@ -134,8 +134,6 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	_builder.build_contents()
 	await get_tree().physics_frame
-	if Settings.quality != "low":
-		SurfaceDetail.new().apply(self)
 	for z in find_children("*", "Zone", true, false):
 		zones.append(z)
 	for b in find_children("*", "StaticBody3D", true, false):
@@ -1606,44 +1604,23 @@ func _pause_panel() -> void:
 	UI.focus_first(box)
 
 
-## Forward+ effects by the Quality setting (the Compatibility renderer, used on old graphics cards, ignores them).
-##   medium: ambient occlusion (soft dark in corners and under furniture), a little glow on lamps
-##   high:   + bounced light (SSIL), global illumination (SDFGI) and volumetric fog in the moonlight
+## Effects for the cel-shaded look (the Compatibility renderer on old graphics cards ignores them): only a soft glow
+## on lamps and bright spots at medium and high. No realistic ambient occlusion or global illumination: they muddy the
+## clean flat colours.
 func apply_fx() -> void:
 	if env == null:
 		return
-	var q := Settings.quality
-	var on := q != "low"
-	env.ssao_enabled = on
-	env.ssao_radius = 0.6
-	env.ssao_intensity = 1.6
-	env.ssao_power = 1.4
-	env.ssao_detail = 0.6
-	env.ssao_light_affect = 0.15
+	var on := Settings.quality != "low"
 	env.glow_enabled = on
-	env.glow_intensity = 0.5
-	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 1.1
+	env.glow_intensity = 0.6
+	env.glow_bloom = 0.06
+	env.glow_hdr_threshold = 1.0
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	var hi := q == "high"
-	env.ssil_enabled = hi
-	env.ssil_radius = 3.0
-	env.ssil_intensity = 0.8
-	env.sdfgi_enabled = hi
-	env.sdfgi_use_occlusion = true
-	env.sdfgi_cascades = 3
-	env.sdfgi_min_cell_size = 0.05
-	env.sdfgi_energy = 0.7
-	env.sdfgi_bounce_feedback = 0.4
-	env.volumetric_fog_enabled = hi
-	env.volumetric_fog_density = 0.012
-	env.volumetric_fog_albedo = Color(0.75, 0.8, 1.0)
-	env.volumetric_fog_emission = Color(0.0, 0.0, 0.0)
-	env.volumetric_fog_length = 12.0
-	env.volumetric_fog_ambient_inject = 0.15
-	env.fog_enabled = not hi  # the plain fog gives way to the volumetric one
-	if moon:
-		moon.light_volumetric_fog_energy = 1.6
+	env.ssao_enabled = false
+	env.ssil_enabled = false
+	env.sdfgi_enabled = false
+	env.volumetric_fog_enabled = false
+	env.fog_enabled = true
 
 
 func _apply_settings() -> void:

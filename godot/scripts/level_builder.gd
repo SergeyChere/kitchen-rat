@@ -16,6 +16,7 @@ var decor: Node3D
 var foods: Node3D
 var _toon := {}
 static var _outline: StandardMaterial3D
+const OUTLINE := 0.0055  # outline width (m): bold, cartoon
 
 
 func _init(game: Game, n: Dictionary) -> void:
@@ -53,7 +54,7 @@ func spawn(path: String, pos: Vector3, rot_deg := 0.0, parent: Node3D = null) ->
 ## own units, so models scaled on a root node (the imported characters) get it sized back to ~4 mm.
 func toonify(n: Node) -> void:
 	if _outline == null:
-		_outline = _outline_mat(0.004)
+		_outline = _outline_mat(OUTLINE)
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		var ref: Node3D = m
@@ -61,7 +62,7 @@ func toonify(n: Node) -> void:
 		if sk:
 			ref = sk
 		var sc := ref.global_transform.basis.get_scale().x
-		var grow := snappedf(0.004 / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else 0.004
+		var grow := snappedf(OUTLINE / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else OUTLINE
 		for i in m.mesh.get_surface_count():
 			var mat := m.mesh.surface_get_material(i)
 			if not (mat is BaseMaterial3D):
@@ -69,15 +70,29 @@ func toonify(n: Node) -> void:
 			var key := str(mat.get_instance_id()) + ":" + str(grow)
 			if not _toon.has(key):
 				var t := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
-				t.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-				t.specular_mode = BaseMaterial3D.SPECULAR_TOON
-				t.metallic = 0.0
-				t.roughness = 0.9
+				_cel(t)
+				if m.skin:
+					t.roughness = 0.5  # characters are faceted low-poly: a crisp step would chequer every face
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
-					t.next_pass = _outline if grow == 0.004 else _outline_mat(grow)
+					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
+
+
+## The game's look: bright cel shading (not realistic). Two clean steps of light and shadow, no glossy highlights,
+## a soft coloured rim on the edges facing away from the light, like a cartoon.
+static func _cel(t: BaseMaterial3D) -> void:
+	t.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	t.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	t.metallic = 0.0
+	t.roughness = 0.12  # in toon mode this is how soft the light/shadow edge is: a crisp line
+	t.rim_enabled = true
+	t.rim = 0.35
+	t.rim_tint = 0.6
+	if t.albedo_texture == null:
+		var c := t.albedo_color
+		t.albedo_color = Color.from_hsv(c.h, minf(c.s * 1.18, 1.0), minf(c.v * 1.06, 1.0), c.a)  # a little more vivid
 
 
 static func _outline_mat(grow: float) -> StandardMaterial3D:
@@ -260,9 +275,7 @@ func on_top(x: float, y: float) -> Vector3:
 func mat(color: Color, texture := "", tiling := Vector2.ONE) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
-	m.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	m.roughness = 1.0
+	_cel(m)
 	if texture != "":
 		m.albedo_texture = load("res://assets/textures/" + texture + ".png")
 		m.uv1_scale = Vector3(tiling.x, tiling.y, 1)
@@ -337,12 +350,16 @@ func _lighting() -> void:
 	env.background_color = hex(pal.get("fog", 0x0e1220))
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.49, 0.56, 0.77) * 0.75 * float(pal.get("hemi", 0.8)) / 0.8
+	env.ambient_light_color = Color(0.55, 0.57, 0.74) * 0.7 * float(pal.get("hemi", 0.8)) / 0.8  # less, so the light/shadow steps show
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
 	env.fog_density = 0.012
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.adjustment_enabled = true  # bright and vivid, not realistic
+	env.adjustment_brightness = 1.14
+	env.adjustment_contrast = 1.06
+	env.adjustment_saturation = 1.1
 	var we := WorldEnvironment.new()
 	we.environment = env
 	g.env = env
@@ -350,11 +367,11 @@ func _lighting() -> void:
 
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moonlight"
-	moon.light_color = Color(0.62, 0.7, 1.0)
-	moon.light_energy = 0.85 * float(pal.get("moon", 0.9)) / 0.9
+	moon.light_color = Color(0.78, 0.82, 1.0)
+	moon.light_energy = 1.25 * float(pal.get("moon", 0.9)) / 0.9
 	moon.shadow_enabled = true
 	moon.shadow_opacity = 0.55  # soft shadows: you can still see into them
-	moon.shadow_blur = 2.0
+	moon.shadow_blur = 1.2  # fairly crisp, but no stair-steps on the small rat
 	moon.shadow_bias = 0.08  # no striped shadow acne on flat tops
 	moon.shadow_normal_bias = 2.5
 	root.add_child(moon)
