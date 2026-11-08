@@ -85,7 +85,6 @@ func _ready() -> void:
 # ---------- squash & stretch, dust (from Kenney's Starter Kit 3D Platformer, MIT) ----------
 
 var _dust_trail: CPUParticles3D
-var _dust_puff: CPUParticles3D
 
 
 func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
@@ -136,7 +135,6 @@ func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
 
 func _make_dust() -> void:
 	_dust_trail = _dust_emitter(14, false)
-	_dust_puff = _dust_emitter(12, true)
 
 
 ## Stretch tall on take-off, squash flat on landing; the model eases back to its shape.
@@ -146,11 +144,68 @@ func _pop(v: Vector3) -> void:
 
 
 func _land_fx(drop: float) -> void:
+	if tail:
+		tail.kick(-2.5 * clampf(drop, 0.1, 1.0))
+	if drop > STUN_DROP:
+		_stun = clampf(0.8 + (drop - STUN_DROP) * 1.6, 0.8, 2.2)
+		add_noise(0.6)
+		if Game.I:
+			Game.I.bubble_at("@#!", global_position + Vector3.UP * 0.22, _stun, Color(1.0, 0.92, 0.5))
 	var k := clampf(drop / 0.45, 0.3, 1.0)
 	_pop(Vector3(1.0 + 0.25 * k, 1.0 - 0.25 * k, 1.0 + 0.12 * k))
-	if drop > 0.12 and _dust_puff:
-		_dust_puff.amount = int(lerpf(6.0, 14.0, k))
-		_dust_puff.restart()
+
+
+const STUN_DROP := 0.85   # falls higher than this daze her for a moment
+var _stun := 0.0
+var _teeter := 0.0
+var _teeter_cd := 0.0
+var _pre_slide := Vector3.ZERO
+var tail: TailSway
+
+
+func stunned() -> bool: return _stun > 0.0
+
+
+## At the edge of a raised surface (a table, a counter, the fridge) she stops and teeters instead of running off.
+## Walking slowly to an edge she climbs down (_try_descend); Space jumps down on purpose.
+func _hold_edge(dt: float) -> void:
+	_teeter = maxf(_teeter - dt, 0.0)
+	_teeter_cd = maxf(_teeter_cd - dt, 0.0)
+	if not is_on_floor() or surface_id == "floor" or _hopping:
+		return
+	var h := Vector3(velocity.x, 0.0, velocity.z)
+	if h.length() < 0.05:
+		return
+	var dir := h.normalized()
+	var p := global_position + dir * (0.07 + h.length() * 0.06) + Vector3.UP * 0.05
+	var hit := _ray(p, p + Vector3.DOWN * 0.18)
+	if not hit.is_empty():
+		return
+	# no ground just ahead: take away the speed toward the edge
+	var into := h.dot(dir)
+	velocity.x -= dir.x * into
+	velocity.z -= dir.z * into
+	if _teeter_cd <= 0.0 and into > walk_speed * 0.6:
+		_teeter = 0.45
+		_teeter_cd = 1.2
+		Sfx.play("squeak", global_position, -10.0)
+
+
+## Bumping into loose things (a fallen apple, a cup on the floor…) nudges them along.
+func _push_things() -> void:
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i)
+		var rb := c.get_collider() as RigidBody3D
+		if rb == null or rb.freeze:
+			continue
+		var n := -c.get_normal()
+		n.y = 0.0
+		if n.length() < 0.01:
+			continue
+		var sp := maxf(_pre_slide.dot(n.normalized()), 0.0)
+		if sp < 0.05:
+			continue
+		rb.apply_central_impulse(n.normalized() * minf(sp, 1.2) * 1.1 * rb.mass)  # a shove: it rolls on a little ahead of her
 
 
 func moving() -> bool: return move_speed > 0.05
@@ -311,6 +366,22 @@ func _physics_process(dt: float) -> void:
 	var d := Vector3.ZERO if sniffing else (fwd * mv.y + right * mv.x)
 	var spd := run_speed if running else (sneak_speed if sneaking else walk_speed)
 	spd *= 0.5 if dragging() else maxf(0.45, 1.0 - 0.18 * carry_weight())  # loaded she's clearly slower
+	if _stun > 0.0:
+		d = Vector3.ZERO  # dazed after a big fall
+	var cur := Vector3(velocity.x, 0.0, velocity.z)
+	if is_on_floor() and d.length() > 0.01 and cur.length() > 0.25 and not dragging():
+		# turning in an arc: at speed the way she goes swings round toward the stick instead of snapping to it
+		var cd := cur.normalized()
+		var ang := cd.signed_angle_to(d.normalized(), Vector3.UP)
+		var k := clampf((cur.length() - 0.25) / maxf(run_speed - 0.25, 0.01), 0.0, 1.0)
+		var rate := lerpf(11.0, 4.5, k)
+		if absf(ang) > 2.4:
+			d *= 0.25  # turning right round: slow down first, which tightens the turn
+		var step := clampf(ang, -rate * dt, rate * dt)
+		d = cd.rotated(Vector3.UP, step) * d.length()
+		var vy0 := velocity.y
+		velocity = cur.rotated(Vector3.UP, step)  # the momentum turns with her
+		velocity.y = vy0
 	if d.length() > 0.2:
 		_last_strong_dir = d.normalized()
 	if d.length() > 0.01:
@@ -335,10 +406,13 @@ func _physics_process(dt: float) -> void:
 	velocity.y = y_vel
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = -0.5
+	_hold_edge(dt)
 	velocity.y -= gravity * dt
 	if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump"):
 		velocity.y += hop_hold_force * dt  # hold Space: a higher hop
+	_pre_slide = Vector3(velocity.x, 0.0, velocity.z)
 	move_and_slide()
+	_push_things()
 	# pushing but not moving: slide off the wall a little (stuck on a corner)
 	if (global_position - before).length() < 0.0002 and Vector2(velocity.x, velocity.z).length() > 0.05 and get_slide_collision_count() > 0:
 		global_position += get_wall_normal() * 0.004
@@ -368,15 +442,25 @@ func _physics_process(dt: float) -> void:
 	_tick_carry(dt)
 	if _land_t > 0.0:
 		_land_t -= dt
+	if _stun > 0.0:
+		_stun -= dt
 
 	if model and not jumping:
 		# the hop: nose up going up, nose down coming down
 		var tilt := (-4.0 if carry_weight() >= 2 else 0.0) if is_on_floor() else clampf(velocity.y * 10.0, -15.0, 22.0)  # heavy: head down
 		model.rotation.x = lerp_angle(model.rotation.x, -deg_to_rad(tilt), clampf(dt * 14.0, 0.0, 1.0))
+		# teetering at an edge: a quick wobble; dazed after a fall: a slow sway
+		var roll := 0.0
+		if _teeter > 0.0:
+			roll = sin(_teeter * 38.0) * 9.0 * (_teeter / 0.45)
+			model.rotation.x += deg_to_rad(8.0) * (_teeter / 0.45)  # nose down, peering over
+		elif _stun > 0.0:
+			roll = sin(Time.get_ticks_msec() * 0.006) * 10.0 * clampf(_stun, 0.0, 1.0)
+		model.rotation.z = lerp_angle(model.rotation.z, deg_to_rad(roll), clampf(dt * 16.0, 0.0, 1.0))
 	_update_surface()
 	_find_jump_target()
 	if Input.is_action_just_pressed("jump"):
-		if stuck_t > 0.0:
+		if stuck_t > 0.0 or _stun > 0.0:
 			pass
 		elif Game.I.use_tunnel():
 			pass

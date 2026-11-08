@@ -27,6 +27,8 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
+	if _args.has("quality"):  # dev: --quality=low|medium|high for screenshots (not saved)
+		Settings.quality = str(_args.quality)
 	if _args.has("night"):
 		start_night(_args.night)
 	else:

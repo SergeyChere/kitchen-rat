@@ -41,8 +41,8 @@ func awake() -> bool: return mode != Mode.AWAY and mode != Mode.SLEEP
 
 
 func setup(n: Dictionary) -> void:
-	# gait: the clips' own foot speeds were measured from the models (feet planted on the floor)
-	walk_clip_speed = 0.22; run_clip_speed = 0.48; run_from = 1.05
+	# gait: the clips' own foot speeds, measured from the paws on the floor (tester --test=stride)
+	walk_clip_speed = 0.18; run_clip_speed = 0.39; run_from = 1.05
 	accel = 5.0; decel = 8.0; turn_rate = 7.0
 	night = n
 	bed = Nights.pos(n.get("catBed"))

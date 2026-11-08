@@ -72,6 +72,8 @@ var high_surfaces: Array[Node3D] = []
 
 var _evidence := 0.0
 var _alarm := 0.0
+var _goal_offered := false
+var _quiet := 0.0  # seconds since the last noise or sighting: the wanted level cools down
 var _unseen := 0.0
 var _refill := 0.0
 var _noise_t := 0.0
@@ -132,6 +134,8 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	_builder.build_contents()
 	await get_tree().physics_frame
+	if Settings.quality != "low":
+		SurfaceDetail.new().apply(self)
 	for z in find_children("*", "Zone", true, false):
 		zones.append(z)
 	for b in find_children("*", "StaticBody3D", true, false):
@@ -163,6 +167,7 @@ func _ready() -> void:
 	for i in 3:
 		_trails.append(_make_trail())
 	rat.landed.connect(_on_landed)
+	apply_fx()
 	_ambient = env.ambient_light_energy if env else 1.0
 	_moon_e = moon.light_energy if moon else 0.5
 	_last_rp = rat.global_position
@@ -242,6 +247,12 @@ func _make_rat() -> void:
 	var sks := model.find_children("*", "Skeleton3D", true, false)
 	var sk: Skeleton3D = sks[0] if not sks.is_empty() else null
 	var hb := sk.find_bone("Head") if sk else -1
+	if sk and sk.find_bone("Tail1") >= 0:
+		var ts := TailSway.new()
+		ts.name = "TailSway"
+		sk.add_child(ts)
+		ts.setup(rat, sk)
+		rat.tail = ts
 	if hb >= 0:
 		# held in her teeth: the mouth follows the head bone (and keeps a scale of 1, the model is scaled down);
 		# the snout is ~4 cm ahead of the head bone, the mouth a little behind and below its tip
@@ -436,6 +447,8 @@ func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, fr
 	if amt < 0.0:
 		amt = 0.9 if big else (0.3 if radius > 1.5 else 0.4)
 	_alarm += 7.0 if big else (0.5 if radius > 1.5 else (2.0 if radius > 1.0 else 0.0))
+	if big or radius > 1.0:
+		_quiet = 0.0
 	if label != "":
 		bubble_at(label, at + Vector3.UP * 0.24, 1.4, Color(0.95, 0.76, 0.3))
 	owner_ai.hear(at, radius, big)
@@ -621,6 +634,9 @@ func _process(dt: float) -> void:
 		return
 	night_time += dt
 	if night_time >= float(night.get("seconds", 900)):
+		if _free_end() and fed >= int(night.goal):
+			_end(true, "The nest is full!", "Dawn came and the pups are fed. Next night: " + str(night.get("teaser", "")))
+			return
 		_end(false, "Dawn", "The owners are waking up. The pups got %d of %d. There is always tomorrow night." % [fed, int(night.goal)])
 		return
 	grace_t = maxf(0.0, grace_t - dt)
@@ -669,6 +685,9 @@ func _process(dt: float) -> void:
 	_tick_wanted(dt)
 	var chase := cat.mode == CatAI.Mode.CHASE or owner_ai.mode == OwnerAI.Mode.CHASE or (dog != null and dog.mode == DogAI.Mode.CHASE)
 	Sfx.music_layers(stars / 4.0, chase)
+	if _free_end() and fed >= int(night.goal) and not _goal_offered and not (tasks.has_tasks() and tasks.chain_done()):
+		_goal_offered = true
+		_offer_finish()
 	if fed >= int(night.goal) and (not tasks.has_tasks() or tasks.chain_done()):
 		if bool(night.get("finale", false)):
 			_end(true, "The End", "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom.")
@@ -902,6 +921,9 @@ func _tick_wanted(dt: float) -> void:
 	for z in sleepers:
 		if z.sees_rat(): seen = true
 	_unseen = 0.0 if seen else _unseen + dt
+	_quiet = 0.0 if seen else _quiet + dt
+	if _quiet > 15.0 and _evidence > 0.0:  # quiet for a while: the house slowly forgets the thefts
+		_evidence = maxf(_evidence - dt * (0.9 if rat.in_nest else 0.45), 0.0)
 	if rat.in_nest and _unseen > 1.0: _alarm -= dt * 14.0
 	elif _unseen > 4.0: _alarm -= dt * 5.0
 	_alarm = clampf(_alarm, 0.0, 60.0)
@@ -911,6 +933,8 @@ func _tick_wanted(dt: float) -> void:
 			if _evidence + _alarm >= t: ns += 1
 	if ns > stars:
 		_on_stars(ns, stars)
+	elif ns < stars and state == "play":
+		banner("★".repeat(ns) + ("" if ns > 0 else "☆") + " The house calms down", "Wanted level dropped" if ns > 0 else "Nobody is looking for you now", 2.5)
 	stars = ns
 	max_stars = maxi(max_stars, stars)
 
@@ -1536,6 +1560,36 @@ func _set_paused(on: bool) -> void:
 		_pause_panel()
 
 
+## Nights with "freeEnd": once the nest is full the player may finish right away, or keep playing for the
+## other tasks and finish from the pause menu whenever they like.
+func _free_end() -> bool:
+	return bool(night.get("freeEnd", false))
+
+
+func can_finish() -> bool:
+	return _free_end() and fed >= int(night.goal) and (state == "play" or state == "pause")
+
+
+func finish_now() -> void:
+	_set_paused(false)
+	_end(true, "The nest is full!", "The pups are fed. Next night: " + str(night.get("teaser", "")))
+
+
+func _offer_finish() -> void:
+	_set_paused(true)
+	if is_instance_valid(_panel):
+		_panel.queue_free()
+	var sc := UI.screen(hud, 0.55, false, 480.0)
+	_panel = sc[0]
+	_panel.set_meta("pause", true)
+	var box: VBoxContainer = sc[1]
+	box.add_child(UI.label("The nest is full!", 32, UI.ACCENT, true))
+	box.add_child(UI.label("You can finish the night now, or keep playing and do the other tasks. You can finish any time from the pause menu (%s)." % Keys.label("pause"), 16, UI.TEXT, true))
+	box.add_child(UI.button("Finish the night", finish_now))
+	box.add_child(UI.button("Keep playing", func(): _set_paused(false)))
+	UI.focus_first(box)
+
+
 func _pause_panel() -> void:
 	var sc := UI.screen(hud, 0.55, false, 440.0)
 	_panel = sc[0]
@@ -1544,13 +1598,56 @@ func _pause_panel() -> void:
 	box.add_child(UI.label("Paused", 32, UI.ACCENT, true))
 	box.add_child(UI.label("Night %d · %s. The pups are waiting." % [int(night.number), str(night.name)], 16, UI.DIM, true))
 	box.add_child(UI.button("Resume", func(): _set_paused(false)))
+	if can_finish():
+		box.add_child(UI.button("Finish the night", finish_now))
 	box.add_child(UI.button("Settings", func(): _panel.hide(); UI.settings_panel(hud, func(): _apply_settings(); if is_instance_valid(_panel): _panel.show())))
 	box.add_child(UI.button("Restart night", _restart))
 	box.add_child(UI.button("Main menu", func(): Main.I.show_menu()))
 	UI.focus_first(box)
 
 
+## Forward+ effects by the Quality setting (the Compatibility renderer, used on old graphics cards, ignores them).
+##   medium: ambient occlusion (soft dark in corners and under furniture), a little glow on lamps
+##   high:   + bounced light (SSIL), global illumination (SDFGI) and volumetric fog in the moonlight
+func apply_fx() -> void:
+	if env == null:
+		return
+	var q := Settings.quality
+	var on := q != "low"
+	env.ssao_enabled = on
+	env.ssao_radius = 0.6
+	env.ssao_intensity = 1.6
+	env.ssao_power = 1.4
+	env.ssao_detail = 0.6
+	env.ssao_light_affect = 0.15
+	env.glow_enabled = on
+	env.glow_intensity = 0.5
+	env.glow_bloom = 0.05
+	env.glow_hdr_threshold = 1.1
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	var hi := q == "high"
+	env.ssil_enabled = hi
+	env.ssil_radius = 3.0
+	env.ssil_intensity = 0.8
+	env.sdfgi_enabled = hi
+	env.sdfgi_use_occlusion = true
+	env.sdfgi_cascades = 3
+	env.sdfgi_min_cell_size = 0.05
+	env.sdfgi_energy = 0.7
+	env.sdfgi_bounce_feedback = 0.4
+	env.volumetric_fog_enabled = hi
+	env.volumetric_fog_density = 0.012
+	env.volumetric_fog_albedo = Color(0.75, 0.8, 1.0)
+	env.volumetric_fog_emission = Color(0.0, 0.0, 0.0)
+	env.volumetric_fog_length = 12.0
+	env.volumetric_fog_ambient_inject = 0.15
+	env.fog_enabled = not hi  # the plain fog gives way to the volumetric one
+	if moon:
+		moon.light_volumetric_fog_energy = 1.6
+
+
 func _apply_settings() -> void:
+	apply_fx()
 	cam.sensitivity = 0.25 * Settings.sens
 	cam.invert_y = Settings.invert_y
 	cam.fov = Settings.fov

@@ -292,6 +292,36 @@ func _run(host: Node) -> void:
 		await _bugs(host)
 		host.get_tree().quit()
 		return
+	if name == "rules":
+		await _rules(host)
+		host.get_tree().quit()
+		return
+	if name == "physics":
+		await _physics(host)
+		host.get_tree().quit()
+		return
+	if name == "mats":
+		var seen := {}
+		for m in g.find_children("*", "MeshInstance3D", true, false):
+			var mi := m as MeshInstance3D
+			if mi.mesh == null: continue
+			for i in mi.mesh.get_surface_count():
+				var mat := mi.get_active_material(i)
+				var key := (mat.resource_name if mat else "none") + " | " + mat.get_class() if mat else "none"
+				var par := str(mi.get_parent().name) + "/" + str(mi.name)
+				if not seen.has(key): seen[key] = [0, par]
+				seen[key][0] += 1
+		for k in seen: print("MAT ", k, "  x", seen[k][0], "  e.g. ", seen[k][1])
+		host.get_tree().quit()
+		return
+	if name == "stride":
+		await _wait(host, 0.5)
+		for a in [g.cat, g.owner_ai, g.dog]:
+			if a == null: continue
+			a.process_mode = Node.PROCESS_MODE_DISABLED
+			_stride(a)
+		host.get_tree().quit()
+		return
 	if name == "mech":
 		await _mech(host)
 		print("DONE")
@@ -649,3 +679,162 @@ func _bugs(host: Node) -> void:
 		await _wait(host, 0.6)
 		_check("picked the cheese up again", r.carried.has(cheese), "carrying %d" % r.carried.size())
 		_check("evidence counted once per piece", is_equal_approx(g._evidence, e1) and e1 >= 9.0, "%.0f then %.0f" % [e1, g._evidence])
+
+
+## Free end of night 1 and the wanted level cooling down.
+func _rules(host: Node) -> void:
+	await _wait(host, 0.5)
+	var e0: float = g._evidence
+	g._evidence = 30.0
+	g._quiet = 16.0
+	await _wait(host, 0.3)
+	var s1: int = g.stars
+	g._quiet = 200.0
+	g._evidence = 10.5
+	await _wait(host, 2.5)
+	_check("wanted level cools down when quiet", g._evidence < 10.0 and g.stars < s1 or not bool(g.night.get("wanted", false)), "stars %d -> %d ev %.1f" % [s1, g.stars, g._evidence])
+	g._evidence = e0
+	g.fed = int(g.night.goal)
+	await _wait(host, 0.4)
+	_check("full nest: the finish choice is offered", g.state == "pause" and g._goal_offered, "state " + g.state)
+	g._set_paused(false)
+	await _wait(host, 0.3)
+	_check("keep playing", g.state == "play" and g.can_finish())
+	g.finish_now()
+	await _wait(host, 0.3)
+	_check("finish any time", g.state == "outro", "state " + g.state)
+
+
+func _physics(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	_check("the tail has its sway", r.tail != null)
+	# running at the table edge: she stops and teeters instead of falling off
+	r.teleport(Nights.world(700, 420, 76), Nights.yaw_to(Vector3.FORWARD))
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.4)
+	var saw := false
+	Input.action_press("forward"); Input.action_press("run")
+	for i in 90:
+		await host.get_tree().physics_frame
+		saw = saw or r._teeter > 0.0
+	Input.action_release("forward"); Input.action_release("run")
+	await _wait(host, 0.2)
+	_check("running to the table edge she stops and teeters", saw and r.surface_id == "table" and r.global_position.y > 0.7, "surface %s y %.2f teeter %s" % [r.surface_id, r.global_position.y, saw])
+	# turning at a run swings round in an arc
+	var sp := _open_floor(1.1)
+	r.teleport(sp + Vector3(0, 0.01, 0.55), Nights.yaw_to(Vector3.FORWARD))  # runs north through the clear spot
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.3)
+	Input.action_press("forward"); Input.action_press("run")
+	await _wait(host, 0.4)
+	var v0 := Vector3(r.velocity.x, 0, r.velocity.z).normalized()
+	Input.action_release("forward"); Input.action_press("right")
+	for i in 3:
+		await host.get_tree().physics_frame
+	var v1 := Vector3(r.velocity.x, 0, r.velocity.z).normalized()
+	var a1 := rad_to_deg(v0.angle_to(v1))
+	var a2 := 0.0  # the most she has turned within the next 0.6 s (before she may run into something)
+	for i in 36:
+		await host.get_tree().physics_frame
+		var vv := Vector3(r.velocity.x, 0, r.velocity.z)
+		if vv.length() > 0.2:
+			a2 = maxf(a2, rad_to_deg(v0.angle_to(vv.normalized())))
+	Input.action_release("right"); Input.action_release("run")
+	_check("a run turns in an arc, not on the spot", a1 < 40.0 and a2 > 60.0, "after 3 frames %.0f°, within 0.6 s %.0f°" % [a1, a2])
+	var sx: float = absf(r.tail._sx) + absf(r.tail._svx)
+	_check("the tail swung in the turn", sx > 0.01, "%.3f" % sx)
+	await _wait(host, 0.5)
+	# a big fall dazes her
+	var fp := _open_floor()
+	r.teleport(fp + Vector3.UP * 1.4, 0.0)
+	await _wait(host, 0.9)
+	_check("a fall from 1.4 m dazes her", r.stunned() and r.global_position.y < 0.1, "stun %.2f y %.2f" % [r._stun, r.global_position.y])
+	await _wait(host, 2.5)
+	_check("and she gets over it", not r.stunned())
+	# bumping a loose apple pushes it
+	var ap: Knockable = null
+	for k in g.find_children("*", "Knockable", true, false):
+		if (k as Knockable).is_round():
+			ap = k
+			break
+	if ap == null:
+		print("SKIP no round thing to push on this night")
+		return
+	var at := _open_floor()
+	ap.freeze = false
+	ap.knocked = true
+	ap.global_position = at + Vector3(0, 0.05, -0.2)
+	await _wait(host, 0.8)
+	var a0 := ap.global_position
+	r.teleport(at + Vector3(0, 0.01, 0.15), Nights.yaw_to(Vector3.FORWARD))
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.2)
+	Input.action_press("forward")
+	await _wait(host, 1.2)
+	Input.action_release("forward")
+	_check("bumping a loose apple nudges it", ap.global_position.distance_to(a0) > 0.05, "moved %.2f m" % ap.global_position.distance_to(a0))
+
+
+## A spot on the open floor with nothing above it (for falls and pushes).
+func _open_floor(room := 0.0) -> Vector3:
+	for i in 600:
+		var p := g.grid.random_free(1.0, g.hole_point())
+		var roomy := true
+		for k in 16:
+			var a := k * TAU / 16.0
+			for rr in [room * 0.5, room]:
+				if room > 0.0 and g.grid.blocked_at(p + Vector3(cos(a), 0, sin(a)) * rr):
+					roomy = false
+		if not roomy:
+			continue
+		if g.ray(p + Vector3.UP * 0.05, p + Vector3.UP * 1.7).is_empty() and g.grid.free_point(p + Vector3(0, 0, -0.3)).distance_to(p + Vector3(0, 0, -0.3)) < 0.15 and not g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3).is_empty():
+			var h := g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3)
+			if h.position.y < 0.03:
+				return h.position
+	return Vector3.ZERO
+
+
+## How fast each walk/run clip's planted feet move over the ground (m/s at speed 1): the clip must play at
+## speed / this, so the feet don't slide.
+func _stride(a: Node3D) -> void:
+	var sk := a.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var ap := a.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var feet := []
+	for b in sk.get_bone_count():
+		var bn := sk.get_bone_name(b).to_lower()
+		if ((bn.contains("foot") or bn.contains("toe") or bn.contains("paw")) and not bn.contains("end")) or (bn.contains("lowerleg") and bn.ends_with("_end") and not bn.begins_with("ik")):
+			feet.append(b)
+	if feet.is_empty():  # generic bone names (Bone.012): the four lowest leaf bones are the paws
+		var leaves := []
+		for b in sk.get_bone_count():
+			if sk.get_bone_children(b).is_empty() and not sk.get_bone_name(b).begins_with("IK") and sk.get_bone_name(b) != "Eyes":
+				leaves.append([(sk.get_bone_global_rest(b)).origin.y, b])
+		leaves.sort()
+		for i in mini(4, leaves.size()): feet.append(leaves[i][1])
+	for clip in ["walk", "run"]:
+		if not ap.has_animation(clip): continue
+		ap.play(clip)
+		var len := ap.get_animation(clip).length
+		var n := 120
+		var pos := []
+		for i in n + 1:
+			ap.seek(len * i / n, true)
+			sk.force_update_all_bone_transforms() if sk.has_method("force_update_all_bone_transforms") else null
+			var row := []
+			for b in feet:
+				row.append(a.global_transform.affine_inverse() * (sk.global_transform * sk.get_bone_global_pose(b)).origin)
+			pos.append(row)
+		var speeds := []
+		for f in feet.size():
+			var lo := 1e9
+			for i in n + 1: lo = minf(lo, pos[i][f].y)
+			var hi := -1e9
+			for i in n + 1: hi = maxf(hi, pos[i][f].y)
+			var tot := 0.0; var cnt := 0
+			for i in n:
+				if pos[i][f].y < lo + (hi - lo) * 0.2 and pos[i + 1][f].y < lo + (hi - lo) * 0.2:
+					tot += absf(pos[i + 1][f].z - pos[i][f].z) / (len / n); cnt += 1
+			if cnt > 0: speeds.append(tot / cnt)
+		speeds.sort()
+		print("STRIDE %s %s feet %d  ground speed %s  set %.2f" % [a.name, clip, feet.size(), str(speeds), a.walk_clip_speed if clip == "walk" else a.run_clip_speed])

@@ -444,5 +444,6 @@
    ]
   ]
  },
- "kitchenUpper": true
+ "kitchenUpper": true,
+  "freeEnd": true
 }
