@@ -108,7 +108,8 @@ func _run(host: Node) -> void:
 			Input.action_press("jump")
 			await _wait(host, 0.05)
 			Input.action_release("jump")
-			await _wait(host, 1.3)
+			for q in 13:
+				await _wait(host, 0.1)
 			_check("climbed onto the " + st[1], r.surface_id == st[1] and absf(r.global_position.y - st[2]) < 0.05, "surface " + r.surface_id + " y %.2f" % r.global_position.y)
 		# along the cabinet tops and the shelf over the window to the fridge
 		r.teleport(Nights.world(380, 15, 216), Nights.yaw_to(Vector3.RIGHT))
@@ -119,6 +120,14 @@ func _run(host: Node) -> void:
 		Input.action_release("forward")
 		await _wait(host, 0.5)
 		_check("walked over the window shelf and the cabinets onto the fridge", r.surface_id == "fridge", "surface " + r.surface_id + " at " + str(r.global_position))
+		# on the cabinet tops facing the wall: no jump onto the top of the wall (outside the room)
+		r.teleport(Nights.world(200, 20, 216), Nights.yaw_to(Vector3.FORWARD))
+		await _wait(host, 0.4)
+		_check("no jump target onto the wall top from the cabinets", not r.has_jump_target() or r._target.y < 2.3, "target " + str(r._target))
+		# outside the room: put back
+		r.teleport(Vector3(0, 3.2, -3.4), 0.0)
+		await _wait(host, 0.3)
+		_check("brought back into the room from outside", r.global_position.y < 2.6 and r.global_position.z > -3.1, str(r.global_position))
 		# push the mug off the table: it slides to the edge, falls and breaks
 		var cup: Knockable = null
 		for k in g.knockables:

@@ -7,6 +7,7 @@ signal surface_changed(id: String)
 signal landed(drop: float)
 
 const MASK := 1  # raycasts hit the world, never the rat (layer 2)
+const CEILING := 2.5
 
 var walk_speed := 0.9
 var run_speed := 1.9
@@ -226,7 +227,8 @@ func _find_jump_target() -> void:
 		var dd := 0.14
 		while dd <= max_jump_reach and not _has_target:
 			var o := p0 + f * dd + Vector3.UP * (max_jump_up + 0.2)
-			var hit := _ray(o, o + Vector3.DOWN * (max_jump_up + 0.7))
+			o.y = minf(o.y, CEILING - 0.03)  # start under the ceiling, not on top of it
+			var hit := _ray(o, Vector3(o.x, p0.y - 0.5, o.z))
 			if not hit.is_empty():
 				var dy: float = hit.position.y - p0.y
 				if dy > 0.07 and dy <= max_jump_up and hit.normal.y > 0.75 and _clear(hit.position) and _path_clear(p0, hit.position):
@@ -302,8 +304,8 @@ func _tick_jump(dt: float) -> void:
 		p = _climb_pos(t)
 	else:
 		p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
-	# a real flight: something in the way (a chair back, a wall, a lamp) stops her and she drops
-	if not _jump_up or t < 0.35:
+	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops
+	if not _jump_up:
 		var hit := move_and_collide(p - global_position, true)
 		if hit and hit.get_normal().y < 0.5:
 			var away := hit.get_normal()
@@ -336,7 +338,7 @@ func _climb_pos(t: float) -> Vector3:
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
 	var edge_d := clampf(Vector3(_climb_edge.x - _from.x, 0, _climb_edge.z - _from.z).length(), 0.0, flat.length())
-	var base := _from + dirv * maxf(0.0, edge_d - 0.07)  # hind paws under the edge
+	var base := _from + dirv * maxf(0.0, edge_d - 0.13)  # snout at the edge, hind paws under it
 	var dy := _to.y - _from.y
 	var reach := minf(dy, 0.13)  # how far up she stretches before the hop
 	if t < 0.35:  # run in and rear up

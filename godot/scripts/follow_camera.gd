@@ -24,9 +24,9 @@ func _ready() -> void:
 	arm = SpringArm3D.new()
 	arm.collision_mask = 1 | 4  # the world and the ceiling
 	var sh := SphereShape3D.new()
-	sh.radius = 0.04
+	sh.radius = 0.06  # keeps the lens a little away from walls and furniture, so it doesn't see into them
 	arm.shape = sh
-	arm.margin = 0.02
+	arm.margin = 0.03
 	add_child(arm)
 	cam = Camera3D.new()
 	cam.near = 0.02

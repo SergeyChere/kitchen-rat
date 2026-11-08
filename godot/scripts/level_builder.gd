@@ -402,8 +402,8 @@ func _room() -> void:
 	var fm := (fl as MeshInstance3D).mesh as BoxMesh
 	fm.size = Vector3(9.6, 0.1, 6.0)
 	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), mat(hex(pal.get("ceil", 0x22263a))), root, false)
-	var cb := StaticBody3D.new()  # only the camera bumps into the ceiling (layer 3), up on the cabinets
-	cb.collision_layer = 4
+	var cb := StaticBody3D.new()  # the rat and the camera bump into the ceiling (up on the cabinets)
+	cb.collision_layer = 1 | 4
 	cb.collision_mask = 0
 	var ccs := CollisionShape3D.new()
 	var csh := BoxShape3D.new()

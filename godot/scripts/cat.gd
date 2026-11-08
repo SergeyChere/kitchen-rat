@@ -114,7 +114,21 @@ func after_catch() -> void:
 	G.bubble_on("Hmph.", self, 0.5, 1.2)
 
 
+## Lying down she sits on top of the cushion, not inside it (and the curled pose sits a little low anyway).
+func _lift(dt: float) -> void:
+	if anim == null or anim.ap == null:
+		return
+	var m := anim.ap.owner as Node3D
+	if m == null:
+		return
+	var lying := mode == Mode.SLEEP
+	var on_bed := Vector2(global_position.x - bed.x, global_position.z - bed.z).length() < 0.2
+	var want := (0.045 + (0.05 if on_bed else 0.0)) if lying else 0.0
+	m.position.y = move_toward(m.position.y, want, dt * 0.6) if dt > 0.0 else want
+
+
 func _process(dt: float) -> void:
+	_lift(dt)
 	if not G.playing() or mode == Mode.AWAY:
 		sees = false
 		return

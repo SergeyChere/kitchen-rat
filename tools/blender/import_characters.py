@@ -65,7 +65,7 @@ PUP.update({
 })
 
 CAT_SIT = hold(k("Bone", down=0.08, pitch=-10))
-CAT_SLEEP = hold(k("Bone", down=0.36), k("Bone.001", down=0.0, pitch=10), k("Bone.003", pitch=30), k("Bone.004", pitch=70))
+CAT_SLEEP = hold(k("Bone", down=0.2), k("Bone.001", down=0.0, pitch=10), k("Bone.003", pitch=30), k("Bone.004", pitch=70))
 CAT = {
     "walk": ("Walking",), "run": ("Walking", 2.2), "carry_pup": ("Walking", 0.8),
     "pounce": ("Walking", 3.0, 0, 20, False, [k("Bone", 0, down=0.12), k("Bone", 0.5, down=-0.08), k("Bone", 1)]),
@@ -79,7 +79,7 @@ CAT = {
     "sleep": ("Idle", 0.5, None, None, False, CAT_SLEEP),
     "stir": ("Idle", 1.0, 0, 30, False, CAT_SLEEP[:4] + [k("Bone.003", 0, pitch=30), k("Bone.003", 0.5, pitch=10, yaw=15), k("Bone.003", 1, pitch=30)]),
     "head_up": ("Idle", 1.0, 0, 20, False, CAT_SLEEP[:4] + [k("Bone.003", 0, pitch=30), k("Bone.003", 1, pitch=-10)]),
-    "wake_up": ("Idle", 1.0, 0, 24, False, [k("Bone", 0, down=0.36), k("Bone.001", 0, pitch=10), k("Bone.003", 0, pitch=30),
+    "wake_up": ("Idle", 1.0, 0, 24, False, [k("Bone", 0, down=0.2), k("Bone.001", 0, pitch=10), k("Bone.003", 0, pitch=30),
                                            k("Bone", 1), k("Bone.001", 1), k("Bone.003", 1)]),
 }
 

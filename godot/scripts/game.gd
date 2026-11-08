@@ -214,12 +214,21 @@ func _make_rat() -> void:
 	cs.shape = cap
 	cs.position = Vector3(0, 0.062, 0)
 	rat.add_child(cs)
+	# her body and snout, lying along her length, so her head doesn't poke into walls and furniture
+	var body := CollisionShape3D.new()
+	var bc := CapsuleShape3D.new()
+	bc.radius = 0.04
+	bc.height = 0.26
+	body.shape = bc
+	body.rotation = Vector3(PI / 2.0, 0, 0)
+	body.position = Vector3(0, 0.065, 0.02)
+	rat.add_child(body)
 	add_child(rat)
 	rat.global_position = Nights.world(180, 680, 2)
 	rat.rotation.y = PI  # facing north, toward the mouse hole
 	var model := _builder.spawn("characters/rat_mother", rat.global_position, 0.0, rat)
 	model.rotation = Vector3.ZERO
-	model.position = Vector3.UP * 0.012  # the paws dip a little in the walk and run clips
+	model.position = Vector3.UP * 0.018  # the paws dip a little in the run and sneak clips
 	rat.anim = ClipPlayer.new(model)
 	rat.model = model
 	var b := LevelBuilder.aabb_of(model)
@@ -340,7 +349,7 @@ func _make_extras() -> void:
 		pp.name = "Pup " + str(list[i])
 		add_child(pp)
 		var m := _builder.spawn("characters/rat_pup", Vector3.ZERO, 0.0, pp)
-		m.position = Vector3.UP * 0.008
+		m.position = Vector3.UP * 0.01
 		m.scale = Vector3.ONE * (0.75 + age * 0.55)
 		pp.global_position = hole + Vector3(0.2 + i * 0.12, 0, -0.2 - i * 0.1)
 		pp.rotation.y = PI
@@ -593,6 +602,7 @@ func _process(dt: float) -> void:
 			noisy_near = z.sound
 			break
 	_tick_rat_noise(dt)
+	_keep_in_room(rp)
 	if Input.is_action_just_pressed("drop"):
 		var dropped := rat.drop_one()
 		if dropped:
@@ -632,6 +642,24 @@ func _process(dt: float) -> void:
 			_end(true, "The End", "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom.")
 		else:
 			_end(true, "The nest is full!", "The pups are fed. Next night: " + str(night.get("teaser", "")))
+
+
+var _safe_p := Vector3.INF
+
+
+## A safety net: if she ever ends up outside the room (through a gap, onto a wall top), put her back where she
+## last stood safely.
+func _keep_in_room(rp: Vector3) -> void:
+	var inside := rp.x > -4.95 and rp.x < 4.95 and rp.z > -3.1 and rp.z < 4.95 and rp.y > -0.3 and rp.y < 2.6
+	if inside:
+		if rat.is_on_floor() and not rat.jumping and rp.y < 2.35:
+			_safe_p = rp
+		return
+	if _safe_p != Vector3.INF:
+		rat.teleport(_safe_p, rat.rotation.y)
+	else:
+		rat.teleport(hole + Vector3(0, 0, -0.2), PI)
+	bubble_at("Whoa!", rat.global_position + Vector3.UP * 0.3, 1.0)
 
 
 func _tick_rat_noise(dt: float) -> void:
