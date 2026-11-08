@@ -80,6 +80,7 @@ var _sniffing := false
 var _sniff_hold := 0.0
 var _scent: Array[Food] = []
 var _trails: Array[MeshInstance3D] = []
+var _sniff_beat := 0.0
 var _builder: LevelBuilder
 var _stuck_imm := 0.0
 var _stuck_snd := 0.0
@@ -447,6 +448,31 @@ func add_alarm(a: float) -> void:
 	_alarm += a
 
 
+## Mom hands the food over: it hops from her mouth to the nearest pup in the nest, who squeaks.
+func _hand_over(f: Food) -> void:
+	var pup: Node3D = null
+	var best := 1e9
+	for p in nest_pups:
+		if p.visible and p.global_position.distance_to(rat.global_position) < best:
+			best = p.global_position.distance_to(rat.global_position)
+			pup = p
+	if pup == null:
+		f.queue_free()
+		return
+	var from := f.global_position
+	f.reparent(self, true)
+	f.global_position = from
+	var to := pup.global_position + Vector3.UP * 0.04
+	var tw := create_tween()
+	tw.tween_method(func(t: float): if is_instance_valid(f): f.global_position = from.lerp(to, t) + Vector3.UP * sin(t * PI) * 0.12, 0.0, 1.0, 0.45)
+	tw.tween_callback(func():
+		if is_instance_valid(f): f.queue_free()
+		Sfx.play("squeak", to, -6.0, randf_range(1.4, 1.7))
+		var cp := ClipPlayer.new(pup)
+		cp.play("eat", 0.1)
+		get_tree().create_timer(1.6).timeout.connect(func(): if is_instance_valid(pup): cp.play("idle", 0.3)))
+
+
 func deliver() -> void:
 	var poison := 0
 	var value := 0
@@ -458,7 +484,7 @@ func deliver() -> void:
 		if f.is_cheese() and not f.poison: cheese = true
 		if f.id != "": tasks.delivered[f.id] = true
 		foods.erase(f)
-		f.queue_free()
+		_hand_over(f)
 	tasks.delivered_any = true
 	if weight >= 3:
 		tasks.set_flag("full")
@@ -774,6 +800,15 @@ func _tick_sniff(dt: float) -> void:
 		return
 	var before := _sniff_hold
 	_sniff_hold += dt
+	# "warmer, colder": she sniffs faster when the camera faces the strongest smell
+	if not _scent.is_empty() and is_instance_valid(_scent[0]):
+		var to := _scent[0].global_position - rp
+		var cf := Vector3(sin(cam.yaw), 0, cos(cam.yaw))
+		var facing := clampf(cf.dot(Vector3(to.x, 0, to.z).normalized()), 0.0, 1.0)
+		_sniff_beat -= dt
+		if _sniff_beat <= 0.0:
+			_sniff_beat = lerpf(0.9, 0.22, facing * facing)
+			Sfx.play("sniff", rp, lerpf(-12.0, -3.0, facing), lerpf(0.95, 1.25, facing))
 	if _sniff_hold > 0.6:
 		tasks.set_flag("sniffed")
 	if (before <= 0.35 and _sniff_hold > 0.35) or floori(before / 0.5) != floori(_sniff_hold / 0.5):
@@ -801,6 +836,7 @@ func _pick_scent(first: bool) -> void:
 		var f: Food = cand[i][1]
 		_scent.append(f)
 		f.reveal_t = 7.0
+		f.set_meta("scent_mark", 6.0)  # stays marked for a while after sniffing
 		if f.poison and not f.has_meta("seen"):
 			f.set_meta("seen", true)
 			tasks.flag("poisonSeen")
@@ -1674,8 +1710,24 @@ func _draw_trail(mi: MeshInstance3D, from: Vector3, to: Vector3, poison: bool, i
 		var p := pts[k]
 		var tan := (pts[mini(k + 1, 23)] - pts[maxi(k - 1, 0)]).normalized()
 		var off := tan.cross((eye - p).normalized()).normalized() * 0.007  # the ribbon faces the camera: seen from any side
-		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
+		im.surface_set_color(Color(c.r, c.g, c.b, alpha * 0.45 * (1.0 - t * 0.6)))
 		im.surface_add_vertex(p + off)
-		im.surface_set_color(Color(c.r, c.g, c.b, alpha * (1.0 - t * 0.6)))
+		im.surface_set_color(Color(c.r, c.g, c.b, alpha * 0.45 * (1.0 - t * 0.6)))
 		im.surface_add_vertex(p - off)
+	im.surface_end()
+	# specks of smell drifting along it toward the food, brighter the closer the food is
+	var near := clampf(1.0 - from.distance_to(to) / 4.0, 0.25, 1.0)
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for j in 14:
+		var u := fmod(t0 * 0.35 + j / 14.0, 1.0)
+		var fi := u * 23.0
+		var k0 := int(floor(fi))
+		var q := pts[k0].lerp(pts[mini(k0 + 1, 23)], fi - k0)
+		var to_eye := (eye - q).normalized()
+		var rx := to_eye.cross(Vector3.UP).normalized() * 0.008
+		var ry := rx.cross(to_eye).normalized() * 0.008
+		var col := Color(c.r, c.g, c.b, alpha * near * sin(u * PI) * 1.4)
+		for v in [q - rx - ry, q + rx - ry, q + rx + ry, q - rx - ry, q + rx + ry, q - rx + ry]:
+			im.surface_set_color(col)
+			im.surface_add_vertex(v)
 	im.surface_end()

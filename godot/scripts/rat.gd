@@ -56,6 +56,8 @@ var hop_hold_force := 6.0
 var _last_strong_dir := Vector3.BACK
 var _was_on_floor := true
 var _air_top := 0.0
+var _sway := 0.0
+var _rustle := 0.0
 var _jump_up := false
 var _from := Vector3.ZERO
 var _to := Vector3.ZERO
@@ -67,6 +69,9 @@ var _target_up := false
 var _target := Vector3.ZERO
 var _edge := Vector3.ZERO  # where the surface she climbs onto begins
 var _climb_edge := Vector3.ZERO
+var _kind := ""  # up (climb an edge), grab (caught an edge in the air), down (jump down), descend (climb down), pole (up a leg)
+var _grabbed := false  # one ledge grab per hop
+var _hopping := false  # in the air after her own hop (only then she reaches for an edge)
 
 
 func _ready() -> void:
@@ -120,21 +125,52 @@ func _set_crouch(on: bool) -> void:
 	body_shape.position.y = 0.04 if on else 0.065
 
 
+## What she carries swings with her steps; heavy cheese hangs low; dragging rustles.
+func _tick_carry(dt: float) -> void:
+	if carried.is_empty():
+		return
+	_sway += dt * (4.0 + move_speed * 14.0)
+	var amp := clampf(move_speed / run_speed, 0.0, 1.0)
+	var heavy := carry_weight() >= 2
+	for i in carried.size():
+		var f := carried[i]
+		f.rotation.z = sin(_sway + i * 0.7) * 0.25 * amp
+		f.rotation.x = (0.35 if heavy else 0.0) + absf(cos(_sway)) * 0.15 * amp
+	if dragging() and moving():
+		_rustle -= dt
+		if _rustle <= 0.0:
+			_rustle = 0.35
+			Sfx.play("scrape", global_position, -10.0, randf_range(0.9, 1.1))
+			add_noise(0.3)
+
+
 ## Drop the last thing she carries in front of her (key G). Returns it, or null.
 func drop_one() -> Food:
 	if carried.is_empty() or jumping:
 		return null
 	var f: Food = carried.pop_back()
 	f.carried = false
-	var at := global_position + global_transform.basis.z * 0.1
-	var hit := _ray(at + Vector3.UP * 0.15, at + Vector3.DOWN * 0.3)
+	# tossed: it flies a little ahead and rolls to a stop
+	var fw := global_transform.basis.z
+	var at := global_position + fw * 0.32
+	var hit := _ray(at + Vector3.UP * 0.15, at + Vector3.DOWN * 3.0)
 	if not hit.is_empty():
 		at = hit.position
+	var from := f.global_position
 	f.reparent(Game.I._builder.foods, true)
-	f.global_position = at
+	f.global_position = from
 	f.rotation = Vector3.ZERO
 	f.scale = Vector3.ONE
-	f.set_meta("dropped_at", at)  # not picked up again until she walks away from it
+	var roll := at + fw * 0.06
+	var hit2 := _ray(roll + Vector3.UP * 0.05, roll + Vector3.DOWN * 0.06)
+	if hit2.is_empty():
+		roll = at
+	var tw := f.create_tween()
+	tw.tween_method(func(t: float): f.global_position = from.lerp(at, t) + Vector3.UP * sin(t * PI) * 0.1; f.rotation.x = t * 4.0, 0.0, 1.0, 0.32)
+	tw.tween_callback(func(): Sfx.play("land", at, -8.0, 1.8))
+	tw.tween_property(f, "global_position", roll, 0.2).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(f, "rotation:x", 6.0, 0.2)
+	f.set_meta("dropped_at", roll)  # not picked up again until she walks away from it
 	return f
 
 
@@ -149,6 +185,8 @@ func teleport(p: Vector3, yaw: float) -> void:
 	hide_spot = null
 	in_nest = false
 	_was_on_floor = true
+	_grabbed = false
+	_last_strong_dir = Vector3(sin(yaw), 0, cos(yaw))
 
 
 func _physics_process(dt: float) -> void:
@@ -199,11 +237,16 @@ func _physics_process(dt: float) -> void:
 	spd *= 0.5 if dragging() else maxf(0.45, 1.0 - 0.18 * carry_weight())  # loaded she's clearly slower
 	if d.length() > 0.2:
 		_last_strong_dir = d.normalized()
-	if d.length() > 0.01 or not is_on_floor():
-		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(_last_strong_dir), clampf(dt * rotation_speed, 0.0, 1.0))
+	if d.length() > 0.01:
+		# dragging something big she walks backwards, pulling it after her
+		var face := -_last_strong_dir if dragging() else _last_strong_dir
+		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(face), clampf(dt * rotation_speed, 0.0, 1.0))
 
 	if _land_t > 0.0:
 		spd *= 0.4  # getting up after a landing (longer after a big drop)
+	if is_on_floor() and not running and _try_descend(d):
+		_play_anim()
+		return
 	var before := global_position
 	# velocity eases toward the wanted one; in the air she mostly keeps her momentum
 	var acc := (acceleration * (1.0 - 0.12 * carry_weight())) if is_on_floor() else air_acceleration
@@ -226,24 +269,32 @@ func _physics_process(dt: float) -> void:
 	# landing after a fall or a hop (the aimed jumps land on their own)
 	if not is_on_floor():
 		_air_top = maxf(_air_top, global_position.y) if not _was_on_floor else global_position.y
+		_try_ledge_grab()
+		if jumping:
+			_play_anim()
+			return
 	elif not _was_on_floor:
 		var drop := _air_top - global_position.y
 		if drop > 0.05:
 			landed.emit(drop)
 			_land_t = clampf(0.08 + drop * 0.35, 0.08, 0.5)
 	_was_on_floor = is_on_floor()
+	if is_on_floor():
+		_grabbed = false
+		_hopping = false
 	var moved := global_position - before
 	moved.y = 0.0
 	move_speed = moved.length() / dt if dt > 0.0 else 0.0
 	blocked = d.length() > 0.1 and move_speed < spd * 0.35
 	if moving():
 		add_noise(0.8 if running else (0.0 if sneaking else 0.25))
+	_tick_carry(dt)
 	if _land_t > 0.0:
 		_land_t -= dt
 
 	if model and not jumping:
 		# the hop: nose up going up, nose down coming down
-		var tilt := 0.0 if is_on_floor() else clampf(velocity.y * 10.0, -15.0, 22.0)
+		var tilt := (-4.0 if carry_weight() >= 2 else 0.0) if is_on_floor() else clampf(velocity.y * 10.0, -15.0, 22.0)  # heavy: head down
 		model.rotation.x = lerp_angle(model.rotation.x, -deg_to_rad(tilt), clampf(dt * 14.0, 0.0, 1.0))
 	_update_surface()
 	_find_jump_target()
@@ -252,11 +303,14 @@ func _physics_process(dt: float) -> void:
 			pass
 		elif Game.I.use_tunnel():
 			pass
-		elif _has_target and not (_target_up and dragging()):
+		elif _has_target and not dragging():
 			_start_jump(_target, _target_up)
-		elif is_on_floor():
+		elif _try_pole():
+			pass
+		elif is_on_floor() and not dragging():
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			velocity.y = hop_impulse
+			_hopping = true
 			var fw := global_transform.basis.z
 			velocity.x += fw.x * 0.9
 			velocity.z += fw.z * 0.9
@@ -334,7 +388,7 @@ func _path_clear(a: Vector3, b: Vector3) -> bool:
 func _show_marker(on: bool) -> void:
 	if marker == null:
 		return
-	marker.visible = on
+	marker.visible = false  # no ring: Space near an edge just does the right thing
 	if on:
 		marker.global_position = _target + Vector3.UP * 0.004
 
@@ -343,6 +397,7 @@ func _start_jump(to: Vector3, up: bool) -> void:
 	jumping = true
 	Sfx.play("jump", global_position)
 	_jump_up = up
+	_kind = "up" if up else "down"
 	_from = global_position
 	_to = to
 	_t = 0.0
@@ -361,12 +416,13 @@ func _tick_jump(dt: float) -> void:
 	var t := clampf(_t, 0.0, 1.0)
 	var p := _from.lerp(_to, t)
 	var dy := _to.y - _from.y
-	if _jump_up:
-		p = _climb_pos(t)
-	else:
-		p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
+	match _kind:
+		"up", "grab": p = _climb_pos(t)
+		"descend": p = _descend_pos(t)
+		"pole": p = _pole_pos(t)
+		_: p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
 	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops
-	if not _jump_up:
+	if _kind == "down":
 		var hit := move_and_collide(p - global_position, true)
 		if hit and hit.get_normal().y < 0.5:
 			var away := hit.get_normal()
@@ -379,7 +435,12 @@ func _tick_jump(dt: float) -> void:
 			return
 	global_position = p
 	if model:
-		model.rotation.x = -deg_to_rad(_climb_tilt(t)) if _jump_up else 0.0
+		var tilt := 0.0
+		match _kind:
+			"up", "grab": tilt = _climb_tilt(t)
+			"pole": tilt = 85.0 * (1.0 - smoothstep(0.75, 1.0, t)) * smoothstep(0.0, 0.15, t)
+			"descend": tilt = -60.0 * smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(0.85, 1.0, t))
+		model.rotation.x = -deg_to_rad(tilt)
 	if t < 1.0:
 		return
 	jumping = false
@@ -387,8 +448,8 @@ func _tick_jump(dt: float) -> void:
 		model.rotation.x = 0.0
 	velocity = Vector3(0, -0.5, 0)
 	var drop := _from.y - _to.y
-	_land_t = clampf(0.12 + drop * 0.35, 0.12, 0.5) if not _jump_up else 0.12
-	add_noise(0.15 if _jump_up else 0.35)
+	_land_t = clampf(0.12 + drop * 0.35, 0.12, 0.5) if _kind == "down" else 0.1
+	add_noise(0.35 if _kind == "down" else 0.12)
 	_update_surface()
 	landed.emit(_from.y - _to.y)
 
@@ -417,6 +478,124 @@ func _climb_pos(t: float) -> Vector3:
 	return q
 
 
+## Climbing down: to the edge, nose down, and down the side onto the surface below.
+func _descend_pos(t: float) -> Vector3:
+	var edge := _climb_edge
+	if t < 0.25:
+		var q := _from.lerp(Vector3(edge.x, _from.y, edge.z), smoothstep(0.0, 1.0, t / 0.25))
+		return q
+	var k := (t - 0.25) / 0.75
+	var q := Vector3(edge.x, _from.y, edge.z).lerp(_to, smoothstep(0.0, 1.0, k))
+	q.y = lerpf(_from.y, _to.y, smoothstep(0.0, 1.0, k))
+	return q
+
+
+## Up a chair or table leg: straight up its side, then over onto the top.
+func _pole_pos(t: float) -> Vector3:
+	var base := _climb_edge  # at the leg, on the floor
+	if t < 0.12:
+		return _from.lerp(base, t / 0.12)
+	if t < 0.78:
+		var q := base
+		q.y = lerpf(_from.y, _to.y - 0.04, smoothstep(0.0, 1.0, (t - 0.12) / 0.66))
+		return q
+	var k := (t - 0.78) / 0.22
+	var q := Vector3(base.x, _to.y - 0.04, base.z).lerp(_to, smoothstep(0.0, 1.0, k))
+	q.y = lerpf(_to.y - 0.04, _to.y, k)
+	return q
+
+
+func _start_kind(kind: String, to: Vector3, edge: Vector3, dur: float) -> void:
+	jumping = true
+	_jump_up = kind != "descend"
+	_kind = kind
+	_from = global_position
+	_to = to
+	_climb_edge = edge
+	_t = 0.0
+	_dur = dur
+	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
+	if flat.length() > 0.01:
+		rotation.y = Nights.yaw_to(flat)
+	Sfx.play("scratch", global_position, -8.0, 1.4)
+
+
+## In the air after a hop: an edge right ahead within reach of her front paws? Grab it and pull up.
+func _try_ledge_grab() -> void:
+	if not _hopping or _grabbed or dragging() or velocity.y > 0.8:
+		return
+	var p0 := global_position
+	var f := global_transform.basis.z.normalized()
+	var dd := 0.08
+	while dd <= 0.26:
+		var o := p0 + f * dd + Vector3.UP * 0.4
+		o.y = minf(o.y, CEILING - 0.03)
+		var hit := _ray(o, Vector3(o.x, p0.y - 0.02, o.z))
+		dd += 0.04
+		if hit.is_empty():
+			continue
+		var dy: float = hit.position.y - p0.y
+		if dy > 0.1 and dy < 0.42 and hit.normal.y > 0.75 and hit.position.y < CEILING - 0.25 and _clear(hit.position):
+			_grabbed = true
+			_edge = hit.position
+			_start_kind("grab", _inward(hit.position, f), hit.position, 0.5 + maxf(dy, 0.0) * 0.8)
+			velocity = Vector3.ZERO
+			return
+
+
+## Walking (not running) off a raised surface: she climbs down the side instead of dropping.
+func _try_descend(d: Vector3) -> bool:
+	if running or dragging() or surface_id == "floor" or d.length() < 0.2:
+		return false
+	var f := d.normalized()
+	var p0 := global_position
+	var ahead := p0 + f * 0.09
+	if not _ray(ahead + Vector3.UP * 0.05, ahead + Vector3.DOWN * 0.06).is_empty():
+		return false  # still ground under her nose
+	# where the edge is, and what's below beyond it
+	var edge := p0
+	for i in 8:
+		var q := p0 + f * (0.01 * i)
+		if _ray(q + Vector3.UP * 0.05, q + Vector3.DOWN * 0.06).is_empty():
+			break
+		edge = q
+	var land := edge + f * 0.1
+	var hit := _ray(land + Vector3.UP * 0.05, land + Vector3.DOWN * 1.3)
+	if hit.is_empty():
+		return false
+	var drop: float = p0.y - hit.position.y
+	if drop < 0.12 or drop > 1.0 or hit.normal.y < 0.75 or not _clear(hit.position):
+		return false
+	_start_kind("descend", hit.position, edge, 0.45 + drop * 0.8)
+	return true
+
+
+## Space right at a chair / table / stool that's too high to jump onto: climb up its side or leg to the top
+## (up to 1.2 m).
+func _try_pole() -> bool:
+	if dragging() or not is_on_floor():
+		return false
+	var p0 := global_position
+	var f := global_transform.basis.z.normalized()
+	var dd := 0.06
+	while dd <= 0.3:
+		var o := p0 + f * dd + Vector3.UP * 1.3
+		o.y = minf(o.y, CEILING - 0.03)
+		var hit := _ray(o, Vector3(o.x, p0.y + 0.25, o.z))
+		dd += 0.03
+		if hit.is_empty():
+			continue
+		var dy: float = hit.position.y - p0.y
+		var what := Game.surface_of(hit.collider)
+		if dy > 0.28 and dy <= 1.2 and hit.normal.y > 0.75 and what != "fridge" and hit.position.y < CEILING - 0.25 \
+				and _clear(hit.position) and _ray(p0 + Vector3.UP * 0.1, Vector3(p0.x, hit.position.y + 0.12, p0.z)).is_empty():
+			var at := p0 + f * maxf(0.0, dd - 0.03 - 0.09)  # snout at the side
+			_start_kind("pole", _inward(hit.position, f), at, 0.55 + dy * 1.1)
+			return true
+		break
+	return false
+
+
 func _climb_tilt(t: float) -> float:
 	if t < 0.35:
 		return 70.0 * smoothstep(0.4, 1.0, t / 0.35)
@@ -439,10 +618,12 @@ func _play_anim() -> void:
 		clip = "land"
 	elif sniffing:
 		clip = "sniff"
+	elif hidden() and not moving():
+		clip = "sneak"  # pressed low in her hiding spot
 	elif moving():
 		# walk or run by how fast she actually goes (she eases into a run), as in GDQuest's walk/run blend
 		var fast := move_speed > (walk_speed + run_speed) * 0.5
 		clip = "drag" if dragging() else ("run" if fast else ("sneak" if sneaking else ("carry_walk" if not carried.is_empty() else "walk")))
 	anim.play(clip)
 	var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
-	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else 1.0)
+	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else (0.15 if clip == "sneak" else 1.0))

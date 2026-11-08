@@ -256,7 +256,37 @@ func ring(at: Vector3, radius: float, big: bool) -> void:
 	_rings.append([mi, 0.0, 1.0 if big else 0.6, clampf(radius, 0.5, 6.0)])
 
 
+## A small glowing mark over food she has sniffed out, for a few seconds.
+func _scent_marks(dt: float) -> void:
+	for f in g.foods:
+		if not is_instance_valid(f) or not f.has_meta("scent_mark"):
+			continue
+		var t: float = f.get_meta("scent_mark") - dt
+		var mark := f.get_node_or_null("ScentMark") as Label3D
+		if t <= 0.0 or f.carried:
+			f.remove_meta("scent_mark")
+			if mark: mark.queue_free()
+			continue
+		f.set_meta("scent_mark", t)
+		if mark == null:
+			mark = Label3D.new()
+			mark.name = "ScentMark"
+			mark.text = "◆"
+			mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			mark.no_depth_test = true
+			mark.fixed_size = true
+			mark.pixel_size = 0.0025
+			mark.font_size = 22
+			mark.outline_size = 6
+			mark.modulate = Color(1.0, 0.85, 0.4)
+			f.add_child(mark)
+			mark.position = Vector3.UP * 0.1
+		mark.modulate.a = clampf(t, 0.0, 1.0) * (0.75 + 0.25 * sin(Time.get_ticks_msec() / 160.0))
+		mark.position.y = 0.1 + 0.01 * sin(Time.get_ticks_msec() / 300.0)
+
+
 func _process(dt: float) -> void:
+	_scent_marks(dt)
 	if _beacon:
 		_beacon.visible = not g.rat.carried.is_empty() and not g.rat.in_nest
 		if _beacon.visible:

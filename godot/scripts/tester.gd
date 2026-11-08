@@ -41,6 +41,74 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "climb":
+		var r := g.rat
+		await _wait(host, 0.5)
+		# up a table leg: the table top (75 cm) is too high to jump onto
+		r.teleport(Nights.world(720, 528, 1), Nights.yaw_to(Vector3.FORWARD))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.4)
+		_check("no jump onto the table from the floor", not r.has_jump_target())
+		await _press(host, "jump")
+		await _wait(host, 1.8)
+		_check("climbed up the table leg onto the table", r.surface_id == "table", "surface " + r.surface_id + " y %.2f" % r.global_position.y)
+		# walk off the north edge (not running): she climbs down
+		r.teleport(Nights.world(700, 395, 76), Nights.yaw_to(Vector3.FORWARD))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.3)
+		Input.action_press("forward")
+		var saw := false
+		for i in 20:
+			await _wait(host, 0.1)
+			if r.jumping and r._kind == "descend": saw = true
+		Input.action_release("forward")
+		await _wait(host, 1.0)
+		_check("walking off the table she climbs down", saw and r.global_position.y < 0.05, "y %.2f" % r.global_position.y)
+		# a hop that falls short of the chair seat: she grabs the edge and pulls up
+		r.teleport(Nights.world(634, 420, 1), Nights.yaw_to(Vector3.LEFT))
+		await _wait(host, 0.3)
+		r.velocity = Vector3(-0.9, 1.7, 0)
+		r._hopping = true
+		await _wait(host, 1.4)
+		_check("a short hop grabs the chair edge and climbs up", r.surface_id == "chair", "surface " + r.surface_id + " y %.2f" % r.global_position.y)
+		host.get_tree().quit()
+		return
+	if name == "show":  # a video of the new climbing, sniffing and carrying
+		var r := g.rat
+		await _wait(host, 0.4)
+		r.teleport(Nights.world(720, 545, 1), Nights.yaw_to(Vector3.FORWARD))
+		g.cam.snap(r.rotation.y)
+		Input.action_press("forward")
+		await _wait(host, 0.35)
+		Input.action_release("forward")
+		await _press(host, "jump")
+		await _wait(host, 2.0)
+		g.cam.snap(r.rotation.y)
+		Input.action_press("forward")
+		await _wait(host, 2.2)
+		Input.action_release("forward")
+		await _wait(host, 0.4)
+		Input.action_press("sniff")
+		await _wait(host, 2.6)
+		Input.action_release("sniff")
+		var f := g.spawn_food("cheese", r.global_position, "", false)
+		r.carry(f)
+		g.cam.snap(r.rotation.y + PI * 0.5)
+		Input.action_press("left")
+		await _wait(host, 1.2)
+		Input.action_release("left")
+		await _press(host, "drop")
+		await _wait(host, 1.2)
+		var f2 := g.spawn_food("cheese", r.global_position, "", false)
+		r.teleport(Nights.world(180, 560, 1), PI)
+		r.carry(f2)
+		g.cam.snap(0.0)
+		Input.action_press("back")
+		await _wait(host, 1.6)
+		Input.action_release("back")
+		await _wait(host, 1.6)
+		host.get_tree().quit()
+		return
 	if name == "feel":  # a little run for a video of the movement
 		var r := g.rat
 		r.teleport(Nights.world(300, 500, 1), PI)

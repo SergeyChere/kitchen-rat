@@ -21,6 +21,8 @@ var cam: Camera3D
 ## From GDQuest's third-person controller (MIT): the camera follows the height of the ground she stands on, eased, not
 ## her body, so hops and little drops don't bob the view.
 var _ground_y := INF
+var _sniff_k := 0.0  # 0…1 while she sniffs: a little closer and calmer
+var _hide_k := 0.0  # 0…1 while she hides: the camera sinks to the floor, peeking out with her
 var _pivot_y := INF
 
 
@@ -51,8 +53,9 @@ func _unhandled_input(e: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		return
 	if e is InputEventMouseMotion:
-		yaw -= deg_to_rad(e.relative.x * sensitivity)
-		pitch = pitch - e.relative.y * sensitivity * (-1.0 if invert_y else 1.0)
+		var sens := sensitivity * lerpf(1.0, 0.5, _sniff_k)
+		yaw -= deg_to_rad(e.relative.x * sens)
+		pitch = pitch - e.relative.y * sens * (-1.0 if invert_y else 1.0)
 	elif e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom = clampf(zoom - 4.0, -30.0, 40.0)
@@ -72,7 +75,10 @@ func _process(_dt: float) -> void:
 		yaw -= look.x * 2.6 * _dt
 		pitch = pitch - look.y * 120.0 * _dt
 	pitch = clampf(pitch, lo, hi)
-	cam.fov = clampf(fov + zoom, 30.0, 110.0)
+	var rr := target as Rat
+	_sniff_k = move_toward(_sniff_k, 1.0 if rr and rr.sniffing else 0.0, _dt * 3.0)
+	_hide_k = move_toward(_hide_k, 1.0 if rr and rr.hidden() else 0.0, _dt * 2.5)
+	cam.fov = clampf(fov + zoom - 8.0 * _sniff_k, 30.0, 110.0)
 	rotation = Vector3(deg_to_rad(pitch), yaw + PI, 0.0)  # the camera looks along -Z; +PI makes yaw 0 look toward +Z
 	var rat := target as Rat
 	if first_person and rat and rat.mouth:
@@ -88,11 +94,13 @@ func _process(_dt: float) -> void:
 		var grounded := rat == null or rat.is_on_floor() or rat.jumping or rat.carrier != null
 		if _ground_y == INF or grounded or ty < _ground_y:
 			_ground_y = ty
-		var want_y := _ground_y + lerpf(height, 0.07, high)
+		var want_y := _ground_y + lerpf(lerpf(height, 0.045, _hide_k), 0.07, high)
 		_pivot_y = want_y if _pivot_y == INF else lerpf(_pivot_y, want_y, clampf(_dt * 8.0, 0.0, 1.0))
 		global_position = Vector3(target.global_position.x, _pivot_y, target.global_position.z)
 		global_position.y = minf(global_position.y, Rat.CEILING - 0.12)
-		arm.spring_length = lerpf(distance, 0.5, high)
+		arm.spring_length = lerpf(distance, 0.5, high) * lerpf(1.0, 0.8, _sniff_k) * lerpf(1.0, 0.6, _hide_k)
+		if _hide_k > 0.0 and high <= 0.0:
+			rotation.x = deg_to_rad(lerpf(pitch, clampf(pitch, -12.0, 6.0), _hide_k))  # a level, floor-high look
 		if high > 0.0:
 			rotation.x = deg_to_rad(clampf(pitch, -35.0, lerpf(hi, -2.0, high)))
 		cam.near = 0.02
