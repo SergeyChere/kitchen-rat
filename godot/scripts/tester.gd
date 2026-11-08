@@ -796,11 +796,15 @@ func _open_floor(room := 0.0) -> Vector3:
 					roomy = false
 		if not roomy:
 			continue
-		if g.ray(p + Vector3.UP * 0.05, p + Vector3.UP * 1.7).is_empty() and g.grid.free_point(p + Vector3(0, 0, -0.3)).distance_to(p + Vector3(0, 0, -0.3)) < 0.15 and not g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3).is_empty():
+		var clear_above := true
+		for o in [Vector3.ZERO, Vector3(0.15, 0, 0), Vector3(-0.15, 0, 0), Vector3(0, 0, 0.15), Vector3(0, 0, -0.15)]:
+			if not g.ray(p + o + Vector3.UP * 0.05, p + o + Vector3.UP * 1.7).is_empty():
+				clear_above = false
+		if clear_above and g.grid.free_point(p + Vector3(0, 0, -0.3)).distance_to(p + Vector3(0, 0, -0.3)) < 0.15 and not g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3).is_empty():
 			var h := g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3)
 			if h.position.y < 0.03:
 				return h.position
-	return Vector3.ZERO
+	return _open_floor(room * 0.7) if room > 0.3 else Vector3.ZERO  # nothing that roomy: ask for a little less
 
 
 ## How fast each walk/run clip's planted feet move over the ground (m/s at speed 1): the clip must play at
@@ -892,7 +896,11 @@ func _juice(host: Node) -> void:
 	await _wait(host, 1.0)
 	_check("and settles", absf(g.cam.cam.h_offset) < 0.0005)
 	# running widens the view
+	while r.drop_one() != null:  # heavy food would slow her to a drag
+		pass
+	await _wait(host, 0.6)
 	var fov0: float = g.cam.cam.fov
+	fp = _open_floor(1.2)
 	r.teleport(fp + Vector3(0, 0.01, 0.6), Nights.yaw_to(Vector3.FORWARD))
 	g.cam.snap(r.rotation.y)
 	Input.action_press("forward"); Input.action_press("run")
