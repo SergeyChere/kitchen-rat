@@ -18,6 +18,10 @@ var yaw := PI  # 0 looks toward +Z (south)
 var pitch := -16.0
 var arm: SpringArm3D
 var cam: Camera3D
+## From GDQuest's third-person controller (MIT): the camera follows the height of the ground she stands on, eased, not
+## her body, so hops and little drops don't bob the view.
+var _ground_y := INF
+var _pivot_y := INF
 
 
 func _ready() -> void:
@@ -39,6 +43,8 @@ func _ready() -> void:
 func snap(new_yaw: float) -> void:
 	yaw = new_yaw
 	pitch = -16.0
+	_ground_y = INF
+	_pivot_y = INF
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -78,7 +84,13 @@ func _process(_dt: float) -> void:
 		# up on the cabinets, right under the ceiling: a closer, flatter view so the camera doesn't scrape along the
 		# ceiling and walls (and look into them)
 		var high := clampf((target.global_position.y - 1.6) / 0.5, 0.0, 1.0)
-		global_position = target.global_position + Vector3.UP * lerpf(height, 0.07, high)
+		var ty := target.global_position.y
+		var grounded := rat == null or rat.is_on_floor() or rat.jumping or rat.carrier != null
+		if _ground_y == INF or grounded or ty < _ground_y:
+			_ground_y = ty
+		var want_y := _ground_y + lerpf(height, 0.07, high)
+		_pivot_y = want_y if _pivot_y == INF else lerpf(_pivot_y, want_y, clampf(_dt * 8.0, 0.0, 1.0))
+		global_position = Vector3(target.global_position.x, _pivot_y, target.global_position.z)
 		global_position.y = minf(global_position.y, Rat.CEILING - 0.12)
 		arm.spring_length = lerpf(distance, 0.5, high)
 		if high > 0.0:

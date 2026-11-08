@@ -43,6 +43,19 @@ var crouched := false  # sneaking makes her low enough to get under a sofa
 var stuck_t := 0.0  # caught in sticky tape, a cage or spray
 
 var _sneak_toggle := false
+## Movement feel ported from GDQuest's Godot 4 3D third-person controller (MIT, see THIRD_PARTY.md):
+## velocity eases toward the wanted one (lerp × acceleration), a dead stop under a small speed, the body turns toward
+## the last clear input direction (not every tiny stick wobble), a jump that goes higher while Space is held, and a
+## nudge off walls when she's pushing but not moving.
+var acceleration := 10.0
+var air_acceleration := 2.0
+var rotation_speed := 12.0
+var stopping_speed := 0.05
+var hop_impulse := 1.7
+var hop_hold_force := 6.0
+var _last_strong_dir := Vector3.BACK
+var _was_on_floor := true
+var _air_top := 0.0
 var _jump_up := false
 var _from := Vector3.ZERO
 var _to := Vector3.ZERO
@@ -135,6 +148,7 @@ func teleport(p: Vector3, yaw: float) -> void:
 	velocity = Vector3.ZERO
 	hide_spot = null
 	in_nest = false
+	_was_on_floor = true
 
 
 func _physics_process(dt: float) -> void:
@@ -183,25 +197,41 @@ func _physics_process(dt: float) -> void:
 	var d := Vector3.ZERO if sniffing else (fwd * mv.y + right * mv.x)
 	var spd := run_speed if running else (sneak_speed if sneaking else walk_speed)
 	spd *= 0.5 if dragging() else maxf(0.45, 1.0 - 0.18 * carry_weight())  # loaded she's clearly slower
-	if d.length() > 0.01:
-		rotation.y = rotate_toward(rotation.y, Nights.yaw_to(d), 10.0 * dt)
+	if d.length() > 0.2:
+		_last_strong_dir = d.normalized()
+	if d.length() > 0.01 or not is_on_floor():
+		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(_last_strong_dir), clampf(dt * rotation_speed, 0.0, 1.0))
 
 	if _land_t > 0.0:
 		spd *= 0.4  # getting up after a landing (longer after a big drop)
 	var before := global_position
-	# a little weight: she speeds up and slows down over a moment (slower to get going with a load)
-	var want := Vector2(d.x, d.z) * spd
-	var cur := Vector2(velocity.x, velocity.z)
-	var rate := (9.0 * (1.0 - 0.12 * carry_weight())) if want.length() > cur.length() * 0.9 else 7.0
-	if not is_on_floor():
-		rate *= 0.15  # in the air she keeps her momentum
-	cur = cur.move_toward(want, rate * dt)
-	velocity.x = cur.x
-	velocity.z = cur.y
+	# velocity eases toward the wanted one; in the air she mostly keeps her momentum
+	var acc := (acceleration * (1.0 - 0.12 * carry_weight())) if is_on_floor() else air_acceleration
+	var want := d * spd
+	var y_vel := velocity.y
+	velocity.y = 0.0
+	velocity = velocity.lerp(want, clampf(acc * dt, 0.0, 1.0))
+	if want.length() < 0.001 and velocity.length() < stopping_speed:
+		velocity = Vector3.ZERO
+	velocity.y = y_vel
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = -0.5
 	velocity.y -= gravity * dt
+	if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump"):
+		velocity.y += hop_hold_force * dt  # hold Space: a higher hop
 	move_and_slide()
+	# pushing but not moving: slide off the wall a little (stuck on a corner)
+	if (global_position - before).length() < 0.0002 and Vector2(velocity.x, velocity.z).length() > 0.05 and get_slide_collision_count() > 0:
+		global_position += get_wall_normal() * 0.004
+	# landing after a fall or a hop (the aimed jumps land on their own)
+	if not is_on_floor():
+		_air_top = maxf(_air_top, global_position.y) if not _was_on_floor else global_position.y
+	elif not _was_on_floor:
+		var drop := _air_top - global_position.y
+		if drop > 0.05:
+			landed.emit(drop)
+			_land_t = clampf(0.08 + drop * 0.35, 0.08, 0.5)
+	_was_on_floor = is_on_floor()
 	var moved := global_position - before
 	moved.y = 0.0
 	move_speed = moved.length() / dt if dt > 0.0 else 0.0
@@ -226,7 +256,7 @@ func _physics_process(dt: float) -> void:
 			_start_jump(_target, _target_up)
 		elif is_on_floor():
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
-			velocity.y = 2.2
+			velocity.y = hop_impulse
 			var fw := global_transform.basis.z
 			velocity.x += fw.x * 0.9
 			velocity.z += fw.z * 0.9
@@ -410,7 +440,9 @@ func _play_anim() -> void:
 	elif sniffing:
 		clip = "sniff"
 	elif moving():
-		clip = "drag" if dragging() else ("run" if running else ("sneak" if sneaking else ("carry_walk" if not carried.is_empty() else "walk")))
+		# walk or run by how fast she actually goes (she eases into a run), as in GDQuest's walk/run blend
+		var fast := move_speed > (walk_speed + run_speed) * 0.5
+		clip = "drag" if dragging() else ("run" if fast else ("sneak" if sneaking else ("carry_walk" if not carried.is_empty() else "walk")))
 	anim.play(clip)
-	var base := run_speed if running else (sneak_speed if sneaking else walk_speed)
-	anim.set_speed(clampf(move_speed / base, 0.6, 1.4) if moving() and not jumping else 1.0)
+	var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
+	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else 1.0)

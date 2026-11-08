@@ -41,6 +41,30 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "feel":  # a little run for a video of the movement
+		var r := g.rat
+		r.teleport(Nights.world(300, 500, 1), PI)
+		g.cam.snap(PI)
+		await _wait(host, 0.5)
+		Input.action_press("forward")
+		await _wait(host, 1.2)
+		Input.action_press("run")
+		await _wait(host, 1.0)
+		Input.action_press("left")
+		await _wait(host, 0.8)
+		Input.action_release("left")
+		Input.action_release("run")
+		await _press(host, "jump")
+		Input.action_press("jump")
+		await _wait(host, 0.4)
+		Input.action_release("jump")
+		await _wait(host, 0.8)
+		Input.action_release("forward")
+		await _wait(host, 0.6)
+		await _press(host, "jump")
+		await _wait(host, 1.2)
+		host.get_tree().quit()
+		return
 	if name == "crouch":
 		await _wait(host, 0.5)
 		var r := g.rat
