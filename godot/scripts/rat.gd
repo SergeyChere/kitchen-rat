@@ -47,7 +47,12 @@ var _sneak_toggle := false
 ## velocity eases toward the wanted one (lerp × acceleration), a dead stop under a small speed, the body turns toward
 ## the last clear input direction (not every tiny stick wobble), a jump that goes higher while Space is held, and a
 ## nudge off walls when she's pushing but not moving.
-var acceleration := 10.0
+var acceleration := 15.0  # snappy start
+var brake := 24.0         # and a short stop
+const COYOTE := 0.12      # s after leaving an edge that Space still hops
+const JUMP_BUFFER := 0.15 # s before landing that Space is remembered
+var _coyote := 0.0
+var _jump_buf := 0.0
 var air_acceleration := 2.0
 var rotation_speed := 12.0
 var stopping_speed := 0.05
@@ -166,6 +171,58 @@ var tail: TailSway
 func stunned() -> bool: return _stun > 0.0
 
 
+# ---------- body language ----------
+
+var head_look: HeadLook
+var _exert := 0.0        # 0…1: builds up while she runs, she pants for a while after
+var _breath_t := 0.0
+var _noise_at := Vector3.ZERO
+var _noise_t := 0.0      # s left to keep looking at the last noise
+
+
+## The breathing she shows in her body: slow and small at rest, quick and deep after a sprint.
+func _breath(dt: float) -> Vector3:
+	_exert = clampf(_exert + (dt / 3.0 if running and moving() else -dt / 5.0), 0.0, 1.0)
+	_breath_t += dt * TAU * lerpf(1.3, 4.2, _exert)
+	var still := 1.0 - clampf(move_speed / walk_speed, 0.0, 1.0) * 0.8
+	var a := lerpf(0.012, 0.045, _exert) * still
+	var b := sin(_breath_t)
+	return Vector3(1.0 + a * b, 1.0 + a * 1.3 * b, 1.0)
+
+
+## A sudden sound somewhere: she turns her head to it for a moment.
+func notice(at: Vector3) -> void:
+	if at.distance_to(global_position) < 4.0:
+		_noise_at = at
+		_noise_t = 1.6
+
+
+func _tick_look(dt: float) -> void:
+	if head_look == null:
+		return
+	_noise_t = maxf(_noise_t - dt, 0.0)
+	var w := 0.0
+	if jumping or sniffing or carrier != null or frozen or scripted or dragging():
+		w = 0.0
+	elif _noise_t > 0.0:
+		head_look.target = _noise_at
+		w = 1.0
+	elif not running and Game.I:
+		var best: Food = null
+		var bd := 0.9
+		for f in Game.I.foods:
+			if not is_instance_valid(f) or f.carried or not f.visible:
+				continue
+			var d: float = f.global_position.distance_to(global_position)
+			if d < bd:
+				bd = d
+				best = f
+		if best:
+			head_look.target = best.global_position
+			w = 0.8
+	head_look.weight = move_toward(head_look.weight, w, dt * 4.0)
+
+
 ## At the edge of a raised surface (a table, a counter, the fridge) she stops and teeters instead of running off.
 ## Walking slowly to an edge she climbs down (_try_descend); Space jumps down on purpose.
 func _hold_edge(dt: float) -> void:
@@ -237,6 +294,14 @@ func carry(f: Food) -> void:
 	f.position = Vector3(0, -0.006 + i * 0.012, 0.01 - i * 0.025)
 	f.rotation = Vector3.ZERO
 	f.scale = Vector3.ONE * 0.6  # a mouthful
+	# snapped up: it pops into her mouth (overshoots, settles) and she gives a happy little bob
+	var to := f.position
+	f.position = to + Vector3(0, -0.035, 0.02)
+	f.scale = Vector3.ONE * 0.95
+	var tw := f.create_tween().set_parallel(true)
+	tw.tween_property(f, "position", to, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(f, "scale", Vector3.ONE * 0.6, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_pop(Vector3(1.06, 0.92, 1.04))
 
 
 func _set_crouch(on: bool) -> void:
@@ -318,7 +383,8 @@ func teleport(p: Vector3, yaw: float) -> void:
 
 func _physics_process(dt: float) -> void:
 	if model:
-		model.scale = model.scale.lerp(Vector3.ONE, clampf(dt * 10.0, 0.0, 1.0))
+		model.scale = model.scale.lerp(_breath(dt), clampf(dt * 10.0, 0.0, 1.0))
+	_tick_look(dt)
 	if _dust_trail:
 		_dust_trail.emitting = running and is_on_floor() and move_speed > walk_speed and not jumping and not hidden()
 	noise_level = move_toward(noise_level, 0.0, dt * 1.5)
@@ -400,6 +466,8 @@ func _physics_process(dt: float) -> void:
 	var want := d * spd
 	var y_vel := velocity.y
 	velocity.y = 0.0
+	if is_on_floor() and want.length() < 0.001:
+		acc = brake  # letting go of the keys: she stops short, she doesn't skate
 	velocity = velocity.lerp(want, clampf(acc * dt, 0.0, 1.0))
 	if want.length() < 0.001 and velocity.length() < stopping_speed:
 		velocity = Vector3.ZERO
@@ -459,7 +527,19 @@ func _physics_process(dt: float) -> void:
 		model.rotation.z = lerp_angle(model.rotation.z, deg_to_rad(roll), clampf(dt * 16.0, 0.0, 1.0))
 	_update_surface()
 	_find_jump_target()
-	if Input.is_action_just_pressed("jump"):
+	# forgiving jumps: Space pressed a moment before landing still jumps on landing (buffer), and a moment after
+	# walking off an edge still hops (coyote time)
+	_coyote = COYOTE if is_on_floor() else maxf(_coyote - dt, 0.0)
+	_jump_buf = maxf(_jump_buf - dt, 0.0)
+	var press := Input.is_action_just_pressed("jump")
+	if press and not is_on_floor() and _coyote <= 0.0:
+		_jump_buf = JUMP_BUFFER
+		press = false
+	elif not press and _jump_buf > 0.0 and is_on_floor():
+		press = true
+		_jump_buf = 0.0
+	if press:
+		var grounded := is_on_floor() or (_coyote > 0.0 and not _hopping)
 		if stuck_t > 0.0 or _stun > 0.0:
 			pass
 		elif Game.I.use_tunnel():
@@ -468,8 +548,9 @@ func _physics_process(dt: float) -> void:
 			_start_jump(_target, _target_up)
 		elif _try_pole():
 			pass
-		elif is_on_floor() and not dragging():
+		elif grounded and not dragging():
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
+			_coyote = 0.0
 			velocity.y = hop_impulse
 			_hopping = true
 			_pop(Vector3(0.9, 1.16, 0.95))

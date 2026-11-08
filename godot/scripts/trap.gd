@@ -26,6 +26,10 @@ func spring() -> void:
 	sprung = true
 	visible = true
 	Sfx.play("snap", global_position)
+	var gm := Game.I
+	if gm and gm.rat and gm.feel and gm.rat.global_position.distance_to(global_position) < 0.5:
+		gm.feel.slowmo(0.3, 0.35)  # snapped right next to her
+		gm.cam.shake(0.45)
 
 
 func _process(dt: float) -> void:

@@ -13,6 +13,7 @@ var night_id := "kitchen"
 var tasks: TaskTracker
 var grid: NavGrid
 var nav: NavWorld
+var feel: GameFeel
 var rat: Rat
 var cat: CatAI
 var owner_ai: OwnerAI
@@ -130,6 +131,8 @@ func _ready() -> void:
 	_make_agents()
 	hud = Hud.new()
 	add_child(hud)
+	feel = GameFeel.new(self)
+	add_child(feel)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	_builder.build_contents()
@@ -251,6 +254,12 @@ func _make_rat() -> void:
 		sk.add_child(ts)
 		ts.setup(rat, sk)
 		rat.tail = ts
+	if sk and sk.find_bone("Head") >= 0:
+		var hl := HeadLook.new()
+		hl.name = "HeadLook"
+		sk.add_child(hl)
+		hl.setup(rat, sk)
+		rat.head_look = hl
 	if hb >= 0:
 		# held in her teeth: the mouth follows the head bone (and keeps a scale of 1, the model is scaled down);
 		# the snout is ~4 cm ahead of the head bone, the mouth a little behind and below its tip
@@ -442,6 +451,8 @@ func noise(at: Vector3, radius: float, label: String, big: bool, amt := -1.0, fr
 				pp.force_say("Eek! I can’t move!", 1.8)
 	if fx:
 		fx.ring(at, radius, big)
+	if rat and at.distance_to(rat.global_position) > 0.5:
+		rat.notice(at)  # not her own steps
 	if amt < 0.0:
 		amt = 0.9 if big else (0.3 if radius > 1.5 else 0.4)
 	_alarm += 7.0 if big else (0.5 if radius > 1.5 else (2.0 if radius > 1.0 else 0.0))
@@ -527,6 +538,8 @@ func caught(text: String, at: Vector3) -> void:
 	lives -= 1
 	run.caught = true
 	Sfx.play("caught")
+	cam.shake(0.7)
+	feel.slowmo(0.25, 0.3)
 	if text.begins_with("WHACK"):
 		Sfx.play("whack", at)
 	rat.carrier = null
@@ -555,6 +568,8 @@ func knock_landed(k: Knockable, at: Vector3) -> void:
 	noise(at, 4.6, "Crash!" if breaks else k.sound(), true, -1.0, true)
 	var loud := clampf(remap(k._speed, 1.2, 4.0, -8.0, 2.0), -8.0, 2.0)  # harder hit, louder
 	Sfx.play("crash" if breaks else KNOCK_SND.get(k.kind, "thud"), at, loud)
+	var near := clampf(1.0 - at.distance_to(rat.global_position) / 3.0, 0.0, 1.0)
+	cam.shake((0.4 if breaks else 0.22) * near)
 	if breaks:
 		var shards := _builder.spawn("props/mug_broken", Vector3(k.global_position.x, 0.0, k.global_position.z), randf() * 360.0, _builder.decor)
 		if shards:
@@ -589,7 +604,50 @@ func knock_group(k: Knockable) -> void:
 			get_tree().create_timer(0.22 * n).timeout.connect(func(): if is_instance_valid(other): other.knock(k.push_dir))
 
 
+## Things standing near where she lands (or runs right past) rattle: plates, mugs, jars wobble and clink.
+var _jigglers: Array = []
+var _jiggle_cd := {}
+
+
+func _jiggle(p: Vector3, radius: float, strength: float) -> void:
+	if _jigglers.is_empty():
+		for n in find_children("*", "Node3D", true, false):
+			if n is Knockable:
+				_jigglers.append(n)
+			elif n.get_parent() == _builder.decor:
+				var nm := str(n.name).to_lower()
+				for k in ["plate", "mug", "jar", "bowl", "glass", "bottle", "vase", "cup", "can"]:
+					if nm.contains(k):
+						_jigglers.append(n)
+						break
+	var now := Time.get_ticks_msec()
+	for n in _jigglers:
+		var o := n as Node3D
+		if not is_instance_valid(o) or not o.visible or (o is Knockable and ((o as Knockable).knocked or not (o as RigidBody3D).freeze)):
+			continue
+		var d := o.global_position - p
+		if absf(d.y) > 0.18 or Vector2(d.x, d.z).length() > radius:
+			continue
+		if now - int(_jiggle_cd.get(o.get_instance_id(), 0)) < 350:
+			continue
+		_jiggle_cd[o.get_instance_id()] = now
+		var k := strength * (1.0 - Vector2(d.x, d.z).length() / radius)
+		var r0 := o.rotation
+		var y0 := o.position.y
+		var tw := o.create_tween()
+		var a := deg_to_rad(6.0 * k)
+		tw.tween_property(o, "rotation", r0 + Vector3(a * 0.6, 0, a), 0.05)
+		tw.parallel().tween_property(o, "position:y", y0 + 0.006 * k, 0.05)
+		tw.tween_property(o, "rotation", r0 + Vector3(-a * 0.4, 0, -a * 0.7), 0.07)
+		tw.parallel().tween_property(o, "position:y", y0, 0.07)
+		tw.tween_property(o, "rotation", r0, 0.09).set_trans(Tween.TRANS_SINE)
+		Sfx.play("clink", o.global_position, lerpf(-22.0, -10.0, clampf(k, 0.0, 1.0)), 1.3, 0.1)
+
+
 func _on_landed(drop: float) -> void:
+	_jiggle(rat.global_position, 0.45, clampf(drop * 2.0, 0.4, 1.0))
+	if drop > 0.4:
+		cam.shake(clampf((drop - 0.3) * 0.55, 0.12, 0.55))
 	Sfx.play("land_big" if drop > 0.5 else "land", rat.global_position)
 	if fx and drop > 0.15:
 		fx.dust(rat.global_position, drop > 0.5)
@@ -711,22 +769,55 @@ func _keep_in_room(rp: Vector3) -> void:
 	bubble_at("Whoa!", rat.global_position + Vector3.UP * 0.3, 1.0)
 
 
+## Her paws patter in time with her stride, and sound like what she walks on (tiles, wood, a sofa, metal…).
+## Sneaking she makes no sound at all.
+var _stride := 0.0
+
+
+func _footsteps(dt: float) -> void:
+	if not rat.is_on_floor() or rat.sneaking or rat.dragging():
+		return
+	_stride += rat.move_speed * dt
+	var every := 0.15 if rat.running else 0.085
+	if _stride < every:
+		return
+	_stride = 0.0
+	Sfx.play(step_sound(rat.surface_id), rat.global_position, 0.0 if rat.running else -7.0, 1.0, 0.08)
+	if rat.running and rat.surface_id != "floor":
+		_jiggle(rat.global_position, 0.22, 0.45)
+
+
+func step_sound(surface: String) -> String:
+	if surface == "floor":
+		match str(night.get("pal", {}).get("floor", "tile")):
+			"wood": return "step_wood"
+			_: return "step_tile"
+	for k in ["fridge", "washer", "dryer", "boiler", "toaster", "kettle", "sink"]:
+		if surface.contains(k): return "step_metal"
+	for k in ["sofa", "armchair", "ottoman", "beanbag", "cushion", "cat_bed"]:
+		if surface.contains(k): return "step_soft"
+	for k in ["bed", "rug", "laundry", "towel", "nest"]:
+		if surface.contains(k): return "step_cloth"
+	if surface.contains("table") and bool(night.get("tablecloth", false)):
+		return "step_cloth"
+	return "step_wood"
+
+
 func _tick_rat_noise(dt: float) -> void:
 	_noise_t -= dt
 	_bump_t -= dt
 	if not rat.moving() or rat.jumping:
 		return
+	_footsteps(dt)
 	var on_floor := rat.surface_id == "floor"
 	if rat.dragging() and _noise_t <= 0.0:
 		Sfx.play("scrape", rat.global_position, -4.0 if rat.sneaking else 0.0)
 		_noise_t = 0.6
 		noise(rat.global_position, 0.6 if rat.sneaking else 1.2, "", false, 0.05 if rat.sneaking else 0.15)
 	elif rat.running and _noise_t <= 0.0:
-		Sfx.play("step", rat.global_position, 5.0, 0.9)
 		_noise_t = 0.35
 		noise(rat.global_position, 2.1, "", false, 0.3)
 	elif not rat.running and not rat.sneaking and on_floor and in_hum == 0 and _noise_t <= 0.0:
-		Sfx.play("step", rat.global_position)
 		_noise_t = 0.45
 		noise(rat.global_position, 0.95, "", false, 0.1)
 	if rat.running and on_floor and rat.blocked and _bump_t <= 0.0:

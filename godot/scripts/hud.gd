@@ -12,6 +12,10 @@ var _bubbles := []  # {label, follow, height, pos, t, rise}
 var font: Font
 
 
+var _last_counts := Vector2i(-1, -1)
+var _punch_at := -10.0
+
+
 func _ready() -> void:
 	layer = 10
 	font = ThemeDB.fallback_font
@@ -217,10 +221,19 @@ func _draw_hud() -> void:
 	# top-centre: nest progress
 	var bw := 320.0
 	var bx := (W - bw) / 2.0
+	# the counters punch (grow and flash gold) when food is picked up or brought home
+	var now := Time.get_ticks_msec() / 1000.0
+	var key := Vector2i(g.fed, g.rat.carry_weight())
+	if key != _last_counts:
+		if _last_counts.x >= 0 and (key.x > _last_counts.x or key.y > _last_counts.y):
+			_punch_at = now
+		_last_counts = key
+	var pk := clampf(1.0 - (now - _punch_at) / 0.45, 0.0, 1.0)
+	pk = pk * pk
 	_canvas.draw_rect(Rect2(bx - 10, 12, bw + 20, 52), PANEL)
-	_text(Vector2(bx, 32), "Nest  %d / %d     Carrying  %d / %d" % [g.fed, goal, g.rat.carry_weight(), g.rat.capacity], 14)
+	_text(Vector2(bx, 32 + pk * 2.0), "Nest  %d / %d     Carrying  %d / %d" % [g.fed, goal, g.rat.carry_weight(), g.rat.capacity], 14 + int(round(pk * 5.0)), Color.WHITE.lerp(Color(1.0, 0.85, 0.3), pk))
 	_canvas.draw_rect(Rect2(bx, 42, bw, 12), BAR_BG)
-	_canvas.draw_rect(Rect2(bx, 42, bw * clampf(float(g.fed) / maxf(1.0, goal), 0.0, 1.0), 12), BAR)
+	_canvas.draw_rect(Rect2(bx, 42, bw * clampf(float(g.fed) / maxf(1.0, goal), 0.0, 1.0), 12), BAR.lerp(Color(1.0, 0.9, 0.5), pk * 0.7))
 
 	# top-right: are you seen, and how loud are you
 	var chip := _chip(g)

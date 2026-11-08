@@ -10,8 +10,8 @@ extends Node
 const SND := "res://assets/sounds/"
 const REAL := "res://assets/sounds/real/"  # CC0 recordings (tools/import_sounds.py): used instead of the synth when present
 ## Recordings tuned for a rat-sized world.
-const REAL_PITCH := {"pickup": 1.35, "step": 1.6, "land": 1.4, "land_big": 1.2, "squeak": 1.15, "scrape": 1.3, "gnaw": 1.2}
-const REAL_DB := {"pickup": -5.0, "step": -6.0, "land": -4.0, "click": -6.0, "jump": -4.0}
+const REAL_PITCH := {"step_wood": 1.7, "step_tile": 1.8, "step_soft": 1.5, "step_cloth": 1.6, "step_metal": 2.2, "pickup": 1.35, "step": 1.6, "land": 1.4, "land_big": 1.2, "squeak": 1.15, "scrape": 1.3, "gnaw": 1.2}
+const REAL_DB := {"step_wood": -8.0, "step_tile": -8.0, "step_soft": -6.0, "step_cloth": -6.0, "step_metal": -14.0, "pickup": -5.0, "step": -6.0, "land": -4.0, "click": -6.0, "jump": -4.0}
 const MUS := "res://assets/music/"
 const SETTINGS := "user://settings.cfg"
 

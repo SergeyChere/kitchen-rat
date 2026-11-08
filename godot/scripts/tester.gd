@@ -322,6 +322,10 @@ func _run(host: Node) -> void:
 			_stride(a)
 		host.get_tree().quit()
 		return
+	if name == "juice":
+		await _juice(host)
+		host.get_tree().quit()
+		return
 	if name == "mech":
 		await _mech(host)
 		print("DONE")
@@ -842,3 +846,100 @@ func _stride(a: Node3D) -> void:
 			if cnt > 0: speeds.append(tot / cnt)
 		speeds.sort()
 		print("STRIDE %s %s feet %d  ground speed %s  set %.2f" % [a.name, clip, feet.size(), str(speeds), a.walk_clip_speed if clip == "walk" else a.run_clip_speed])
+
+
+## Game feel: forgiving jumps, quick stop, footsteps by surface, camera, danger, head turning, muffled hiding.
+func _juice(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	# quick stop
+	var fp := _open_floor(1.0)
+	r.teleport(fp + Vector3(0, 0.01, 0.4), Nights.yaw_to(Vector3.FORWARD))
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.2)
+	Input.action_press("forward")
+	await _wait(host, 0.6)
+	Input.action_release("forward")
+	var p0 := r.global_position
+	await _wait(host, 0.5)
+	var slide := Vector2(r.global_position.x - p0.x, r.global_position.z - p0.z).length()
+	_check("letting go she stops short", slide < 0.06, "slid %.3f m" % slide)
+	# coyote time: walk off the table edge and press Space a moment later
+	r.teleport(fp + Vector3(0, 0.12, 0.4), 0.0)  # just stepped off a ledge: in the air, not hopping
+	r._coyote = r.COYOTE
+	Input.action_press("jump")
+	await host.get_tree().physics_frame
+	await host.get_tree().physics_frame
+	Input.action_release("jump")
+	_check("Space just after leaving an edge still hops", r._hopping or r.velocity.y > 0.5, "vy %.2f hopping %s" % [r.velocity.y, r._hopping])
+	await _wait(host, 1.2)
+	# jump buffer: Space pressed in the air is remembered until landing
+	r.teleport(fp + Vector3(0, 0.25, 0.4), 0.0)
+	await _wait(host, 0.08)
+	await _press(host, "jump")
+	var hopped := false
+	for i in 40:
+		await host.get_tree().physics_frame
+		if r._hopping and r.velocity.y > 0.3: hopped = true
+	_check("Space a moment before landing hops on landing", hopped)
+	await _wait(host, 1.0)
+	# footsteps by surface
+	_check("footsteps: floor / table / sofa / fridge", g.step_sound("floor").begins_with("step_") and g.step_sound("table") != "" and g.step_sound("sofa") == "step_soft" and g.step_sound("fridge") == "step_metal", "%s %s %s %s" % [g.step_sound("floor"), g.step_sound("table"), g.step_sound("sofa"), g.step_sound("fridge")])
+	# camera shake
+	g.cam.shake(0.5)
+	await _wait(host, 0.05)
+	_check("the camera shakes", absf(g.cam.cam.h_offset) + absf(g.cam.cam.v_offset) > 0.0005)
+	await _wait(host, 1.0)
+	_check("and settles", absf(g.cam.cam.h_offset) < 0.0005)
+	# running widens the view
+	var fov0: float = g.cam.cam.fov
+	r.teleport(fp + Vector3(0, 0.01, 0.6), Nights.yaw_to(Vector3.FORWARD))
+	g.cam.snap(r.rotation.y)
+	Input.action_press("forward"); Input.action_press("run")
+	var fov1 := fov0
+	for i in 42:
+		await host.get_tree().process_frame
+		fov1 = maxf(fov1, g.cam.cam.fov)
+	Input.action_release("forward"); Input.action_release("run")
+	_check("running widens the view", fov1 > fov0 + 2.0, "%.1f -> %.1f" % [fov0, fov1])
+	await _wait(host, 0.8)
+	# head turns to a noise on her right
+	var hp := r.global_position + r.global_transform.basis.x * 1.0 + Vector3.UP * 0.05
+	r.notice(hp)
+	await _wait(host, 0.6)
+	var sk := r.head_look.get_skeleton()
+	var hb := sk.find_bone("Head")
+	var hpos := sk.global_transform * sk.get_bone_global_pose(hb).origin
+	var snout := r.mouth.global_position - hpos
+	snout.y = 0.0
+	var fwd := r.global_transform.basis.z
+	var to_n := hp - hpos
+	to_n.y = 0.0
+	var a_before := rad_to_deg(fwd.angle_to(to_n))
+	var a_now := rad_to_deg(snout.angle_to(to_n))
+	_check("she turns her head to a noise", absf(r.head_look._yaw) > 0.3 and a_now < a_before - 15.0, "yaw %.2f, snout %.0f° off the noise (body %.0f°)" % [r.head_look._yaw, a_now, a_before])
+	# panting after a sprint
+	r._exert = 1.0
+	await _wait(host, 0.1)
+	_check("panting after a sprint", r._exert > 0.9)
+	# danger: chase -> slow motion, heartbeat, red edge
+	if g.cat and g.cat.has_method("wake_up"):
+		g.cat.visible = true
+		g.cat.global_position = r.global_position + Vector3(0.8, 0, 0)
+		g.cat.mode = CatAI.Mode.CHASE
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		var slowed := Engine.time_scale < 1.0
+		await _wait(host, 0.6)
+		_check("spotted: a moment of slow motion", slowed)
+		_check("chased: the screen edge goes red", float(g.feel._mat.get_shader_parameter("amount")) > 0.1, "%.2f" % float(g.feel._mat.get_shader_parameter("amount")))
+		g.cat.mode = CatAI.Mode.SLEEP
+	# hiding muffles the room
+	if g.feel._lp:
+		for z in g.zones:
+			if z is HideSpot and (z as HideSpot).id != "crack":
+				r.teleport((z as Zone).global_position + Vector3(0, 0.01, 0), 0.0)
+				r._sneak_toggle = true
+				break
+		await _wait(host, 1.2)
+		_check("hiding muffles the room", not r.hidden() or g.feel._lp.cutoff_hz < 3000.0, "hidden %s cutoff %.0f" % [r.hidden(), g.feel._lp.cutoff_hz])

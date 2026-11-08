@@ -51,6 +51,12 @@ MAP = {
     'land': [KI + 'impact_soft_medium_00*.ogg'],
     'land_big': [KI + 'impact_soft_heavy_00*.ogg'],
     'step': [KI + 'footstep_carpet_00*.ogg'],
+    # the rat's steps by surface (game.gd picks one by what she walks on)
+    'step_wood': [KI + 'footstep_wood_00*.ogg'],
+    'step_tile': [KI + 'footstep_concrete_00*.ogg'],
+    'step_soft': [KI + 'footstep_carpet_00*.ogg'],
+    'step_cloth': [KI + 'footstep_snow_00*.ogg'],
+    'step_metal': [KI + 'impact_metal_light_00*.ogg'],
     'stomp': [KI + 'footstep_wood_00*.ogg'],
     'door': [LV + '100-CC0-SFX/door_01.ogg', LV + '100-CC0-SFX/door_02.ogg'],
     'light_switch': [LV + '100-CC0-SFX/switch_0*.ogg'],
@@ -130,6 +136,17 @@ def put(name, files, loop=False):
     return min(len(files), 6)
 
 
+def heartbeat():
+    """A soft double thump (lub-dub), synthesized: played while the cat is close or chasing."""
+    t = np.arange(int(0.75 * SR)) / SR
+    def thump(t0, f, a):
+        u = np.clip(t - t0, 0, None)
+        return a * np.sin(2 * np.pi * f * u * (1 - 0.35 * u)) * np.exp(-u * 18) * (t >= t0)
+    x = thump(0.0, 55, 1.0) + thump(0.22, 48, 0.7)
+    x += 0.15 * thump(0.0, 110, 1.0)
+    return x / np.abs(x).max() * 0.8
+
+
 def main(src):
     os.makedirs(OUT, exist_ok=True)
     total = 0
@@ -166,6 +183,7 @@ def main(src):
         txt = open(cp).read().split('\nOwn licensed')[0] if os.path.exists(cp) else CREDITS
         with open(cp, 'w') as f:
             f.write(txt + '\nOwn licensed recordings (not CC0, from the developer\'s sound library subscription): %s\n' % ', '.join(sorted(own)))
+    write_ogg(os.path.join(OUT, 'heartbeat_0.ogg'), heartbeat())
     print('imported', total, 'recordings into', os.path.relpath(OUT, REPO))
 
 
