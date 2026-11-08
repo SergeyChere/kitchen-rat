@@ -678,7 +678,11 @@ func _bugs(host: Node) -> void:
 		r.teleport(cheese.global_position + Vector3(0.0, 0.02, -0.05), 0.0)
 		await _wait(host, 0.6)
 		_check("picked the cheese up again", r.carried.has(cheese), "carrying %d" % r.carried.size())
-		_check("evidence counted once per piece", is_equal_approx(g._evidence, e1) and e1 >= 9.0, "%.0f then %.0f" % [e1, g._evidence])
+		var others := 0.0  # anything else she happened to pick up on the way counts on its own
+		for f in r.carried:
+			if f != cheese and not (f as Food).poison:
+				others += 9.0 if (f as Food).is_cheese() else 3.0
+		_check("evidence counted once per piece", is_equal_approx(g._evidence, e1 + others) and e1 >= 9.0, "%.0f then %.0f (+%.0f other food)" % [e1, g._evidence, others])
 
 
 ## Free end of night 1 and the wanted level cooling down.
