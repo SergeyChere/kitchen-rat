@@ -41,6 +41,60 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "crouch":
+		await _wait(host, 0.5)
+		var r := g.rat
+		var spot: HideSpot = null
+		for z in g.zones:
+			if z is HideSpot and z.id == "sofa": spot = z
+		if spot == null:
+			print("no sofa"); host.get_tree().quit(); return
+		var up := g.ray(Vector3(spot.global_position.x, 0.01, spot.global_position.z), Vector3(spot.global_position.x, 1.0, spot.global_position.z))
+		print("clearance under the sofa: ", up.get("position", "none"), " ", up.get("collider", null))
+		# stand 0.5 m in front of the sofa's hiding spot (on the room side) and walk in, first upright, then sneaking
+		var c := spot.global_position
+		var out := Vector3(0, 0, 1) if c.z < 0.0 else Vector3(0, 0, -1)
+		for sneak in [false, true]:
+			r.teleport(Vector3(c.x, 0.0, c.z) + out * (spot.size.z / 2.0 + 0.35), Nights.yaw_to(-out))
+			g.cam.snap(r.rotation.y)
+			await _wait(host, 0.3)
+			if sneak: Input.action_press("sneak")
+			Input.action_press("forward")
+			await _wait(host, 2.0)
+			Input.action_release("forward")
+			await _wait(host, 0.3)
+			for hy in [0.03, 0.06, 0.09, 0.12]:
+				var h2 := g.ray(r.global_position + Vector3.UP * hy, r.global_position + Vector3.UP * hy - out * 0.6)
+				print("   ray fwd y", hy, ": ", h2.get("position", "none"), " ", (h2.get("collider") as Node).get_parent().name if h2.has("collider") else "")
+			print("   crouched ", r.crouched, " sneaking ", r.sneaking)
+			var inside := r.hidden() and r.hide_kind() == "sofa"
+			_check(("sneaking she gets under the sofa" if sneak else "upright she can't get under the sofa"), inside == sneak, "hidden " + str(r.hidden()) + " at " + str(r.global_position))
+			if sneak:
+				Input.action_release("sneak")
+				await _wait(host, 0.4)
+				_check("under the sofa she stays crouched", r.crouched, "")
+		host.get_tree().quit()
+		return
+	if name == "catjump":
+		await _wait(host, 0.5)
+		g._evidence = 999.0
+		g.grace_t = 0.0
+		var r := g.rat
+		r.teleport(Nights.world(700, 445, 76), PI / 2)
+		g.cat.global_position = Nights.world(720, 560)
+		g.cat.mode = CatAI.Mode.WATCH
+		g.cat.alert = 1.0
+		g.cat._watch = 4.0
+		var top := false
+		for i in 40:
+			await _wait(host, 0.1)
+			if g.cat._top: top = true
+			if i % 5 == 0: print("  cat mode ", g.cat.mode, " pos ", g.cat.global_position.snapped(Vector3.ONE * 0.01), " d ", snappedf(Vector2(g.cat.global_position.x - r.global_position.x, g.cat.global_position.z - r.global_position.z).length(), 0.01), " rat y ", snappedf(r.global_position.y, 0.01), " floor ", r.is_on_floor(), " cd ", snappedf(g.cat._jump_cd, 0.1))
+		print("stars ", g.stars, " cat y ", g.cat.global_position.y, " lives ", g.lives)
+		_check("at 3 stars the cat jumps up onto the table after her", top or g.lives < 3)
+		g._evidence = 0.0
+		host.get_tree().quit()
+		return
 	if name == "chairray":
 		await _wait(host, 0.5)
 		for x in [586, 596, 606]:
@@ -55,7 +109,7 @@ func _run(host: Node) -> void:
 		host.get_tree().quit()
 		return
 	if name == "islands":
-		for path in ["furniture/chair", "furniture/table_kitchen", "furniture/stool", "furniture/low_shelf", "furniture/kitchen_island"]:
+		for path in ["furniture/sofa", "furniture/armchair", "furniture/bed_kid", "furniture/coffee_table"]:
 			var n: Node3D = (load("res://assets/models/" + path + ".glb") as PackedScene).instantiate()
 			for mi in n.find_children("*", "MeshInstance3D", true, false):
 				var isl := LevelBuilder._islands((mi as MeshInstance3D).mesh)
@@ -251,7 +305,9 @@ func _hides(host: Node) -> void:
 		if not (z is HideSpot) or (z as HideSpot).id == "crack":
 			continue
 		var c: Vector3 = Vector3(z.global_position.x, 0.0, z.global_position.z)
-		var room := g.box_free(c + Vector3.UP * 0.066, Vector3(0.045, 0.05, 0.045))
+		var low := (z as HideSpot).id == "sofa"  # under a sofa there's only room for a crouching rat
+		rat._set_crouch(low)
+		var room := g.box_free(c + Vector3.UP * (0.046 if low else 0.066), Vector3(0.045, 0.04 if low else 0.05, 0.045))
 		# walk in: from any side that's free outside it
 		var got_in := false
 		if room:
@@ -274,6 +330,7 @@ func _hides(host: Node) -> void:
 						got_in = true
 						break
 		_check("%s at %s: room %s, walked in %s" % [(z as HideSpot).id, str(c), room, got_in], room and got_in)
+		rat._set_crouch(false)
 	print("DONE")
 	host.get_tree().quit()
 

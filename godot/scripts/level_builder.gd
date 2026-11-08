@@ -355,7 +355,7 @@ func _lighting() -> void:
 	moon.shadow_enabled = true
 	moon.shadow_opacity = 0.55  # soft shadows: you can still see into them
 	moon.shadow_blur = 2.0
-	moon.shadow_bias = 0.08  # no striped shadow acne on the flat counter tops
+	moon.shadow_bias = 0.08  # no striped shadow acne on flat tops
 	moon.shadow_normal_bias = 2.5
 	root.add_child(moon)
 	g.moon = moon
@@ -367,6 +367,8 @@ func _lighting() -> void:
 		pl.light_energy = float(l.get("i", 1.0)) * 1.6
 		pl.omni_range = float(l.get("r", 500)) / 100.0
 		pl.shadow_enabled = true
+		pl.shadow_bias = 0.15
+		pl.shadow_normal_bias = 2.0
 		root.add_child(pl)
 		pl.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)))
 		g.flickers.append([pl, pl.light_energy, "steady"])

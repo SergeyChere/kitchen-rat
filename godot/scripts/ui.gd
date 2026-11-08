@@ -178,9 +178,35 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 			reset.text = "Click again to erase progress")
 	box.add_child(reset)
 	box.add_child(msg)
-	box.add_child(button("Back", func(): Settings.save(); root.queue_free(); on_back.call(), 220))
+	var back := func(): Settings.save(); root.queue_free(); on_back.call()
+	box.add_child(button("Back", back, 220))
+	_esc_back(root, back)
 	focus_first(box)
 	return root
+
+
+## Esc (or the gamepad's Start) on a sub-panel works like its Back button, and nothing behind it sees the key.
+static func _esc_back(root: Control, back: Callable) -> void:
+	var h := EscBack.new()
+	h.back = back
+	h.panel = root
+	root.add_child(h)
+
+
+class EscBack extends Node:
+	var back: Callable
+	var panel: Control
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+
+	func _input(e: InputEvent) -> void:
+		for c in panel.get_children():
+			if c is Keys.Catcher:
+				return  # waiting for a key to rebind: Esc cancels that instead
+		if panel.visible and (e.is_action_pressed("pause") or e.is_action_pressed("ui_cancel")):
+			get_viewport().set_input_as_handled()
+			back.call()
 
 
 ## Rebind keys: click an action, press the new key (Esc cancels).
@@ -214,7 +240,9 @@ static func controls_panel(parent: Node, on_back: Callable) -> Control:
 		grid.add_child(b)
 		grid.add_child(pad)
 	box.add_child(button("Reset to defaults", func(): Keys.reset(); root.queue_free(); controls_panel(parent, on_back), 260))
-	box.add_child(button("Back", func(): root.queue_free(); on_back.call(), 220))
+	var back := func(): root.queue_free(); on_back.call()
+	box.add_child(button("Back", back, 220))
+	_esc_back(root, back)
 	focus_first(box)
 	return root
 

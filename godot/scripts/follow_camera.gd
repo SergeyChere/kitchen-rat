@@ -75,8 +75,14 @@ func _process(_dt: float) -> void:
 		arm.spring_length = 0.0
 		cam.near = 0.005
 	else:
-		global_position = target.global_position + Vector3.UP * height
-		arm.spring_length = distance
+		# up on the cabinets, right under the ceiling: a closer, flatter view so the camera doesn't scrape along the
+		# ceiling and walls (and look into them)
+		var high := clampf((target.global_position.y - 1.6) / 0.5, 0.0, 1.0)
+		global_position = target.global_position + Vector3.UP * lerpf(height, 0.07, high)
+		global_position.y = minf(global_position.y, Rat.CEILING - 0.12)
+		arm.spring_length = lerpf(distance, 0.5, high)
+		if high > 0.0:
+			rotation.x = deg_to_rad(clampf(pitch, -35.0, lerpf(hi, -2.0, high)))
 		cam.near = 0.02
 	if rat and rat.model:
 		# hidden in the rat's-eye view, and when a wall has pushed the camera right up to her

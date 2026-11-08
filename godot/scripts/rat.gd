@@ -37,6 +37,9 @@ var surface_id := "floor"
 var blocked := false
 var carried: Array[Food] = []
 var carrier: Node3D  # riding the robot vacuum
+var stand_shape: CollisionShape3D  # set by Game: the upright capsule and the one along her body
+var body_shape: CollisionShape3D
+var crouched := false  # sneaking makes her low enough to get under a sofa
 var stuck_t := 0.0  # caught in sticky tape, a cage or spray
 
 var _sneak_toggle := false
@@ -89,6 +92,19 @@ func carry(f: Food) -> void:
 	f.position = Vector3(0, -0.006 + i * 0.012, 0.01 - i * 0.025)
 	f.rotation = Vector3.ZERO
 	f.scale = Vector3.ONE * 0.6  # a mouthful
+
+
+func _set_crouch(on: bool) -> void:
+	if on == crouched or stand_shape == null:
+		return
+	crouched = on
+	var cap := stand_shape.shape as CapsuleShape3D
+	cap.radius = 0.045 if on else 0.055
+	cap.height = 0.09 if on else 0.12
+	stand_shape.position.y = 0.047 if on else 0.062
+	var bc := body_shape.shape as CapsuleShape3D
+	bc.radius = 0.033 if on else 0.04
+	body_shape.position.y = 0.04 if on else 0.065
 
 
 ## Drop the last thing she carries in front of her (key G). Returns it, or null.
@@ -157,6 +173,10 @@ func _physics_process(dt: float) -> void:
 	if running:
 		_sneak_toggle = false
 	sneaking = not running and (Input.is_action_pressed("sneak") or _sneak_toggle)
+	if not sneaking and crouched and not Game.I.sphere_free(global_position + Vector3.UP * 0.105, 0.03):
+		sneaking = true  # no room to stand up under the sofa: stay low
+		running = false
+	_set_crouch(sneaking)
 
 	var fwd := Vector3(sin(cam_yaw), 0, cos(cam_yaw))  # the camera looks along +Z of its yaw
 	var right := Vector3(-fwd.z, 0, fwd.x)
@@ -173,6 +193,8 @@ func _physics_process(dt: float) -> void:
 	var want := Vector2(d.x, d.z) * spd
 	var cur := Vector2(velocity.x, velocity.z)
 	var rate := (9.0 * (1.0 - 0.12 * carry_weight())) if want.length() > cur.length() * 0.9 else 7.0
+	if not is_on_floor():
+		rate *= 0.15  # in the air she keeps her momentum
 	cur = cur.move_toward(want, rate * dt)
 	velocity.x = cur.x
 	velocity.z = cur.y
@@ -189,6 +211,10 @@ func _physics_process(dt: float) -> void:
 	if _land_t > 0.0:
 		_land_t -= dt
 
+	if model and not jumping:
+		# the hop: nose up going up, nose down coming down
+		var tilt := 0.0 if is_on_floor() else clampf(velocity.y * 10.0, -15.0, 22.0)
+		model.rotation.x = lerp_angle(model.rotation.x, -deg_to_rad(tilt), clampf(dt * 14.0, 0.0, 1.0))
 	_update_surface()
 	_find_jump_target()
 	if Input.is_action_just_pressed("jump"):
@@ -199,7 +225,12 @@ func _physics_process(dt: float) -> void:
 		elif _has_target and not (_target_up and dragging()):
 			_start_jump(_target, _target_up)
 		elif is_on_floor():
+			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			velocity.y = 2.2
+			var fw := global_transform.basis.z
+			velocity.x += fw.x * 0.9
+			velocity.z += fw.z * 0.9
+			Sfx.play("jump", global_position)
 	_play_anim()
 
 
@@ -372,6 +403,8 @@ func _play_anim() -> void:
 	var clip := "idle"
 	if jumping:
 		clip = "jump_up" if _jump_up else "jump_down"
+	elif not is_on_floor() and carrier == null:
+		clip = "jump_up" if velocity.y > 0.0 else "jump_down"
 	elif _land_t > 0.0:
 		clip = "land"
 	elif sniffing:

@@ -3,7 +3,8 @@ extends Agent
 ## The cat, ported from the prototype's updateCat. Modes:
 ## away · sleep (a sleep meter that noise lowers; half awake it lifts its head and looks) · eat → to bed ·
 ## wander / idle · investigate (a noise) · search · chase · watch (the rat is up high: it waits below).
-## It can't climb, can't get under furniture, and loses you in hiding spots.
+## It can't climb (only at 3 stars of the wanted level it jumps up onto a table, chair or counter after her), can't
+## get under furniture, and loses you in hiding spots. Noises: the louder and the closer, the more they alert it.
 
 enum Mode { AWAY, SLEEP, EAT, TO_BED, WANDER, IDLE, INVESTIGATE, SEARCH, CHASE, WATCH }
 
@@ -28,6 +29,12 @@ var _calm := 0.0
 var _eat := 0.0
 var _stage := 0
 var _going_home := false
+var _jt := -1.0  # a jump up or down in progress (0…1)
+var _jfrom := Vector3.ZERO
+var _jto := Vector3.ZERO
+var _top := false  # up on a table / counter after the rat
+var _top_t := 0.0
+var _jump_cd := 0.0
 
 
 func awake() -> bool: return mode != Mode.AWAY and mode != Mode.SLEEP
@@ -71,7 +78,20 @@ func hear(at: Vector3, radius: float, big: bool, amt: float, from_knock: bool) -
 		if sleep <= 0.0:
 			wake_up(at)
 		return
-	if d < radius * _sense() and mode != Mode.CHASE and mode != Mode.WATCH:
+	var heard := radius * _sense()
+	if d >= heard or mode == Mode.CHASE or mode == Mode.WATCH:
+		return
+	# how much it heard: louder (amt, big) and closer count more; a faint far squeak only turns its head
+	var k := (1.0 - d / heard) * clampf(amt, 0.1, 1.0) * (1.6 if big else 1.0)
+	alert = clampf(alert + k * 0.5, 0.0, 0.95)
+	if k < 0.3 and not from_knock:
+		_last = at
+		turn(at - global_position, 1.0)
+		if mode == Mode.WANDER or mode == Mode.IDLE:
+			mode = Mode.IDLE; _idle = 1.5; path.clear()
+		G.bubble_on("?", self, 0.5, 0.8)
+		return
+	if true:
 		if from_knock and mode != Mode.INVESTIGATE:
 			G.tasks.flag("lure")
 		if mode != Mode.INVESTIGATE:
@@ -185,6 +205,11 @@ func _process(dt: float) -> void:
 			wake_up(rat.global_position)
 		return
 
+	_jump_cd -= dt
+	if _jt >= 0.0 or _top:
+		_tick_top(dt, dist)
+		return
+
 	var rat_high := rat.global_position.y >= 0.3
 	var in_cone := dist < _range() and angle_to_rat() < 35.5
 	sees = G.grace_t <= 0.0 and not _rat_hidden() and (in_cone or dist < 0.34) and line_of_sight()
@@ -233,6 +258,7 @@ func _process(dt: float) -> void:
 					_meow = 2.2
 					G.bubble_on("Meow…" if randf() < 0.5 else "Get down here!", self, 0.52, 1.4)
 					Sfx.play("meow", global_position + Vector3.UP * 0.3)
+			_try_jump_up()
 			_watch -= dt * 0.35 if sees else dt
 			if not rat_high and sees:
 				mode = Mode.CHASE; _lost = 0.0; _repath = 0.0
@@ -273,3 +299,80 @@ func _process(dt: float) -> void:
 	if G.grace_t <= 0.0 and not _rat_hidden() and not rat.jumping and rat.global_position.y < 0.3 and dist < 0.3:
 		play("pounce", 0.05)
 		G.caught("Gotcha!", global_position + Vector3.UP * 0.58)
+
+
+# ---------- 3 stars: jumping up after her ----------
+
+## Up onto the table / chair / counter she is on, if it's low enough for a cat (≤ 1 m) and the cat is right below.
+func _try_jump_up() -> void:
+	if G.stars < 3 or _jump_cd > 0.0 or rat.jumping or _rat_hidden() or not rat.is_on_floor():
+		return
+	var ry := rat.global_position.y
+	if ry < 0.3 or ry > 1.0:
+		return
+	var flat := Vector3(global_position.x - rat.global_position.x, 0, global_position.z - rat.global_position.z)
+	if flat.length() > 1.0:
+		return
+	var land := rat.global_position + flat.normalized() * minf(0.28, flat.length())
+	var hit := G.ray(land + Vector3.UP * 0.4, land + Vector3.DOWN * 0.3)
+	if hit.is_empty() or absf(hit.position.y - ry) > 0.05:
+		land = rat.global_position + flat.normalized() * 0.12
+		hit = G.ray(land + Vector3.UP * 0.4, land + Vector3.DOWN * 0.3)
+		if hit.is_empty() or absf(hit.position.y - ry) > 0.05:
+			return
+	_jump(hit.position)
+	_top_t = 6.0
+	G.bubble_on("MRRAOW!", self, 0.52, 1.2)
+	Sfx.play("meow_angry", global_position + Vector3.UP * 0.3)
+
+
+func _jump(to: Vector3) -> void:
+	_jfrom = global_position
+	_jto = to
+	_jt = 0.0
+	path.clear()
+	play("pounce", 0.05)
+
+
+func _tick_top(dt: float, dist: float) -> void:
+	if _jt >= 0.0:  # in the air
+		_jt += dt / 0.5
+		var t := minf(_jt, 1.0)
+		var p := _jfrom.lerp(_jto, t)
+		p.y = lerpf(_jfrom.y, _jto.y, t) + 0.3 * sin(t * PI)
+		global_position = p
+		turn(_jto - _jfrom, dt * 10.0)
+		play("pounce", 0.05)
+		if t >= 1.0:
+			_jt = -1.0
+			global_position = _jto
+			_top = _jto.y > 0.2
+			if not _top:
+				mode = Mode.SEARCH; _search = 1.5; _jump_cd = 3.0
+			Sfx.play("land", global_position, 2.0, 0.7)
+		return
+	# on top: go for her along the surface, never off the edge
+	_top_t -= dt
+	G.run.chased = true
+	var same := absf(rat.global_position.y - global_position.y) < 0.12 and not _rat_hidden()
+	if same:
+		var d := Vector3(rat.global_position.x - global_position.x, 0, rat.global_position.z - global_position.z)
+		var step := minf(d.length(), 1.3 * dt)
+		var np := global_position + d.normalized() * step
+		var hit := G.ray(np + Vector3.UP * 0.3, np + Vector3.DOWN * 0.2)
+		if not hit.is_empty() and absf(hit.position.y - global_position.y) < 0.05:
+			global_position = np
+			speed = 1.3
+		turn(d, dt * 8.0)
+		play("run" if speed > 0.0 else "idle_sit", 0.15)
+		if G.grace_t <= 0.0 and not rat.jumping and dist < 0.3:
+			play("pounce", 0.05)
+			G.caught("Gotcha!", global_position + Vector3.UP * 0.58)
+	else:
+		play("idle_sit", 0.3)
+	if _top_t <= 0.0 or not same and _top_t < 4.5:
+		# down again, to the floor nearby
+		var down := G.grid.free_point(global_position + global_transform.basis.z * 0.45)
+		down.y = 0.0
+		_top = false
+		_jump(down)

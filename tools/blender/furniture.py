@@ -57,7 +57,8 @@ def table(name, w, d, ht, top=WOOD, leg=WOOD_D, cloth=None, cloth_drop=18):
 def counter_section(sink=False, corner=False):
     body, top, door, handle = mat(0xeee2c8, 0.7), mat(0x8a5a34, 0.5), mat(0xe6d8bc, 0.6), mat(0x3a2a20, 0.5)
     w = 72 if corner else 60
-    parts = [box(w, 72, 86, 0, 0, 6, body), box(w - 4, 66, 6, 0, 2, 0, mat(0x3a2a20)), box(w + 1, 74, 4, 0, -1, 88, top, bevel=0.6)]
+    # the body stops under the top slab (a shared top face flickered)
+    parts = [box(w, 72, 81, 0, 0, 6, body), box(w - 4, 66, 6, 0, 2, 0, mat(0x3a2a20)), box(w + 1, 74, 4, 0, -1, 88, top, bevel=0.6)]
     parts += [box(w / 2 - 3, 1, 70, x, -36.5, 12, door, bevel=0.4) for x in ((-w / 4, w / 4) if not corner else (0,))]
     parts += [box(1.5, 1.5, 12, x, -37.5, 66, handle) for x in ((-3, 3) if not corner else (8,))]
     name = 'counter_corner' if corner else 'counter_section'

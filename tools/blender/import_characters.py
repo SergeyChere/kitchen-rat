@@ -141,7 +141,8 @@ CHARS = [
     # out, source, turn (deg about up), height (m, of the source model's bounding box), clips, new colours (linear)
     ("rat_mother", QS + "easy_enemies_pack/Rat.glb", 0, 0.165, RAT, {"Grey": RAT_STYLE["fur"]}, RAT_STYLE),
     ("rat_pup", QS + "easy_enemies_pack/Rat.glb", 0, 0.095, PUP, {"Grey": RAT_STYLE["pup_fur"]}, RAT_STYLE),
-    ("cat", QP + "Animal Pack Vol.2 - Jul 2017/Blends/Cat.blend", -90, 0.53, CAT, {"Grey": (0.7, 0.28, 0.06)}),
+    ("cat", QP + "Animal Pack Vol.2 - Jul 2017/Blends/Cat.blend", -90, 0.53, CAT, {"Grey": (0.7, 0.28, 0.06)},
+     {"kind": "cat", "closed": ["sleep", "stir"]}),
     ("dog", QS + "animals_pack/ShibaInu.glb", 0, 0.70, DOG, {}),
     ("owner", QP + "Animated Men Characters - Feb 2019/Blends/Male_Casual.blend", 0, 1.78, OWNER,
      {"Shirt": (0.08, 0.14, 0.4), "Pants": (0.12, 0.1, 0.08)}),
@@ -220,7 +221,7 @@ def pose_action(arm, keys, length, height, turn, scales=None):
     arm.animation_data.action = act
     for bone, f in (scales or {}).items():
         pb = arm.pose.bones[bone]
-        pb.scale = (f, f, f)
+        pb.scale = tuple(f) if isinstance(f, (tuple, list)) else (f, f, f)
         pb.keyframe_insert("scale", frame=1)
         pb.keyframe_insert("scale", frame=length)
         pb.scale = (1, 1, 1)
@@ -367,6 +368,39 @@ def add_face(arm, f):
     bpy.ops.object.join()
 
 
+def add_cat_eyes(arm):
+    """Cat eyes: yellow-green with a black slit pupil and a glint, on their own bone "Eyes" (child of the head) so
+    the sleeping clips can squash them shut. Source model units: the cat looks along +X, head front at x 3.23."""
+    body = next(o for o in bpy.context.scene.objects if o.type == "MESH" and o.find_armature() == arm)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="EDIT")
+    inv = arm.matrix_world.inverted()
+    eb = arm.data.edit_bones.new("Eyes")
+    eb.head = inv @ Vector((2.93, 0, 2.8))
+    eb.tail = inv @ Vector((2.93, 0, 3.0))  # pointing up: scaling its Y closes the eyes
+    eb.parent = arm.data.edit_bones["Bone.003"]
+    bpy.ops.object.mode_set(mode="OBJECT")
+    iris = _mat("CatIris", (0.62, 0.78, 0.12), 0.25)
+    pupil = _mat("Eye", (0.01, 0.01, 0.012), 0.15)
+    shine = _mat("EyeShine", (1, 1, 1), 0.2)
+    parts = []
+    for sx in (-1, 1):
+        c = Vector((2.93, sx * 0.235, 2.82))
+        out = Vector((0.55, sx * 0.83, 0.05)).normalized()
+        _add("sphere", c, (0.07, 0.1, 0.12), iris, parts)
+        _add("sphere", c + out * 0.07, (0.025, 0.025, 0.085), pupil, parts)
+        _add("sphere", c + out * 0.085 + Vector((0.02, 0, 0.05)), (0.022,) * 3, shine, parts)
+    for o in parts:
+        vg = o.vertex_groups.new(name="Eyes")
+        vg.add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in parts:
+        o.select_set(True)
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+
+
 def build(out, path, turn, height, clips, recolor, face=None):
     load(os.path.join(src_dir, path))
     fix_materials(recolor)
@@ -375,11 +409,14 @@ def build(out, path, turn, height, clips, recolor, face=None):
         arm.animation_data.action = None
     lo, hi = bounds()
     h = hi.z - lo.z
-    if face:
+    if face and face.get("kind") == "cat":
+        add_cat_eyes(arm)
+    elif face:
         add_face(arm, face)
     scales = {"Head": face["head"]} if face and face.get("head", 1.0) != 1.0 else None
+    closed = set(face.get("closed", [])) if face else set()
     source = set(bpy.data.actions)
-    made = [make_clip(arm, n, spec, h, turn, scales) for n, spec in clips.items()]
+    made = [make_clip(arm, n, spec, h, turn, {"Eyes": (1.0, 0.1, 1.0)} if n in closed else scales) for n, spec in clips.items()]
     for a in source:
         bpy.data.actions.remove(a)
     for a in list(bpy.data.actions):

@@ -42,7 +42,7 @@ func _process(_dt: float) -> void:
 		game.begin()
 		if _args.has("at"):
 			var p := str(_args.at).split(",")
-			game.rat.teleport(Nights.world(float(p[0]), float(p[1]), 1), deg_to_rad(float(p[2])) if p.size() > 2 else PI)
+			game.rat.teleport(Nights.world(float(p[0]), float(p[1]), float(p[3]) if p.size() > 3 else 1.0), deg_to_rad(float(p[2])) if p.size() > 2 else PI)
 			game.cam.snap(game.rat.rotation.y)
 		if _args.has("carry"):  # dev: start with a cheese in her teeth
 			var f := game.spawn_food(str(_args.carry) if str(_args.carry) != "" else "cheese", game.rat.global_position, "", false)

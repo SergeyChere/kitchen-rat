@@ -223,6 +223,8 @@ func _make_rat() -> void:
 	body.rotation = Vector3(PI / 2.0, 0, 0)
 	body.position = Vector3(0, 0.065, 0.02)
 	rat.add_child(body)
+	rat.stand_shape = cs
+	rat.body_shape = body
 	add_child(rat)
 	rat.global_position = Nights.world(180, 680, 2)
 	rat.rotation.y = PI  # facing north, toward the mouse hole

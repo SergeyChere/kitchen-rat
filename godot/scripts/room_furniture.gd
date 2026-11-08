@@ -78,6 +78,14 @@ func hide(kind: String, f: Dictionary, inset := 8.0) -> void:
 	b._hide(kind, float(f.x) + w / 2.0, float(f.y) + d / 2.0, maxf(16.0, w - inset * 2.0), maxf(16.0, d - inset * 2.0))
 
 
+## Under a sofa or an armchair there's only room for a crouching rat: an invisible slab 10 cm up stops her unless she
+## sneaks (crouched she is lower).
+func low_roof(f: Dictionary, inset: float) -> void:
+	var w := float(f.get("w", 32)); var d := float(f.get("h", 32))
+	var slab := b.box("Low clearance", W(float(f.x) + w / 2.0, float(f.y) + d / 2.0, 11.5), Vector3((w - inset * 2.0) / 100.0, 0.03, (d - inset * 2.0) / 100.0), b.mat(Color.BLACK), b.furn)
+	slab.visible = false
+
+
 func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire") -> OmniLight3D:
 	var l := OmniLight3D.new()
 	l.light_color = color
@@ -161,6 +169,7 @@ func build(list: Array) -> void:
 				var r := 180.0 if face == "n" else (90.0 if face == "e" else (-90.0 if face == "w" else 0.0))
 				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r)
 				hide("sofa", f, 12.0)
+				low_roof(f, 4.0)
 			"wall":
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)
@@ -201,6 +210,7 @@ func build(list: Array) -> void:
 # ---------- decor ----------
 
 func decor(kind: String) -> void:
+	dress(kind)
 	match kind:
 		"living":
 			_rug("rooms/rug_diamond", 480, 280, 440, 250)
@@ -245,3 +255,161 @@ func _art(model: String, x: float, h: float) -> void:
 	if n:
 		var bb := LevelBuilder.aabb_of(n)
 		n.global_position.y = h / 100.0 - bb.size.y / 2.0
+
+
+# ---------- dressing a room (like night 1): a second level on the walls, pictures, plants ----------
+
+## Shelf props by room: what stands on the wall shelves.
+const SHELF_PROPS := {
+	"living": ["props/small_box", "props/jar", "rooms/kettle"],
+	"dining": ["props/mug", "props/glass", "props/bottle"],
+	"pantry": ["props/can", "props/jar", "props/bottle"],
+	"kids": ["props/ball", "props/squeaky_toy", "props/lego_bricks"],
+}
+const ART := ["rooms/wall_art_landscape", "rooms/wall_art_flowers", "rooms/wall_art_portrait", "rooms/wall_clock"]
+
+var _inner := {}  # wall → its inside face, in cm from the room edge
+
+
+## Two climbable wall shelves (floor → 55 cm → 100 cm), pictures on free walls and a plant / lamp in free corners.
+## Everything goes only where there's room and away from the door, the mouse hole, cracks, food and traps.
+func dress(kind: String) -> void:
+	if bool(g.night.get("kitchenUpper", false)) or kind == "kitchen":
+		return
+	var props: Array = SHELF_PROPS.get("kids" if int(g.night.number) == 13 else kind, SHELF_PROPS.living)
+	for wall in ["n", "s", "w", "e"]:
+		_inner[wall] = _probe_inner(wall)
+	var placed := 0
+	for wall in ["w", "e", "n", "s"]:
+		if placed < 2 and _shelf_pair(wall, props):
+			placed += 1
+	var arts := ART.duplicate()
+	if kind == "living":
+		arts.erase("rooms/wall_clock")  # it already has one
+	var ai := 0
+	for wall in ["s", "w", "e", "n"]:
+		for along in range(120, 900, 150):
+			if ai >= 3:
+				break
+			if _art_at(wall, float(along), arts[ai % arts.size()]):
+				ai += 1
+	var extras := ["furniture/plant", "furniture/floor_lamp"]
+	var ei := 0
+	for c in [[60, 60], [900, 60], [60, 540], [900, 540], [480, 560], [60, 300]]:
+		if ei >= extras.size():
+			break
+		if _floor_item(extras[ei], float(c[0]), float(c[1])):
+			ei += 1
+
+
+func _probe_inner(wall: String) -> float:
+	var from := W(480, 300, 100)
+	var to: Vector3 = {"n": W(480, -60, 100), "s": W(480, 660, 100), "w": W(-60, 300, 100), "e": W(1020, 300, 100)}[wall]
+	var hit := g.ray(from, to)
+	if hit.is_empty():
+		return 0.0
+	var p: Vector3 = hit.position
+	match wall:
+		"n": return (p.z + 3.0) * 100.0
+		"s": return 600.0 - (p.z + 3.0) * 100.0
+		"w": return (p.x + 4.8) * 100.0
+		_: return 960.0 - (p.x + 4.8) * 100.0
+
+
+## A point on a wall: `along` cm along it, `out` cm into the room from its inside face, h cm up. And the rotation
+## that faces into the room.
+func _wall_pt(wall: String, along: float, out: float, h: float) -> Vector3:
+	var i: float = _inner.get(wall, 0.0) + out
+	match wall:
+		"n": return W(along, i, h)
+		"s": return W(along, 600.0 - i, h)
+		"w": return W(i, along, h)
+		_: return W(960.0 - i, along, h)
+
+
+func _wall_rot(wall: String) -> float:
+	return {"n": 0.0, "s": 180.0, "w": 90.0, "e": -90.0}[wall]
+
+
+## Too close to something the night needs (cm): the door, the mouse hole, cracks, food, traps, things to knock over.
+func _busy(p: Vector3, r_cm: float) -> bool:
+	var x := (p.x + 4.8) * 100.0
+	var y := (p.z + 3.0) * 100.0
+	var door := float(g.night.get("door", 300))
+	if x > 860.0 and absf(y - door) < 80.0 + r_cm:
+		return true
+	if y > 500.0 and absf(x - 180.0) < 70.0 + r_cm:
+		return true
+	var win: Dictionary = g.night.get("window", {})
+	if y < 60.0 and float(win.get("w", 0)) > 0.0 and x > float(win.x) - 40.0 - r_cm and x < float(win.x) + float(win.w) + 40.0 + r_cm:
+		return true
+	for c in g.cracks:
+		if Vector2(c.x - p.x, c.z - p.z).length() * 100.0 < 50.0 + r_cm:
+			return true
+	var spots: Array = (g.night.get("food", {}) as Dictionary).get("spots", [])
+	for lst in [spots, g.night.get("knocks", []), g.night.get("trapSpots", []), g.night.get("props", [])]:
+		for s in lst:
+			if s is Dictionary and s.has("x") and Vector2(float(s.x) - x, float(s.y) - y).length() < 45.0 + r_cm:
+				return true
+	return false
+
+
+func _free_box(center: Vector3, size_cm: Vector3) -> bool:
+	return g.box_free(center, size_cm / 200.0)
+
+
+## Two shelves on a wall, the low one reachable from the floor and the high one from the low one.
+func _shelf_pair(wall: String, props: Array) -> bool:
+	var length := 540.0 if wall in ["w", "e"] else 880.0
+	var along := 60.0
+	while along + 125.0 < length:
+		var a := _wall_pt(wall, along + 35.0, 12.0, 54.0)
+		var bb := _wall_pt(wall, along + 85.0, 12.0, 99.0)
+		var front := _wall_pt(wall, along + 35.0, 40.0, 25.0)
+		var side := wall in ["w", "e"]
+		var sz := Vector3(22, 30, 72) if side else Vector3(72, 30, 22)
+		if not _busy(a, 50.0) and not _busy(bb, 50.0) and _free_box(a + Vector3.UP * 0.12, sz) and _free_box(bb + Vector3.UP * 0.12, sz) \
+				and _free_box(front, Vector3(40, 40, 40)):
+			_shelf(wall, along + 35.0, 54.0, props)
+			_shelf(wall, along + 85.0, 99.0, props)
+			return true
+		along += 20.0
+	return false
+
+
+func _shelf(wall: String, along: float, top_cm: float, props: Array) -> void:
+	var side := wall in ["w", "e"]
+	var c := _wall_pt(wall, along, 12.0, top_cm - 1.5)
+	var size := Vector3(0.24, 0.03, 0.7) if side else Vector3(0.7, 0.03, 0.24)
+	var wood := b.mat(LevelBuilder.hex(0x8a5a34))
+	var sh := b.box("Wall shelf", c, size, wood, b.furn)
+	sh.get_child(0).set_meta("surface", "shelf")
+	for br in [-0.25, 0.25]:  # brackets
+		var bp := _wall_pt(wall, along + br * 100.0, 3.0, top_cm - 8.0)
+		b.box("Bracket", bp, Vector3(0.02, 0.12, 0.02), wood, b.furn, false)
+	for j in 2:  # a couple of things at the back, leaving room to walk
+		var pp := _wall_pt(wall, along - 22.0 + j * 40.0, 4.0, top_cm)
+		var n := b.spawn(str(props[(j + int(top_cm)) % props.size()]), pp, _wall_rot(wall), b.decor)
+		if n:
+			var ab := LevelBuilder.world_aabb(n)
+			if ab.size.y > 0.2:
+				n.scale *= 0.2 / ab.size.y
+			b.collide(n)
+
+
+func _art_at(wall: String, along: float, model: String) -> bool:
+	var p := _wall_pt(wall, along, 3.0, 165.0)
+	if _busy(p, 10.0) or not _free_box(_wall_pt(wall, along, 4.0, 165.0), Vector3(60, 60, 4) if wall in ["n", "s"] else Vector3(4, 60, 60)):
+		return false
+	b._wall_art(model, ((p.x + 4.8) * 100.0), ((p.z + 3.0) * 100.0), 165.0, _wall_rot(wall))
+	return true
+
+
+func _floor_item(model: String, x: float, y: float) -> bool:
+	var p := W(x, y)
+	if _busy(p, 30.0) or not _free_box(p + Vector3.UP * 0.6, Vector3(44, 110, 44)):
+		return false
+	var n := b.spawn(model, p, randf() * 360.0, b.furn)
+	if n:
+		b.collide(n)
+	return n != null
