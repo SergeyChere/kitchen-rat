@@ -12,6 +12,7 @@ var night: Dictionary
 var night_id := "kitchen"
 var tasks: TaskTracker
 var grid: NavGrid
+var nav: NavWorld
 var rat: Rat
 var cat: CatAI
 var owner_ai: OwnerAI
@@ -142,6 +143,7 @@ func _ready() -> void:
 		if z is HideSpot and (z as HideSpot).id != "crack":
 			no_go.append(z)
 	grid = NavGrid.new(self, no_go)
+	nav = NavWorld.new(self, no_go)
 	fx = WorldFx.new(self)
 	fx.name = "World fx"
 	add_child(fx)
@@ -1642,6 +1644,8 @@ func _restart() -> void:
 
 
 func _exit_tree() -> void:
+	if nav:
+		nav.dispose()
 	if is_instance_valid(_rain):
 		_rain.queue_free()
 

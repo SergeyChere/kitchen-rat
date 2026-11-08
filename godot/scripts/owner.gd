@@ -38,6 +38,8 @@ func _has_plan() -> bool: return str(_plan.get("type", "")) != ""
 
 
 func setup(n: Dictionary, door_point: Vector3) -> void:
+	walk_clip_speed = 1.4; run_clip_speed = 3.4; run_from = 1.75
+	accel = 2.5; decel = 4.0; turn_rate = 4.0; turn_in_place = 1.6
 	night = n
 	door = door_point
 	_plan = n.get("owner", {})
@@ -229,8 +231,7 @@ func _process(dt: float) -> void:
 	if _step_d > 0.6:
 		_step_d = 0.0
 		Sfx.play("stomp", global_position, 0.0, 1.0, 0.1)
-	if speed > 1.2: play("run", 0.15)
-	elif speed > 0.05: play("walk")
+	if move_anim(): pass
 	elif mode == Mode.DRINK: play("drink")
 	elif flashlight and flashlight.visible: play("flashlight_sweep")
 	else: play("look_around" if mode == Mode.LOOK else "idle")

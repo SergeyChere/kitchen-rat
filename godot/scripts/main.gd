@@ -315,6 +315,11 @@ func _focus() -> void:
 			ap.play(f[1])
 	var fwd := t.global_transform.basis.z
 	var side := t.global_transform.basis.x
+	if f.size() > 2 and f[2] == "wide":  # from a fixed spot up in the room, turning to follow (to see how they walk)
+		var at := Vector3(clampf(t.global_position.x, -2.5, 2.5) * 0.5, 2.35, 2.75)
+		c.global_position = c.global_position.lerp(at, 0.05) if c.global_position.y > 1.0 else at
+		c.look_at(t.global_position + Vector3.UP * d * 0.15)
+		return
 	var low := f.size() > 2 and f[2] == "low"  # at floor level, from the side
 	var to := t.global_position + (side if low else (fwd * 0.8 + side * 0.6).normalized()) * d + Vector3.UP * (0.03 if low else d * 0.45)
 	c.global_position = to

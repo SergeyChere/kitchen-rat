@@ -41,6 +41,9 @@ func awake() -> bool: return mode != Mode.AWAY and mode != Mode.SLEEP
 
 
 func setup(n: Dictionary) -> void:
+	# gait: the clips' own foot speeds were measured from the models (feet planted on the floor)
+	walk_clip_speed = 0.22; run_clip_speed = 0.48; run_from = 1.05
+	accel = 5.0; decel = 8.0; turn_rate = 7.0
 	night = n
 	bed = Nights.pos(n.get("catBed"))
 	bowl = Nights.pos(n.get("bowl")) if (n.get("bowl", []) as Array).size() >= 2 else bed
@@ -291,8 +294,7 @@ func _process(dt: float) -> void:
 	if mode == Mode.CHASE:
 		G.run.chased = true
 
-	if speed > 1.3: play("run", 0.15)
-	elif speed > 0.05: play("walk")
+	if move_anim(): pass
 	elif mode == Mode.SEARCH: play("look_around")
 	else: play("idle_sit", 0.3)
 

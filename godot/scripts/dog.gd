@@ -19,6 +19,8 @@ var _play := 0.0
 
 
 func setup(at: Vector3) -> void:
+	walk_clip_speed = 0.5; run_clip_speed = 1.2; run_from = 1.25
+	accel = 4.5; decel = 7.0; turn_rate = 6.0
 	global_position = at
 	rotation.y = Nights.yaw_to(Vector3.LEFT)
 	eye_height = 0.4
@@ -153,8 +155,7 @@ func _process(dt: float) -> void:
 					path_to(G.grid.random_free(2.0, global_position))
 			follow(0.95, dt)
 
-	if speed > 1.3: play("run", 0.15)
-	elif speed > 0.05: play("sniff_ground" if mode == Mode.TRACK else "walk")
+	if move_anim("sniff_ground" if mode == Mode.TRACK else "walk"): pass
 	elif mode == Mode.PLAY: play("play")
 	else: play("idle")
 

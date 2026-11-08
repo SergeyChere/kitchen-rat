@@ -79,6 +79,78 @@ func _ready() -> void:
 	collision_mask = 1
 	floor_max_angle = deg_to_rad(50.0)
 	floor_snap_length = 0.05
+	_make_dust()
+
+
+# ---------- squash & stretch, dust (from Kenney's Starter Kit 3D Platformer, MIT) ----------
+
+var _dust_trail: CPUParticles3D
+var _dust_puff: CPUParticles3D
+
+
+func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
+	var e := CPUParticles3D.new()
+	e.amount = amount
+	e.lifetime = 0.55 if burst else 0.45
+	e.one_shot = burst
+	e.explosiveness = 0.95 if burst else 0.0
+	e.emitting = false
+	e.local_coords = false
+	e.direction = Vector3.UP
+	e.spread = 80.0 if burst else 40.0
+	e.initial_velocity_min = 0.08 if burst else 0.02
+	e.initial_velocity_max = 0.22 if burst else 0.06
+	e.gravity = Vector3(0, -0.05, 0)
+	e.damping_min = 0.4
+	e.damping_max = 0.8
+	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	e.emission_sphere_radius = 0.03 if burst else 0.015
+	e.scale_amount_min = 0.6
+	e.scale_amount_max = 1.2
+	var c := Curve.new()
+	c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.3))
+	e.scale_amount_curve = c
+	var g := Gradient.new()
+	g.set_color(0, Color(0.78, 0.74, 0.68, 0.45 if burst else 0.25))
+	g.set_color(1, Color(0.78, 0.74, 0.68, 0.0))
+	e.color_ramp = g
+	var q := QuadMesh.new()
+	q.size = Vector2(0.035, 0.035)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			var r := Vector2(x - 15.5, y - 15.5).length() / 15.5
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - r, 0.0, 1.0) ** 1.5))
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	q.material = m
+	e.mesh = q
+	add_child(e)
+	e.position = Vector3(0, 0.01, 0)
+	return e
+
+
+func _make_dust() -> void:
+	_dust_trail = _dust_emitter(14, false)
+	_dust_puff = _dust_emitter(12, true)
+
+
+## Stretch tall on take-off, squash flat on landing; the model eases back to its shape.
+func _pop(v: Vector3) -> void:
+	if model:
+		model.scale = v
+
+
+func _land_fx(drop: float) -> void:
+	var k := clampf(drop / 0.45, 0.3, 1.0)
+	_pop(Vector3(1.0 + 0.25 * k, 1.0 - 0.25 * k, 1.0 + 0.12 * k))
+	if drop > 0.12 and _dust_puff:
+		_dust_puff.amount = int(lerpf(6.0, 14.0, k))
+		_dust_puff.restart()
 
 
 func moving() -> bool: return move_speed > 0.05
@@ -190,6 +262,10 @@ func teleport(p: Vector3, yaw: float) -> void:
 
 
 func _physics_process(dt: float) -> void:
+	if model:
+		model.scale = model.scale.lerp(Vector3.ONE, clampf(dt * 10.0, 0.0, 1.0))
+	if _dust_trail:
+		_dust_trail.emitting = running and is_on_floor() and move_speed > walk_speed and not jumping and not hidden()
 	noise_level = move_toward(noise_level, 0.0, dt * 1.5)
 	if scripted:
 		_show_marker(false)
@@ -277,6 +353,7 @@ func _physics_process(dt: float) -> void:
 		var drop := _air_top - global_position.y
 		if drop > 0.05:
 			landed.emit(drop)
+			_land_fx(drop)
 			_land_t = clampf(0.08 + drop * 0.35, 0.08, 0.5)
 	_was_on_floor = is_on_floor()
 	if is_on_floor():
@@ -311,6 +388,7 @@ func _physics_process(dt: float) -> void:
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			velocity.y = hop_impulse
 			_hopping = true
+			_pop(Vector3(0.9, 1.16, 0.95))
 			var fw := global_transform.basis.z
 			velocity.x += fw.x * 0.9
 			velocity.z += fw.z * 0.9
@@ -395,6 +473,7 @@ func _show_marker(on: bool) -> void:
 
 func _start_jump(to: Vector3, up: bool) -> void:
 	jumping = true
+	_pop(Vector3(0.88, 1.2, 0.94))
 	Sfx.play("jump", global_position)
 	_jump_up = up
 	_kind = "up" if up else "down"
@@ -451,6 +530,8 @@ func _tick_jump(dt: float) -> void:
 	_land_t = clampf(0.12 + drop * 0.35, 0.12, 0.5) if _kind == "down" else 0.1
 	add_noise(0.35 if _kind == "down" else 0.12)
 	_update_surface()
+	if _kind == "down" or _kind == "up":
+		_land_fx(maxf(drop, 0.15))
 	landed.emit(_from.y - _to.y)
 
 
@@ -606,6 +687,9 @@ func _climb_tilt(t: float) -> float:
 
 # ---------- animation ----------
 
+var _fast := false
+
+
 func _play_anim() -> void:
 	if anim == null:
 		return
@@ -622,8 +706,13 @@ func _play_anim() -> void:
 		clip = "sneak"  # pressed low in her hiding spot
 	elif moving():
 		# walk or run by how fast she actually goes (she eases into a run), as in GDQuest's walk/run blend
-		var fast := move_speed > (walk_speed + run_speed) * 0.5
-		clip = "drag" if dragging() else ("run" if fast else ("sneak" if sneaking else ("carry_walk" if not carried.is_empty() else "walk")))
-	anim.play(clip)
+		# with a little hysteresis, so she doesn't flicker between the two around the switch speed
+		var mid := (walk_speed + run_speed) * 0.5
+		_fast = move_speed > (mid * 0.85 if _fast else mid)
+		clip = "drag" if dragging() else ("run" if _fast else ("sneak" if sneaking else ("carry_walk" if not carried.is_empty() else "walk")))
+	else:
+		_fast = false
+	var gait := ["walk", "run", "carry_walk", "sneak", "drag"]
+	anim.play(clip, 0.3 if gait.has(clip) and gait.has(anim.current) else 0.15)  # long cross-fade between gaits
 	var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
 	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else (0.15 if clip == "sneak" else 1.0))
