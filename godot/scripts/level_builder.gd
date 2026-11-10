@@ -281,6 +281,16 @@ func on_top(x: float, y: float) -> Vector3:
 	return hit.position if not hit.is_empty() else W(x, y)
 
 
+## A named demo material (demo polish, plan point 2): the procedural texture from tools/make_textures.py
+## when it has been generated into assets/textures/, the flat colour until then — so the game never breaks
+## on a missing texture. Names: wood, wood_dark, fabric, leather, ceramic_tile, metal_matte, cardboard,
+## plastic, counter_stone.
+func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> StandardMaterial3D:
+	if ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
+		return mat(color, tex_name, tiling)
+	return mat(color)
+
+
 func mat(color: Color, texture := "", tiling := Vector2.ONE) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
@@ -553,7 +563,7 @@ func _kitchen_upper() -> void:
 				var bb := world_aabb(c)
 				c.global_position += W(blk[0] + cw * (i + 0.5), 17.5, 145) - Vector3(bb.get_center().x, bb.position.y, bb.get_center().z)
 				collide_box(c, "cabinet")
-	var wood := mat(hex(0x8a5a34))
+	var wood := mat_named("wood", hex(0x8a5a34))
 	box("Shelf over the window", W(520, 13, 213.5), Vector3(2.4, 0.03, 0.26), wood, furn).get_child(0).set_meta("surface", "shelf")
 	for sh in [[195.0, 138.5], [100.0, 178.5]]:  # [y centre, top − 1.5]
 		var b := box("Wall shelf", W(14, sh[0], sh[1]), Vector3(0.28, 0.03, 1.0), wood, furn)

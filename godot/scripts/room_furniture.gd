@@ -395,7 +395,7 @@ func _shelf(wall: String, along: float, top_cm: float, props: Array) -> void:
 	var side := wall in ["w", "e"]
 	var c := _wall_pt(wall, along, 12.0, top_cm - 1.5)
 	var size := Vector3(0.24, 0.03, 0.7) if side else Vector3(0.7, 0.03, 0.24)
-	var wood := b.mat(LevelBuilder.hex(0x8a5a34))
+	var wood := b.mat_named("wood", LevelBuilder.hex(0x8a5a34))
 	var sh := b.box("Wall shelf", c, size, wood, b.furn)
 	sh.get_child(0).set_meta("surface", "shelf")
 	for br in [-0.25, 0.25]:  # brackets

@@ -16,6 +16,11 @@ var zoom := 0.0  # the wheel: degrees added to the field of view
 var first_person := false
 var yaw := PI  # 0 looks toward +Z (south)
 var pitch := -16.0
+## Demo polish: the mouse and the stick move _yaw_t/_pitch_t, and yaw/pitch ease toward them every frame.
+## Raw mouse motion used to turn the camera instantly, pixel for pixel, which felt twitchy.
+var _yaw_t := PI
+var _pitch_t := -16.0
+const SMOOTH := 18.0  # 1/s: how fast the view catches up with the hand (most of the way in ~60 ms)
 var arm: SpringArm3D
 var cam: Camera3D
 ## From GDQuest's third-person controller (MIT): the camera follows the height of the ground she stands on, eased, not
@@ -48,7 +53,9 @@ func _ready() -> void:
 
 func snap(new_yaw: float) -> void:
 	yaw = new_yaw
+	_yaw_t = new_yaw
 	pitch = -16.0
+	_pitch_t = -16.0
 	_ground_y = INF
 	_pivot_y = INF
 
@@ -58,8 +65,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseMotion:
 		var sens := sensitivity * lerpf(1.0, 0.5, _sniff_k)
-		yaw -= deg_to_rad(e.relative.x * sens)
-		pitch = pitch - e.relative.y * sens * (-1.0 if invert_y else 1.0)
+		_yaw_t -= deg_to_rad(e.relative.x * sens)
+		_pitch_t = _pitch_t - e.relative.y * sens * (-1.0 if invert_y else 1.0)
 	elif e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom = clampf(zoom - 4.0, -30.0, 40.0)
@@ -76,9 +83,12 @@ func _process(_dt: float) -> void:
 	var lo := -70.0
 	var hi := 45.0 if first_person else 8.0  # looking up from behind would push the camera into the floor
 	if look.length() > 0.1:
-		yaw -= look.x * 2.6 * _dt
-		pitch = pitch - look.y * 120.0 * _dt
-	pitch = clampf(pitch, lo, hi)
+		_yaw_t -= look.x * 2.6 * _dt
+		_pitch_t = _pitch_t - look.y * 120.0 * _dt
+	_pitch_t = clampf(_pitch_t, lo, hi)
+	var k := 1.0 - exp(-SMOOTH * _dt)  # frame-rate independent easing
+	yaw = lerp_angle(yaw, _yaw_t, k)  # lerp_angle: the short way round, so spins past +/-PI do not snap back
+	pitch = clampf(lerpf(pitch, _pitch_t, k), lo, hi)
 	var rr := target as Rat
 	_sniff_k = move_toward(_sniff_k, 1.0 if rr and rr.sniffing else 0.0, _dt * 3.0)
 	_hide_k = move_toward(_hide_k, 1.0 if rr and rr.hidden() else 0.0, _dt * 2.5)

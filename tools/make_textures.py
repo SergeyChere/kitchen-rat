@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Procedural textures for Kitchen Rat.
+
+Generates the named materials from the demo-polish plan (point 2: wood must
+look like wood, sofa like sofa) as 256x256 PNGs into godot/assets/textures/,
+next to the 8 existing textures (floor_*/wall_*). No external assets, so no
+licence questions — same approach as tools/make_audio.py.
+
+Usage (from repo root):
+    python3 tools/make_textures.py            # writes 9 PNGs
+    python3 tools/make_textures.py --size 512 # larger tiles
+    python3 tools/make_textures.py --out godot/assets/textures
+
+In level_builder.gd, LevelBuilder.mat_named("wood", colour) uses the
+generated texture when it exists and falls back to the flat colour until
+the script has been run; pass a tiling so the grain scale stays constant
+across furniture of different sizes.
+
+Seeds are fixed, so re-running reproduces identical files.
+"""
+import argparse
+import math
+import random
+from pathlib import Path
+
+from PIL import Image
+
+SIZE_DEFAULT = 256
+
+
+# --- tileable value noise (wraps at the edges, so textures tile cleanly) ---
+class Noise:
+    def __init__(self, seed, period=8):
+        self.rng = random.Random(seed)
+        self.period = period
+        self.grid = [[self.rng.random()
+                      for _ in range(period + 1)] for _ in range(period + 1)]
+        for y in range(period + 1):
+            self.grid[y][period] = self.grid[y][0]
+        for x in range(period + 1):
+            self.grid[period][x] = self.grid[0][x]
+
+    @staticmethod
+    def _smooth(t):
+        return t * t * (3 - 2 * t)
+
+    def at(self, x, y):
+        p = self.period
+        xi, yi = int(x) % p, int(y) % p
+        xf, yf = x - int(x), y - int(y)
+        xf, yf = self._smooth(xf), self._smooth(yf)
+        x0, y0 = xi, yi
+        x1, y1 = (xi + 1) % p, (yi + 1) % p
+        top = self.grid[y0][x0] * (1 - xf) + self.grid[y0][x1] * xf
+        bot = self.grid[y1][x0] * (1 - xf) + self.grid[y1][x1] * xf
+        return top * (1 - yf) + bot * yf
+
+    def fbm(self, x, y, octaves=4):
+        total, amp, freq, norm = 0.0, 1.0, 1.0, 0.0
+        for _ in range(octaves):
+            total += self.at(x * freq, y * freq) * amp
+            norm += amp
+            amp *= 0.5
+            freq *= 2
+        return total / norm
+
+
+def clamp(v):
+    return max(0, min(255, int(v)))
+
+
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+
+def shade(base, factor):
+    return tuple(clamp(c * factor) for c in base)
+
+
+def make_image(size, fn):
+    img = Image.new("RGB", (size, size))
+    px = img.load()
+    for y in range(size):
+        for x in range(size):
+            px[x, y] = fn(x / size, y / size)
+    return img
+
+
+def wrap_dist(a, b):
+    """Shortest distance on a [0, 1) torus — so dots near an edge continue
+    on the opposite edge and the texture tiles seamlessly."""
+    d = abs(a - b)
+    return min(d, 1 - d)
+
+
+def wood(size, seed, base=(138, 90, 52), dark=(96, 58, 30), light=(172, 122, 76)):
+    # Tileability rule used throughout this file: a Noise(period=p) sampled
+    # at (u*a, v*b) tiles only when a and b are multiples of p (so the
+    # coordinate at u=1 / v=1 wraps back to the value at 0). The old code
+    # broke this (e.g. period 8 with u*2), which is why wood showed a seam.
+    n_wob = Noise(seed, period=3)    # wobble: u*3, v*24 — multiples of 3
+    n_g = Noise(seed + 1, period=2)  # grain: u*2, v*30 — multiples of 2
+    n2 = Noise(seed + 2, period=4)   # fine detail: u*16, v*16
+
+    def fn(u, v):
+        # grain stretched along x: fibres run horizontally, wavy
+        wobble = n_wob.fbm(u * 3, v * 24, 3) * 0.35
+        # Smooth grain for the streak phase: 3 octaves, v*24 (was v*30 with
+        # 4 octaves). The old top octave put ~1 lattice cell per pixel, so g
+        # jumped randomly in the last pixel row and the streak phase (x6)
+        # swung with it — a seam even though g itself is exactly periodic.
+        # v*24 keeps the wrap step at the level of a normal row step.
+        g = n_g.fbm(u * 2 + wobble, v * 24, 3)
+        streak = 0.5 + 0.5 * math.sin((v * 26 + g * 6) * math.pi)
+        col = tuple(lerp(dark[i], light[i], streak * 0.7 + g * 0.3)
+                    for i in range(3))
+        # a knot or two: concentric rings around fixed points
+        for kx, ky in ((0.3, 0.35), (0.72, 0.7)):
+            dx, dy = (u - kx) * 1.6, (v - ky) * 1.6
+            d = math.sqrt(dx * dx + dy * dy)
+            if d < 0.12:
+                ring = 0.5 + 0.5 * math.sin(d * 220)
+                col = tuple(lerp(col[i], dark[i], (1 - d / 0.12) * ring * 0.8)
+                            for i in range(3))
+        fine = n2.at(u * 16, v * 16) * 0.12
+        return tuple(clamp(c + (fine - 0.06) * 255 * 0.4) for c in col)
+
+    return make_image(size, fn)
+
+
+def fabric(size, seed, base=(96, 104, 96)):
+    n = Noise(seed, period=16)
+
+    def fn(u, v):
+        # woven threads: alternating over/under pattern + fibre noise
+        tu = 0.5 + 0.5 * math.sin(u * math.pi * 2 * 32)
+        tv = 0.5 + 0.5 * math.sin(v * math.pi * 2 * 32)
+        weave = 0.85 + 0.15 * (tu * tv)
+        fuzz = n.at(u * 32, v * 32) * 0.25  # 32 is a multiple of period 16
+        return shade(base, weave * (0.85 + fuzz))
+
+    return make_image(size, fn)
+
+
+def leather(size, seed, base=(122, 74, 52)):
+    n = Noise(seed, period=6)
+    n2 = Noise(seed + 5, period=24)
+
+    def fn(u, v):
+        blotch = n.fbm(u * 6, v * 6, 3)  # 6 is a multiple of period 6
+        grain = n2.at(u * 24, v * 24)  # 24 is a multiple of period 24
+        f = 0.8 + blotch * 0.35 + (grain - 0.5) * 0.12
+        return shade(base, f)
+
+    return make_image(size, fn)
+
+
+def ceramic_tile(size, seed, base=(214, 210, 198), grout=(120, 116, 108)):
+    # Per-tile shade must be a smooth periodic function of the tile index:
+    # the old code sampled random noise per tile, so the shade step across
+    # the image boundary could be twice as big as any internal step — a
+    # visible seam. With cosines every adjacent step (including the wrap
+    # from tile 3 back to tile 0) is the same size, and the boundary itself
+    # is a grout line, exactly like every internal tile boundary.
+    tiles = 4
+    phase = (seed % tiles) * math.pi / 2
+
+    def fn(u, v):
+        tu, tv = u * tiles, v * tiles
+        fx, fy = tu - int(tu), tv - int(tv)
+        if fx < 0.06 or fy < 0.06:  # grout lines
+            return grout
+        ti, tj = int(tu) % tiles, int(tv) % tiles
+        s = (0.92 + 0.05 * math.cos(2 * math.pi * ti / tiles + phase)
+             + 0.05 * math.cos(2 * math.pi * tj / tiles + phase))
+        return shade(base, s)
+
+    return make_image(size, fn)
+
+
+def metal_matte(size, seed, base=(168, 170, 174)):
+    n = Noise(seed, period=2)  # brushed: u*40, v*2 — multiples of 2
+
+    def fn(u, v):
+        # brushed vertically: long streaks, almost no horizontal variation
+        streak = n.fbm(u * 40, v * 2, 3)
+        return shade(base, 0.9 + streak * 0.18)
+
+    return make_image(size, fn)
+
+
+def cardboard(size, seed, base=(178, 140, 96)):
+    n = Noise(seed, period=6)  # fbm(u*6, v*6) — multiples of 6
+    rng = random.Random(seed + 9)
+    flecks = [(rng.random(), rng.random()) for _ in range(60)]
+
+    def fn(u, v):
+        f = 0.85 + n.fbm(u * 6, v * 6, 3) * 0.3
+        col = shade(base, f)
+        for fx, fy in flecks:
+            # toroidal distance: a fleck cut by one edge continues on the other
+            if wrap_dist(u, fx) < 0.004 and wrap_dist(v, fy) < 0.004:
+                return (120, 92, 60)
+        return col
+
+    return make_image(size, fn)
+
+
+def plastic(size, seed, base=(226, 224, 218)):
+    n = Noise(seed, period=8)
+
+    def fn(u, v):
+        return shade(base, 0.96 + n.at(u * 8, v * 8) * 0.07)
+
+    return make_image(size, fn)
+
+
+def counter_stone(size, seed, base=(188, 186, 180)):
+    n = Noise(seed, period=3)  # fbm(u*3, v*3) — multiples of 3
+    n2 = Noise(seed + 3, period=16)
+    rng = random.Random(seed + 4)
+    speck = [(rng.random(), rng.random(), rng.random() < 0.5)
+             for _ in range(500)]
+
+    def fn(u, v):
+        vein = n.fbm(u * 3 + 2.5, v * 3, 3)
+        f = 0.9 + vein * 0.18 + (n2.at(u * 16, v * 16) - 0.5) * 0.1
+        col = shade(base, f)
+        for sx, sy, dark in speck:
+            if wrap_dist(u, sx) < 0.0025 and wrap_dist(v, sy) < 0.0025:
+                return (90, 88, 84) if dark else (235, 233, 228)
+        return col
+
+    return make_image(size, fn)
+
+
+MATERIALS = {
+    "wood": lambda s: wood(s, 11),
+    "wood_dark": lambda s: wood(s, 23, base=(96, 60, 36),
+                               dark=(62, 36, 18), light=(128, 84, 48)),
+    "fabric": lambda s: fabric(s, 31),
+    "leather": lambda s: leather(s, 41),
+    "ceramic_tile": lambda s: ceramic_tile(s, 51),
+    "metal_matte": lambda s: metal_matte(s, 61),
+    "cardboard": lambda s: cardboard(s, 71),
+    "plastic": lambda s: plastic(s, 81),
+    "counter_stone": lambda s: counter_stone(s, 91),
+}
+
+
+def _edge_diff(img):
+    """Mean per-channel difference between opposite edges, and the mean
+    adjacent-pixel step (sampled). A texture tiles when its edge step is no
+    bigger than a normal step inside it — busy textures (wood grain, weave)
+    legitimately have large steps, so the comparison is relative, not an
+    absolute threshold. For ceramic_tile the raw edge diff is grout-vs-shade
+    by design, so the caller compares the wrap step with an internal
+    tile-boundary step instead."""
+    px = img.load()
+    w, h = img.size
+
+    def d(a, b):
+        return sum(abs(a[i] - b[i]) for i in range(3)) / 3
+
+    lr = sum(d(px[0, y], px[w - 1, y]) for y in range(h)) / h
+    tb = sum(d(px[x, 0], px[x, h - 1]) for x in range(w)) / w
+    mean_row = sum(d(px[x, y], px[x, y + 1])
+                   for x in range(0, w, 4) for y in range(0, h - 1, 4)) / (
+                       (w // 4) * (h // 4))
+    mean_col = sum(d(px[x, y], px[x + 1, y])
+                   for x in range(0, w - 1, 4) for y in range(0, h, 4)) / (
+                       (w // 4) * (h // 4))
+    return lr, tb, mean_row, mean_col
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--size", type=int, default=SIZE_DEFAULT)
+    ap.add_argument("--out", default="godot/assets/textures")
+    args = ap.parse_args()
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for name, fn in MATERIALS.items():
+        img = fn(args.size)
+        path = out / f"{name}.png"
+        img.save(path)
+        lr, tb, mean_row, mean_col = _edge_diff(img)
+        if name == "ceramic_tile":
+            # wrap step (last col -> first col of the next tile) vs an
+            # internal tile-boundary step (col 63 -> 64): both shade->grout
+            px = img.load()
+            w, h = img.size
+
+            def d(a, b):
+                return sum(abs(a[i] - b[i]) for i in range(3)) / 3
+
+            wrap = sum(d(px[w - 1, y], px[0, y]) for y in range(h)) / h
+            inner = sum(d(px[w // 4 - 1, y], px[w // 4, y])
+                        for y in range(h)) / h
+            print(f"wrote {path} ({args.size}x{args.size}) "
+                  f"[ceramic wrap step {wrap:.2f} vs internal {inner:.2f}]")
+        else:
+            ok = tb <= 2 * mean_row + 0.5 and lr <= 2 * mean_col + 0.5
+            flag = "" if ok else "  <-- SEAM, investigate"
+            print(f"wrote {path} ({args.size}x{args.size}) "
+                  f"[tile check: L-R {lr:.2f} vs col step {mean_col:.2f}, "
+                  f"T-B {tb:.2f} vs row step {mean_row:.2f}]{flag}")
+
+
+if __name__ == "__main__":
+    main()

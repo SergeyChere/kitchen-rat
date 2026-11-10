@@ -54,7 +54,7 @@ const JUMP_BUFFER := 0.15 # s before landing that Space is remembered
 var _coyote := 0.0
 var _low_roof := false  # hopping under something: no higher hop for holding Space
 var _jump_buf := 0.0
-var air_acceleration := 2.0
+var air_acceleration := 6.0  # demo polish: was 2.0, a hop could not be corrected in the air at all
 var rotation_speed := 12.0
 var stopping_speed := 0.05
 var hop_impulse := 1.7
@@ -84,7 +84,7 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1
 	floor_max_angle = deg_to_rad(50.0)
-	floor_snap_length = 0.05
+	floor_snap_length = 0.12  # demo polish: was 0.05, she un-stuck and micro-fell stepping off shelves
 	_make_dust()
 
 

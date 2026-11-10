@@ -236,6 +236,14 @@
     "arg": "tv",
     "n": 0,
     "reveal": -1
+   },
+   {
+    "text": "Crawl through a path inside the wall",
+    "hint": "Some cracks are connected. Hide in one and press Space to come out of another. Handy when the cat is after you.",
+    "type": "count",
+    "arg": "tunnel",
+    "n": 1,
+    "reveal": -1
    }
   ],
   "side": [
@@ -254,6 +262,14 @@
     "arg": "bed",
     "n": 0,
     "reveal": 1
+   },
+   {
+    "text": "Use the wall paths 3 times",
+    "hint": "",
+    "type": "count",
+    "arg": "tunnel",
+    "n": 3,
+    "reveal": -1
    },
    {
     "text": "Find a soft sock for the nest",
@@ -472,7 +488,16 @@
  "sleepers": [],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 0,
+   "b": 2
+  }
+ ],
  "music": {
   "root": 55,
   "minor": false,
