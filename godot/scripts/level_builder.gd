@@ -306,8 +306,17 @@ func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> Standar
 		var p := surface_props(tex_name)
 		m.roughness = float(p[0])
 		m.metallic = float(p[1])
+		_add_normal(m, tex_name)
 		return m
 	return mat(color)
+
+
+## A hand-dropped <name>_normal.png (e.g. the normal map from a CC0 PBR set) is picked up
+## automatically next to the procedural <name>.png — see docs/DEMO_POLISH.md round 4.
+static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
+	if ResourceLoader.exists("res://assets/textures/" + tex_name + "_normal.png"):
+		m.normal_enabled = true
+		m.normal_texture = load("res://assets/textures/" + tex_name + "_normal.png") as Texture2D
 
 
 ## Give a placed model a real surface (demo polish, plan point 2): the generated texture laid over its
@@ -332,6 +341,7 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 			var p := surface_props(tex_name)
 			t.roughness = float(p[0])
 			t.metallic = float(p[1])
+			_add_normal(t, tex_name)
 			m.set_surface_override_material(i, t)
 
 
@@ -420,7 +430,7 @@ func _lighting() -> void:
 	env.background_color = hex(pal.get("fog", 0x0e1220))
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.55, 0.57, 0.74) * 0.7 * float(pal.get("hemi", 0.8)) / 0.8  # less, so the light/shadow steps show
+	env.ambient_light_color = Color(0.5, 0.56, 0.8) * 0.42 * float(pal.get("hemi", 0.8)) / 0.8  # round 4: far less sourceless fill — the motivated sources (moon, strips, lamps) carry the room; this is only their bounce
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
@@ -459,6 +469,30 @@ func _lighting() -> void:
 		root.add_child(pl)
 		pl.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)))
 		g.flickers.append([pl, pl.light_energy, "steady"])
+		# round 4: every light gets a visible source — a little candle lantern at the light's own
+		# spot (dark base, warm glowing core), so no light in the room comes from nowhere
+		var base := MeshInstance3D.new()
+		base.name = "Candle base"
+		var bm := CylinderMesh.new()
+		bm.top_radius = 0.035
+		bm.bottom_radius = 0.05
+		bm.height = 0.025
+		base.mesh = bm
+		base.material_override = mat(hex(0x2a2320))
+		root.add_child(base)
+		base.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 7.0)
+		var flame := MeshInstance3D.new()
+		flame.name = "Candle glow"
+		var fm := SphereMesh.new()
+		fm.radius = 0.028
+		fm.height = 0.056
+		flame.mesh = fm
+		var fmat := StandardMaterial3D.new()
+		fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		fmat.albedo_color = hex(l.get("c", 0xffa860))
+		flame.material_override = fmat
+		root.add_child(flame)
+		flame.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 2.0)
 
 	var room := OmniLight3D.new()  # the ceiling light: off at night, the owner switches it on
 	room.name = "Ceiling light"
@@ -474,6 +508,21 @@ func _lighting() -> void:
 
 static func _section(p: float) -> int:
 	return clampi(floori(p / 120.0), 0, 7)
+
+
+## One sheet of the fake moon shaft (see _walls): a single quad, no shadow, additive.
+func _add_shaft_quad(verts: Array, uvs: Array, mat: Material) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_material(mat)
+	for i in [0, 1, 2, 0, 2, 3]:
+		st.set_uv(uvs[i])
+		st.add_vertex(verts[i])
+	var mi := MeshInstance3D.new()
+	mi.name = "Moon shaft"
+	mi.mesh = st.commit()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
 
 
 func _room() -> void:
@@ -544,13 +593,44 @@ func _room() -> void:
 	for p in [Vector2(-5, -5), Vector2(965, -5), Vector2(-5, 605), Vector2(965, 605)]:
 		box("Corner", W(p.x, p.y, 125), Vector3(0.1, 2.5, 0.1), trim, walls)
 	if float(win.get("w", 0)) > 0.0:
+		# round 4: a fake light shaft — two translucent sheets from the window along the moon's
+		# own direction, so the moonlight visibly COMES from the window instead of just being
+		# there. The sky dims them together with the moonlight (it gets the materials below).
+		var shaft_mats: Array = []
+		var sdir := Basis.from_euler(Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0.0)) * Vector3(0, 0, -1)
+		var wcx := W(float(win.x) + float(win.w) / 2.0, 0).x
+		var ww := float(win.w) / 100.0
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		smat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		smat.render_priority = 1
+		if ResourceLoader.exists("res://assets/textures/shaft.png"):
+			smat.albedo_texture = load("res://assets/textures/shaft.png")
+			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.5)
+		else:
+			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.13)
+		shaft_mats.append(smat)
+		var top := 2.18
+		var bot := 1.12
+		var z0 := -2.98
+		var a := Vector3(wcx - ww / 2.0, top, z0)
+		var b := Vector3(wcx + ww / 2.0, top, z0)
+		_add_shaft_quad([a, b, b + sdir * (top / -sdir.y), a + sdir * (top / -sdir.y)],
+			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		var c := Vector3(wcx, top, z0)
+		var d := Vector3(wcx, bot, z0)
+		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
+			[Vector2(0.5, 0), Vector2(0.5, 0.3), Vector2(0.5, 1), Vector2(0.5, 0.7)], smat)
 		# round 3: a living sky outside the window — the moon, clouds drifting past it, branches
 		# swaying (window_sky.gd). The clouds also dim the moonlight itself, via Game.moon_cloud.
 		var sky := WindowSky.new()
 		sky.name = "Window sky"
 		root.add_child(sky)
 		sky.global_position = Vector3(W(float(win.x) + float(win.w) / 2.0, 0).x, 0.0, -3.02)
-		sky.build_sky(g, hash(str(night.get("id", "night"))))
+		sky.build_sky(g, hash(str(night.get("id", "night"))), shaft_mats)
 
 	var lamp := str(night.get("lamp", ""))
 	var shade := spawn("rooms/chandelier" if lamp == "chandelier" else ("rooms/lamp_bulb" if lamp == "bulb" else "rooms/lamp_shade"), W(480, 300), 0.0, decor)

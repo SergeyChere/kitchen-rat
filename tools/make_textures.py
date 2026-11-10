@@ -114,6 +114,22 @@ def wood(size, seed, base=(138, 90, 52), dark=(96, 58, 30), light=(172, 122, 76)
         streak = 0.5 + 0.5 * math.sin((v * 26 + g * 6) * math.pi)
         col = tuple(lerp(dark[i], light[i], streak * 0.7 + g * 0.3)
                     for i in range(3))
+        # round 4, stylised pass (the It Takes Two lesson: big readable shapes,
+        # not noise): the board is four planks — per-plank tone, a dark seam and
+        # a painted bevel highlight under it, nails near the plank ends. Plank
+        # tone uses the ceramic cosine trick, so the wrap step matches the
+        # internal steps; the seam line itself hides the boundary.
+        pj = int(v * 4) % 4
+        fv = v * 4 - int(v * 4)
+        tone = 0.94 + 0.055 * math.cos(2 * math.pi * pj / 4 + 1.3)
+        col = tuple(c * tone for c in col)
+        if fv < 0.045:
+            col = tuple(c * 0.5 for c in col)      # the seam shadow
+        elif fv < 0.11:
+            col = tuple(c * 1.13 for c in col)     # the bevel catching light
+        for nu in (0.055, 0.945):
+            if wrap_dist(u, nu) < 0.011 and abs(fv - 0.5) < 0.035:
+                col = tuple(c * 0.42 for c in col)  # a nail
         # a knot or two: concentric rings around fixed points
         for kx, ky in ((0.3, 0.35), (0.72, 0.7)):
             dx, dy = (u - kx) * 1.6, (v - ky) * 1.6
@@ -122,8 +138,8 @@ def wood(size, seed, base=(138, 90, 52), dark=(96, 58, 30), light=(172, 122, 76)
                 ring = 0.5 + 0.5 * math.sin(d * 220)
                 col = tuple(lerp(col[i], dark[i], (1 - d / 0.12) * ring * 0.8)
                             for i in range(3))
-        fine = n2.at(u * 16, v * 16) * 0.12
-        col = tuple(c + (fine - 0.06) * 255 * 0.4 for c in col)
+        fine = n2.at(u * 16, v * 16) * 0.08
+        col = tuple(c + (fine - 0.04) * 255 * 0.4 for c in col)
         # fine pores along the grain: v*48 with period 2 (48 is a multiple of 2, so it still tiles)
         pore = n_g.at(u * 2 + wobble, v * 48) * 0.07
         return tuple(clamp(c * (0.965 + pore)) for c in col)
@@ -136,14 +152,18 @@ def fabric(size, seed, base=(96, 104, 96)):
     mottle = Noise(seed + 7, period=4)  # at(u*4, v*4): 4 is a multiple of 4
 
     def fn(u, v):
-        # woven threads: alternating over/under pattern + fibre noise
-        tu = 0.5 + 0.5 * math.sin(u * math.pi * 2 * 32)
-        tv = 0.5 + 0.5 * math.sin(v * math.pi * 2 * 32)
-        weave = 0.85 + 0.15 * (tu * tv)
+        # round 4: a chunkier weave (20 threads, was 32) — at sofa scale the
+        # fine weave just buzzed; big threads read as cloth from across a room
+        tu = 0.5 + 0.5 * math.sin(u * math.pi * 2 * 20)
+        tv = 0.5 + 0.5 * math.sin(v * math.pi * 2 * 20)
+        weave = 0.82 + 0.18 * (tu * tv)
         fuzz = n.at(u * 32, v * 32) * 0.25  # 32 is a multiple of period 16
         # broad worn patches, so a whole sofa does not read as one flat weave
         patch = 0.93 + mottle.at(u * 4, v * 4) * 0.12
-        return shade(base, weave * (0.85 + fuzz) * patch)
+        # slub threads: occasional thicker, lighter weft lines (7 full cycles)
+        slub = 1.0 + 0.05 * math.sin(v * math.pi * 2 * 7
+                                     + mottle.at(u * 4, v * 4) * 6.0)
+        return shade(base, weave * (0.85 + fuzz) * patch * slub)
 
     return make_image(size, fn)
 
@@ -188,7 +208,11 @@ def ceramic_tile(size, seed, base=(214, 210, 198), grout=(120, 116, 108)):
         ti, tj = int(tu) % tiles, int(tv) % tiles
         s = (0.92 + 0.05 * math.cos(2 * math.pi * ti / tiles + phase)
              + 0.05 * math.cos(2 * math.pi * tj / tiles + phase))
-        col = shade(base, s * (0.965 + glaze.at(u * 4, v * 4) * 0.06))
+        # round 4: a pillow bevel on every tile — dark at the grout, swelling
+        # to full brightness a fifth of the way in, like a hand-glazed tile
+        edge = min(fx, fy, 1.0 - fx, 1.0 - fy)
+        pillow = 0.9 + 0.13 * min(edge / 0.2, 1.0)
+        col = shade(base, s * (0.965 + glaze.at(u * 4, v * 4) * 0.06) * pillow)
         for sx, sy in speck:  # kiln speckles, toroidal so they tile
             if wrap_dist(u, sx) < 0.003 and wrap_dist(v, sy) < 0.003:
                 return shade(col, 0.82)
@@ -222,7 +246,9 @@ def cardboard(size, seed, base=(178, 140, 96)):
     def fn(u, v):
         # the fluting underneath shows through as faint horizontal bands
         flute = 1.0 + math.sin(v * math.pi * 2 * 18) * 0.028
-        f = (0.85 + n.fbm(u * 6, v * 6, 3) * 0.3) * flute
+        # broad soft stains (the +3 offset is constant, so the wrap is intact)
+        stain = 0.93 + n.fbm(u * 6 + 3.0, v * 6, 2) * 0.12
+        f = (0.85 + n.fbm(u * 6, v * 6, 3) * 0.3) * flute * stain
         col = shade(base, f)
         for fx, fy in flecks:
             # toroidal distance: a fleck cut by one edge continues on the other
@@ -259,13 +285,31 @@ def counter_stone(size, seed, base=(188, 186, 180)):
         col = shade(base, f)
         for sx, sy, dark in speck:
             if wrap_dist(u, sx) < 0.0025 and wrap_dist(v, sy) < 0.0025:
-                return (90, 88, 84) if dark else (235, 233, 228)
+                # round 4: blended in, not hard pixels — painted, not scanned
+                return shade(col, 0.72) if dark else tuple(
+                    clamp(lerp(col[i], 235, 0.5)) for i in range(3))
         for fx, fy in flecks:  # larger quartz flecks
             if wrap_dist(u, fx) < 0.006 and wrap_dist(v, fy) < 0.006:
-                return (208, 204, 196)
+                return tuple(clamp(lerp(col[i], 208, 0.6)) for i in range(3))
         return col
 
     return make_image(size, fn)
+
+
+def shaft_gradient(size):
+    """Not a surface: the alpha gradient for the fake moon shaft (bright at
+    the window, fading along the beam, soft at the side edges). Written as
+    shaft.png next to the materials; level_builder uses it when present."""
+    img = Image.new("RGBA", (size, size))
+    px = img.load()
+    for y in range(size):
+        v = y / size
+        fade = (1.0 - v) ** 1.7
+        for x in range(size):
+            u = x / size
+            edge = math.sin(math.pi * u) ** 0.8
+            px[x, y] = (255, 255, 255, int(255 * edge * fade))
+    return img
 
 
 MATERIALS = {
@@ -314,6 +358,8 @@ def main():
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    shaft_gradient(args.size).save(out / "shaft.png")
+    print(f"wrote {out / 'shaft.png'} (alpha gradient for the moon shaft)")
     for name, fn in MATERIALS.items():
         img = fn(args.size)
         path = out / f"{name}.png"

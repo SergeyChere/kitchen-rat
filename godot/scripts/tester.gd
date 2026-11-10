@@ -977,7 +977,10 @@ func _juice(host: Node) -> void:
 	# danger: chase -> slow motion, heartbeat, red edge
 	if g.cat and g.cat.has_method("wake_up"):
 		g.cat.visible = true
-		g.cat.global_position = r.global_position + Vector3(0.8, 0, 0)
+		# 2.5 m, not 0.8: at 0.8 the cat REACHES her inside the 0.6 s window on a fast
+		# machine and the (deliberate) caught slow-mo trips this check — a race, not a
+		# regression. 2.5 m keeps the full chase threat; she cannot be caught mid-check.
+		g.cat.global_position = r.global_position + Vector3(2.5, 0, 0)
 		g.cat.mode = CatAI.Mode.CHASE
 		await host.get_tree().process_frame
 		await host.get_tree().process_frame

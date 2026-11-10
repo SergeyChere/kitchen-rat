@@ -13,6 +13,7 @@ var _halo_mat: StandardMaterial3D
 var _moon_x := 0.9
 var _clouds: Array = []  # {node, speed, width}
 var _branches: Node3D
+var _shaft_mats: Array = []  # the moon shaft sheets inside the room: they fade with the moon
 
 
 func _unshaded(c: Color) -> StandardMaterial3D:
@@ -35,8 +36,9 @@ func _ball(r: float, mat: Material, squash := 1.0) -> MeshInstance3D:
 	return mi
 
 
-func build_sky(game: Game, seed_value: int) -> void:
+func build_sky(game: Game, seed_value: int, shaft_mats: Array = []) -> void:
 	_game = game
+	_shaft_mats = shaft_mats
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# the moon and its halo
@@ -102,6 +104,8 @@ func _process(dt: float) -> void:
 		var f := _game.moon_cloud
 		_moon_mat.albedo_color = Color(lerpf(0.32, 0.93, f), lerpf(0.36, 0.96, f), lerpf(0.44, 1.0, f))
 		_halo_mat.albedo_color = Color(0.55, 0.65, 1.0, 0.16 * f)
+		for sm in _shaft_mats:
+			(sm as StandardMaterial3D).albedo_color.a = 0.5 * f
 	if _branches:
 		_branches.rotation.z = 0.035 * sin(_t * 0.6) + 0.015 * sin(_t * 1.63 + 1.7)
 		_branches.rotation.x = 0.012 * sin(_t * 0.83 + 0.4)

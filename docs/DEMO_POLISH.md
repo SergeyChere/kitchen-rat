@@ -182,3 +182,48 @@ worktop) and a plug-in night light in the living rooms (amber emissive box by th
 steady OmniLight 0.65). The rooms now read as: cold moon from the window, warm practicals
 inside — the It Takes Two rule that you always see what is lit by what.
 
+## Round 4 — motivated light, ballistic climb, painted textures (2026-11-10)
+
+Playtest verdict on round 3: the heartbeat is perfect; the new sources read,
+but the room as a whole still has light from nowhere; the climb is still not
+right; the surfaces are still not right. Reference, again: It Takes Two —
+which means big readable shapes and motivated light, not more noise.
+
+**Light.** The sourceless light was the ambient fill: it is cut by ~40% and
+cooled (that is moon bounce, nothing more); everything else must now earn its
+place. The night-JSON lights (kitchens 1/5, 6, 13, 14, 16) had NO fixture at
+all — each now gets a little candle lantern at its own spot (dark base, a
+glowing core in the light's colour). And the moon gets a visible path: two
+translucent additive sheets run from the window along the moon's own
+direction to the floor — a fake shaft, the oldest trick in stylised games —
+and the window sky dims the sheets together with the moonlight when a cloud
+crosses. The generator now also writes shaft.png (the shaft's alpha
+gradient); without it the sheets fall back to a faint flat alpha.
+
+**Climb.** The pattern animators use: anticipation, ballistic rise, squash.
+The gathering phase is now a loaded crouch — she DIPS ~3 cm (and leans in to
+76°) instead of creeping up; the scramble's rise is an ease-out cubic (fast
+off the push, soft at the top — the shape gravity gives), not smoothstep's
+slow start; the whole thing is snappier (0.42–0.66 s); and landing from a
+climb squashes the model (1.12 / 0.78 / 1.08).
+
+**Textures.** The generator moves from "noisy" to "painted": the wood board
+is now visibly four planks (per-plank tone, dark seam, bevel highlight, nails
+at the ends); ceramic tiles get a pillow bevel, swelling bright away from
+the grout; the fabric weave is chunkier (20 threads) with slub lines; the
+stone speckle is blended in instead of hard pixels; cardboard gets broad
+soft stains; fine wood noise is reduced.
+
+**Real CC0 textures (optional, better).** The procedural set is a floor, not
+a ceiling. The material code now also picks up a hand-dropped normal map:
+put a CC0 PBR set's colour map at `godot/assets/textures/<name>.png` (1K is
+plenty) and its normal map at `<name>_normal.png`, and the game uses them —
+no code change. Verified-free sources (CC0, commercial use, no attribution):
+ambientCG (https://ambientcg.com/a/Tiles141 — glazed ceramic;
+https://ambientcg.com/a/WoodFloor064 — plank floor;
+https://ambientcg.com/a/Wood095 — bare wood;
+https://ambientcg.com/a/Fabric081C — woven fabric) and Poly Haven
+(https://polyhaven.com/a/patterned_slate_tiles and its wood/floor
+categories). Note: re-running tools/make_textures.py overwrites <name>.png,
+so keep the downloads somewhere safe.
+
