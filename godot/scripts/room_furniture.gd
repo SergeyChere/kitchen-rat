@@ -6,6 +6,7 @@ extends RefCounted
 
 var b: LevelBuilder
 var g: Game
+var _lamp_done := false  # the pantry wall lamp goes up once, by the first washer
 
 
 func _init(builder: LevelBuilder) -> void:
@@ -89,6 +90,36 @@ func low_roof(f: Dictionary, inset: float) -> void:
 	var w := float(f.get("w", 32)); var d := float(f.get("h", 32))
 	var slab := b.box("Low clearance", W(float(f.x) + w / 2.0, float(f.y) + d / 2.0, 11.5), Vector3((w - inset * 2.0) / 100.0, 0.03, (d - inset * 2.0) / 100.0), b.mat(Color.BLACK), b.furn)
 	slab.visible = false
+
+
+## Round 7 (asked): a small wall lamp on the north wall by the washing machines —
+## the pantry had NO light sources of its own at all. Plate, enamel shade, warm bulb.
+func _washer_wall_lamp(lx: float) -> void:
+	b.box("Wall lamp plate", W(lx, 3, 168), Vector3(0.12, 0.2, 0.03), b.mat(LevelBuilder.hex(0x2e2a26)), b.furn, false)
+	var shade := MeshInstance3D.new()
+	shade.name = "Wall lamp shade"
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.035
+	cm.bottom_radius = 0.08
+	cm.height = 0.09
+	shade.mesh = cm
+	shade.material_override = b.mat(LevelBuilder.hex(0x274435))
+	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.furn.add_child(shade)
+	shade.global_position = W(lx, 10, 161)
+	var bulb := MeshInstance3D.new()
+	bulb.name = "Wall lamp bulb"
+	var sm := SphereMesh.new()
+	sm.radius = 0.02
+	sm.height = 0.04
+	bulb.mesh = sm
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.albedo_color = Color8(0xff, 0xc2, 0x7a)
+	bulb.material_override = bmat
+	b.furn.add_child(bulb)
+	bulb.global_position = W(lx, 10, 156)
+	light(W(lx, 16, 148), Color8(0xff, 0xc2, 0x7a), 0.95, 3.4, "steady")
 
 
 func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire") -> OmniLight3D:
@@ -196,7 +227,11 @@ func build(list: Array) -> void:
 				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
 				light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
 			"plant": b.collide(b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn))
-			"washer": place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+			"washer":
+				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				if not _lamp_done:
+					_lamp_done = true
+					_washer_wall_lamp(x - 160.0)
 			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)), null, "plastic")
 			"cans": place("furniture/cans_stack", f, "cans", float(f.get("ht", 30)))
 			"shelfUnit": place("furniture/shelf_unit", f, "shelf", 0.0, null, "wood")
@@ -290,7 +325,7 @@ func build(list: Array) -> void:
 			bulb.material_override = bmat
 			b.furn.add_child(bulb)
 			bulb.global_position = W(p.x, 588, p.y - 7.5)
-			g.garland.append([bmat, float(bi) * 0.55])
+			g.garland.append([bmat, float(bi % 4) * (TAU / 4.0)])  # round 7: four switching groups, not a phase smear
 			bi += 1
 		light(W(480, 585, 205), Color(1.0, 0.8, 0.55), 1.05, 5.2, "garland")
 

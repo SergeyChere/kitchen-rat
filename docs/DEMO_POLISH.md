@@ -363,3 +363,48 @@ the round-5 build): that check teleports her onto a kitchen table at
 (700, 420), which only exists in the kitchen nights. Same family as the
 known night-2 walk failure: the tester assumes kitchen geometry.
 
+## Round 7 — the user's five points (2026-11-10)
+
+1. **The door drifted (night 1).** Round 5's hinge math re-applied the
+   leaf's own offset — its centre sits at (0, 1.06, −0.02) in the model —
+   INSIDE the pivot, lifting the leaf ~1 m. The hinge now goes at the
+   leaf's edge in parent space (through the leaf's own basis), the leaf
+   sits at exactly (0.45, 0, 0) inside it, and the swing adds to the
+   leaf's base yaw instead of overwriting it. A tester check ("the door
+   leaf hangs at door height") guards it.
+2. **A light for the pantry.** Night 4 had NO light sources of its own.
+   A small wall lamp now hangs on the north wall by the washing machines
+   (plate, green enamel shade, warm bulb, steady OmniLight, range 3.4).
+3. **The garland's switching was invisible.** Round 6's wave kept every
+   bulb lit and smeared the phase, so nothing visibly switched. Now a
+   real chase: four groups in turn, bulbs mostly OFF between their beats
+   (emission floor 0.1, pulse^6), so the alternation reads across the room.
+4. **The climb, third rebuild — this time from the rig out.** Diagnosis
+   (measured, not guessed): jump_up is a 0.42 s one-shot. It played at
+   full speed, FINISHED, and froze in its end pose while the parametric
+   path kept gliding — a statue on a wire. Its root-bone translation is
+   ~zero (one key, −0.0005), so the other stack was the tilt: rounds 4–6
+   pitched the whole model 66–80° around the floor-level origin ON TOP of
+   the clip's own spine pitch — a slow backflip. Fixes: the clip is
+   TIME-WARPED onto the climb's length (its crouch/launch/pull-over land
+   with the path's stages; pole climbs play the run clip as a leg
+   scramble); the model tilt is now just a lean (≤38°); the path's hitch
+   became a small SLIP back (0.50 → 0.46) with the body pressed INTO the
+   face, then the kick shoves her off it; the root pose offset is
+   cancelled out of the model node each climb frame as a guard, and
+   restored on every exit from the jump state.
+5. **Toward It Takes Two, honestly.** The gap is bespoke modelled sets +
+   per-asset painted textures + graded light; no single code change
+   closes it. This round's step: the whole game is graded — ACES filmic
+   tonemapping (was linear) and a whisper of glow, so candle cores,
+   garland bulbs and moonlight roll off and bloom instead of clipping.
+   The remaining road, in order: the CDN PBR pack (round 6, awaits the
+   user's upload), denser set dressing per room, bespoke models.
+
+**Testing.** Night 1 CI set all pass: bugs 6 (the new door check among
+them), rules 4, physics 7, juice 13, sink 5, under 1. Physics night 5,
+hides night 2, walk night 1, cat night 5 — pass. The bugs suite fails
+3 checks on night 4 (mug/cheese props) — verified PRE-EXISTING on the
+round-6 build: that suite is kitchen-specific and CI only runs it on
+night 1.
+

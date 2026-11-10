@@ -442,11 +442,19 @@ func _lighting() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
 	env.fog_density = 0.012
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	# round 7: ACES filmic + a whisper of glow — highlights (candle cores, garland
+	# bulbs, moonlight) roll off and bloom instead of clipping flat; the cheapest
+	# real step toward a painted, graded look (It Takes Two is graded hard)
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.glow_enabled = true
+	env.glow_intensity = 0.35
+	env.glow_strength = 0.85
+	env.glow_bloom = 0.08
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.adjustment_enabled = true  # bright and vivid, not realistic
-	env.adjustment_brightness = 1.14
+	env.adjustment_brightness = 1.2  # a touch more than the linear era: ACES darkens the mids
 	env.adjustment_contrast = 1.06
-	env.adjustment_saturation = 1.1
+	env.adjustment_saturation = 1.12
 	var we := WorldEnvironment.new()
 	we.environment = env
 	g.env = env
@@ -549,14 +557,21 @@ func _make_door(section: Node3D) -> void:
 	var door := section.find_child("door", true, false) as Node3D
 	if door == null:
 		return
-	var dpos := door.position
+	# round 7: round 5's math re-applied the leaf's own offset (its centre sits at
+	# (0, 1.06, -0.02) in the model) INSIDE the pivot, lifting the leaf ~1 m — the
+	# "drifted" door of night 1. The hinge goes at the leaf's edge in PARENT space
+	# (through the leaf's own basis), and inside the pivot the leaf is exactly
+	# (0.45, 0, 0) with no leftover offset.
+	var edge := door.transform.basis * Vector3(-0.45, 0, 0)
 	var pivot := Node3D.new()
 	pivot.name = "DoorPivot"
 	door.get_parent().add_child(pivot)
-	pivot.position = dpos + Vector3(-0.45, 0, 0)
-	door.reparent(pivot, true)
-	door.position = Vector3(0.45, dpos.y, dpos.z)
+	pivot.position = door.position + edge
+	pivot.rotation = door.rotation
+	door.reparent(pivot, false)
+	door.position = Vector3(0.45, 0, 0)
 	door.rotation = Vector3.ZERO
+	pivot.set_meta("base_yaw", pivot.rotation.y)
 	g.door_pivot = pivot
 
 

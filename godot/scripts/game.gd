@@ -1303,7 +1303,7 @@ func _tick_props(dt: float) -> void:
 		elif owner_ai.in_room() and owner_ai.global_position.distance_to(owner_ai.door) < 1.3:
 			want = -1.85
 		_door_a = lerpf(_door_a, want, clampf(dt * 5.0, 0.0, 1.0))
-		door_pivot.rotation.y = _door_a
+		door_pivot.rotation.y = float(door_pivot.get_meta("base_yaw", 0.0)) + _door_a
 	if clock_hands.size() == 2:
 		var th := 23.0 + 7.0 * clampf(night_time / float(night.get("seconds", 900)), 0.0, 1.0)
 		(clock_hands[0] as Node3D).rotation.z = -fmod(th, 12.0) / 12.0 * TAU
@@ -1312,9 +1312,11 @@ func _tick_props(dt: float) -> void:
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
 	for gb in garland:
-		# round 6: a slower, softer travelling wave (round 5's fast chase looked cheap)
-		var pulse := pow(0.5 + 0.5 * sin(t * 1.7 + float(gb[1])), 3.0)
-		(gb[0] as StandardMaterial3D).emission_energy_multiplier = 0.25 + 2.3 * pulse
+		# round 7: a real chase — four groups switching in turn, bulbs mostly OFF
+		# between their beats, so the switching is SEEN (round 6's gentle all-lit
+		# wave read as nothing happening at all)
+		var pulse := pow(0.5 + 0.5 * sin(t * 2.3 + float(gb[1])), 6.0)
+		(gb[0] as StandardMaterial3D).emission_energy_multiplier = 0.1 + 2.7 * pulse
 
 
 func _tick_lights(dt: float) -> void:
@@ -1332,7 +1334,7 @@ func _tick_lights(dt: float) -> void:
 			"tv":
 				l.light_energy = float(f[1]) * (1.9 if tv_on else 1.0) * (0.8 + 0.2 * sin(t * 3.0) * sin(t * 5.7 + 1.0))
 			"garland":
-				l.light_energy = float(f[1]) * _light_mul * (0.85 + 0.3 * pow(0.5 + 0.5 * sin(t * 1.7 - 1.2), 2.0))  # breathes WITH the bulbs' wave
+				l.light_energy = float(f[1]) * _light_mul * (0.85 + 0.3 * pow(0.5 + 0.5 * sin(t * 2.3 - 1.2), 2.0))  # breathes WITH the bulbs' chase
 			_: l.light_energy = float(f[1]) * _light_mul
 
 

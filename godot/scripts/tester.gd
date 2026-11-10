@@ -699,6 +699,11 @@ func _bugs(host: Node) -> void:
 			cup = k
 			break
 	_check("there is a mug to knock", cup != null)
+	# round 7: the door leaf hangs on its hinge at door height (round 5's pivot math
+	# re-applied the leaf's own 1.06 m offset inside the pivot — it drifted up)
+	if g.door_pivot != null and g.door_pivot.get_child_count() > 0:
+		var leaf := g.door_pivot.get_child(0) as Node3D
+		_check("the door leaf hangs at door height", leaf != null and absf(leaf.global_position.y - 1.06) < 0.08, "leaf y %.2f" % (leaf.global_position.y if leaf != null else -1.0))
 	if cup:
 		var to := Vector3(0.6, 0.0, 0.4)  # push it toward the nearest edge of whatever it stands on
 		var p := cup.global_position

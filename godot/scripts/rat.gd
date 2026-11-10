@@ -527,6 +527,8 @@ func teleport(p: Vector3, yaw: float) -> void:
 	if water:
 		stop_swim()
 	jumping = false
+	if model != null and _rig_done:
+		model.position = _model_home  # round 7: no leftover root-motion offset
 	carrier = null
 	stuck_t = 0.0
 	global_position = p
@@ -852,10 +854,15 @@ func _tick_jump(dt: float) -> void:
 			jumping = false
 			if model:
 				model.rotation.x = 0.0
+				model.position = _model_home  # round 7: no leftover root-motion offset
 			velocity = away.normalized() * 0.4 + Vector3.DOWN * 0.5
 			Sfx.play("thud", global_position, -10.0, 1.6)
 			return
 	global_position = p
+	# round 7: cancel the clip's root motion (see _climb_rig) — the path moves her,
+	# the clip only poses her
+	if _root_bone >= 0 and model != null:
+		model.position = _model_home - _skel.get_bone_pose_position(_root_bone)
 	if model:
 		var tilt := 0.0
 		match _kind:
@@ -868,6 +875,7 @@ func _tick_jump(dt: float) -> void:
 	jumping = false
 	if model:
 		model.rotation.x = 0.0
+		model.position = _model_home  # round 7: hand the model node back from the root-motion cancel
 	velocity = Vector3(0, -0.5, 0)
 	if _kind == "up" or _kind == "grab":
 		_pop(Vector3(1.12, 0.78, 1.08))  # round 4: landing squash after a climb — weight, not a glide-stop
@@ -882,6 +890,27 @@ func _tick_jump(dt: float) -> void:
 
 ## Climbing up: she runs to the edge, rears up and grabs it with her front paws (body tipped nose-up, hind legs
 ## still on the floor), then pushes off with the hind legs and pulls herself over onto the top.
+# Round 7: the climb rig. The baked clips carry ROOT MOTION — jump_up's root bone
+# translates through its own little arc. Stacked on the parametric path, that arc
+# played TWICE (hers + the clip's), which is most of why climbs looked puppeted.
+# During a climb the path is the only transport: the root's pose offset is
+# cancelled out of the model node every frame and the clip becomes pure acting.
+var _skel: Skeleton3D
+var _root_bone := -1
+var _model_home := Vector3(0.0, 0.018, 0.0)
+var _rig_done := false
+
+
+func _climb_rig() -> void:
+	if _rig_done or model == null:
+		return
+	_rig_done = true
+	_model_home = model.position
+	_skel = model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _skel != null:
+		_root_bone = _skel.find_bone("root")
+
+
 ## Piecewise-smooth keyframe curve (round 6, for the climb stages).
 func _keys(u: float, keys: Array) -> float:
 	for i in keys.size() - 1:
@@ -908,18 +937,19 @@ func _climb_pos(t: float) -> Vector3:
 	if t < 0.40:  # the crouch: she loads her hind legs, nose up the face — THEN springs
 		var k2 := (t - 0.26) / 0.14
 		var q := base
-		q.y = _from.y + reach * 0.35 - 0.034 * sin(k2 * PI * 0.5)
+		q.y = _from.y + reach * 0.35 - 0.026 * sin(k2 * PI * 0.5)
 		return q
-	# Round 6, stage by stage as asked: spring up the face (front paws pull on the
-	# wall) — a hitch while the hind legs find the wall — kick off it — front paws
-	# over the edge and pull through. Two impulses with a hitch between them: one
-	# smooth curve, however eased, reads as a rocket; stages read as a scramble.
+	# Rounds 6-7, stage by stage: spring up the face (front paws pull) — a SLIP
+	# back while she re-grips (motion, never a hover: round 6's level hitch hung
+	# her in the air) — the wall kick — front paws over the edge, pull through.
+	# The time-warped jump clip (see _play_anim) acts the same stages on top.
 	var u := (t - 0.40) / 0.60
-	var low := reach * 0.35 - 0.034
-	var rise := _keys(u, [[0.0, 0.0], [0.34, 0.52], [0.48, 0.58], [0.68, 0.88], [1.0, 1.0]])
-	var q := base.lerp(_to, smoothstep(0.5, 1.0, u))
-	var kick := sin(clampf((u - 0.42) / 0.30, 0.0, 1.0) * PI) * 0.035
-	q -= dirv * kick  # the hind-leg push off the wall face shoves her a touch AWAY from it
+	var low := reach * 0.35 - 0.026
+	var rise := _keys(u, [[0.0, 0.0], [0.30, 0.50], [0.44, 0.46], [0.62, 0.85], [0.82, 0.97], [1.0, 1.0]])
+	var q := base.lerp(_to, smoothstep(0.55, 1.0, u))
+	var press := sin(clampf((u - 0.26) / 0.22, 0.0, 1.0) * PI) * 0.018  # pressed INTO the face while she re-grips
+	var kick := sin(clampf((u - 0.48) / 0.24, 0.0, 1.0) * PI) * 0.030  # the hind-leg kick shoves her off it
+	q += dirv * (press - kick)
 	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.75, 1.0, u))
 	return q
 
@@ -957,6 +987,7 @@ func _pole_pos(t: float) -> Vector3:
 func _start_kind(kind: String, to: Vector3, edge: Vector3, dur: float) -> void:
 	if kind == "up" or kind == "grab":
 		dur *= 1.3  # round 6: the staged scramble (crouch, spring, wall kick) needs time to read
+	_climb_rig()
 	jumping = true
 	_jump_up = kind != "descend"
 	_kind = kind
@@ -1051,12 +1082,14 @@ func _try_pole() -> bool:
 
 
 func _climb_tilt(t: float) -> float:
+	# round 7: the warped clip poses the body now — round 6's 76-80 degrees ON TOP
+	# of the clip's own pitch doubled the rotation into a backflip. This is only a
+	# lean: into the face on the spring, rolling over the edge at the end.
 	if t < 0.26:
-		return 66.0 * smoothstep(0.35, 1.0, t / 0.26)
-	if t < 0.40:  # crouching: nose tips further up the face as she loads the spring
-		return 66.0 + 14.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
-	# up the face nearly vertical, unrolling over the edge on the second kick
-	return _keys((t - 0.40) / 0.60, [[0.0, 80.0], [0.34, 76.0], [0.48, 72.0], [0.68, 46.0], [0.86, -16.0], [1.0, 0.0]])
+		return 30.0 * smoothstep(0.35, 1.0, t / 0.26)
+	if t < 0.40:  # crouching: leans in a touch further as she loads the spring
+		return 30.0 + 8.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
+	return _keys((t - 0.40) / 0.60, [[0.0, 38.0], [0.30, 34.0], [0.44, 30.0], [0.62, 16.0], [0.82, -14.0], [1.0, 0.0]])
 
 
 # ---------- animation ----------
@@ -1069,7 +1102,7 @@ func _play_anim() -> void:
 		return
 	var clip := "idle"
 	if jumping:
-		clip = "jump_up" if _jump_up else "jump_down"
+		clip = "run" if _kind == "pole" else ("jump_up" if _jump_up else "jump_down")  # round 7: legs scramble up a pole
 	elif not is_on_floor() and carrier == null:
 		clip = "jump_up" if velocity.y > 0.0 else "jump_down"
 	elif _land_t > 0.0:
@@ -1088,5 +1121,13 @@ func _play_anim() -> void:
 		_fast = false
 	var gait := ["walk", "run", "carry_walk", "sneak", "drag"]
 	anim.play(clip, 0.3 if gait.has(clip) and gait.has(anim.current) else 0.15)  # long cross-fade between gaits
-	var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
-	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else (0.15 if clip == "sneak" else 1.0))
+	if jumping and _kind != "pole":
+		# round 7: warp the one-shot onto the climb's length — its crouch, launch
+		# and pull-over land with the path's stages instead of ending at 0.42 s
+		# and freezing for the rest of the way up
+		anim.set_speed(clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8))
+	elif jumping:
+		anim.set_speed(1.7)  # the pole scramble
+	else:
+		var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
+		anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() else (0.15 if clip == "sneak" else 1.0))
