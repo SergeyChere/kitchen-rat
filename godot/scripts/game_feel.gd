@@ -89,6 +89,11 @@ func _process(_dt: float) -> void:
 	for a in [g.cat, g.owner_ai, g.dog]:
 		if a == null or not is_instance_valid(a) or not (a as Node3D).visible:
 			continue
+		# round 6: the owner waits INVISIBLE at the door while AWAY / COMING, but his
+		# root node stays "visible" — the proximity term fired the heartbeat by the
+		# door with nobody in the room. He only counts once he is actually IN.
+		if a is OwnerAI and not (a as OwnerAI).in_room():
+			continue
 		var m: int = a.get("mode")
 		var is_chase := (a is CatAI and m == CatAI.Mode.CHASE) or (a is OwnerAI and m == OwnerAI.Mode.CHASE) or (a is DogAI and m == DogAI.Mode.CHASE)
 		if is_chase: chased = true

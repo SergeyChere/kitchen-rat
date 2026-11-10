@@ -238,19 +238,43 @@ func build(list: Array) -> void:
 		b.furn.add_child(nl)
 		nl.global_position = W(ax, ay, 16)
 		light(W(ax, ay, 30), Color(1.0, 0.58, 0.28), 0.65, 2.6, "steady")
-		# round 5: a garland along the south wall — coloured bulbs chasing each other (the game
-		# pulses their emission and the one real light among them, kind "garland")
-		var wire := MeshInstance3D.new()
-		wire.name = "Garland wire"
-		var wm := BoxMesh.new()
-		wm.size = Vector3(7.5, 0.008, 0.008)
-		wire.mesh = wm
-		wire.material_override = b.mat(Color(0.05, 0.05, 0.06))
-		b.furn.add_child(wire)
-		wire.global_position = W(480, 588, 234)
+		# rounds 5-6: a garland along the south wall in TWO SAGGING SWAGS (a dead-straight
+		# wire at the ceiling read as decoration in a shop window) — coloured bulbs on
+		# little drops, pulsing in a slow travelling wave (game.gd pulses the emission
+		# and the one real light among them, kind "garland")
 		var bulb_cols := [Color(1, 0.3, 0.2), Color(1, 0.75, 0.25), Color(0.35, 1, 0.45), Color(0.35, 0.55, 1)]
+		var pts: Array = []
+		var SEG := 28
+		for i in SEG + 1:
+			var fx := lerpf(120.0, 840.0, float(i) / SEG)
+			var hang := 0.5 - 0.5 * cos(TAU * 2.0 * float(i) / SEG)  # 0 at the pins, 1 at a swag's bottom
+			pts.append(Vector2(fx, 234.0 - hang * 34.0))
+		var wire_mat := b.mat(Color(0.05, 0.05, 0.06))
+		for i in SEG:
+			var p0: Vector2 = pts[i]
+			var p1: Vector2 = pts[i + 1]
+			var seg := MeshInstance3D.new()
+			seg.name = "Garland wire"
+			var bm := BoxMesh.new()
+			bm.size = Vector3(p0.distance_to(p1) / 100.0 + 0.01, 0.008, 0.008)
+			seg.mesh = bm
+			seg.material_override = wire_mat
+			b.furn.add_child(seg)
+			seg.global_position = W((p0.x + p1.x) / 2.0, 588, (p0.y + p1.y) / 2.0)
+			seg.rotation.z = atan2(p1.y - p0.y, p1.x - p0.x)
 		var bi := 0
-		for bx in range(120, 871, 45):
+		for i in range(0, SEG + 1, 2):
+			var p: Vector2 = pts[i]
+			var sock := MeshInstance3D.new()
+			sock.name = "Garland socket"
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.008
+			cm.bottom_radius = 0.01
+			cm.height = 0.05
+			sock.mesh = cm
+			sock.material_override = wire_mat
+			b.furn.add_child(sock)
+			sock.global_position = W(p.x, 588, p.y - 2.5)
 			var bmat := StandardMaterial3D.new()
 			var bc: Color = bulb_cols[bi % bulb_cols.size()]
 			bmat.albedo_color = bc
@@ -260,13 +284,13 @@ func build(list: Array) -> void:
 			var bulb := MeshInstance3D.new()
 			bulb.name = "Garland bulb"
 			var sm := SphereMesh.new()
-			sm.radius = 0.021
-			sm.height = 0.042
+			sm.radius = 0.026
+			sm.height = 0.052
 			bulb.mesh = sm
 			bulb.material_override = bmat
 			b.furn.add_child(bulb)
-			bulb.global_position = W(bx, 588, 228)
-			g.garland.append([bmat, float(bi) * 0.9])
+			bulb.global_position = W(p.x, 588, p.y - 7.5)
+			g.garland.append([bmat, float(bi) * 0.55])
 			bi += 1
 		light(W(480, 585, 205), Color(1.0, 0.8, 0.55), 1.05, 5.2, "garland")
 

@@ -308,3 +308,58 @@ round-4 build, so it predates round 5 (likely older). The rat's target
 scanner doesn't offer the chair in the living room. Worth its own look:
 it smells like the same family as the sausage-at-the-edge problem.
 
+## Round 6 — the user's eight points (2026-11-10)
+
+1. **The heartbeat by the door, with no cat.** Root cause: the owner waits
+   invisible at the door while AWAY / COMING, but his root node stays
+   "visible" and GameFeel's proximity term counted him. He now counts only
+   once `OwnerAI.in_room()`. Verified by reading the modes: the cat already
+   hides its root when AWAY and is skipped while asleep — the owner was the
+   only leak.
+2. **The kitchen light stood on air.** The JSON candle (h≈60 in an empty
+   corner) got a visible fixture in round 4 but nothing under it. Now a
+   slim stand (pole + foot disc) carries any candle higher than 12 cm down
+   to the floor.
+3. **The moon shaft was a searchlight.** Albedo alpha 0.5 → 0.26, both in
+   the builder and in the sky's per-frame cloud dimming; the untextured
+   fallback went 0.13 → 0.07.
+4. **The garland worked "so-so".** It was a dead-straight wire at the
+   ceiling with a fast harsh chase. Now: two sagging swags (segmented wire
+   on a cosine hang), bulbs on little sockets below the wire, a slower
+   travelling wave (1.7 rad/s, cubic pulse, phase step 0.55), and the real
+   light breathes with the same wave instead of its own unrelated sine.
+5. **The climb was a rocket.** Rebuilt stage by stage, as specified:
+   run-in and rear up → a real crouch (she loads, nose up the face) → a
+   first spring up the face (front paws pull) → a hitch while the hind
+   legs find the wall → the wall kick (she visibly shoves a touch AWAY
+   from the face) → front paws over the edge and pull through → landing
+   squash (already there). The rise is a keyframed curve (`Rat._keys`)
+   with two impulses and a plateau between them; up/grab climbs take
+   30% longer so the stages can be read.
+6. **Sloppy holes.** The flat dark discs are gone. A hole is now an
+   irregular seeded blob (a 10-point fan, radii 0.7–1.14 of nominal) with
+   a chipped-plaster rim behind it — floor holes and wall holes both.
+7. **No Python — and there will be no Python.** The texture generator was
+   ported INTO the game: `texture_gen.gd` paints the same nine materials
+   (+ the shaft gradient) in GDScript, seeded and tileable, at 256×256.
+   `texture_lib.gd` resolves each texture in order — CDN pack, repo file,
+   earlier-generated cache, paint-now-and-cache — and paints the full set
+   on a background thread at boot, so the first night rarely pays for it.
+   `tools/make_textures.py` stays as the offline reference variant.
+8. **Textures on a CDN.** Heavy good textures never belonged in git
+   anyway. `godot/cdn.json` holds one zip URL (a GitHub Release asset,
+   tag `textures-v1`, on this repo); at boot the game fetches it once in
+   the background into `user://textures/` and marks `.cdn_done`. Offline,
+   a missing release, any failure — the painted textures take over
+   silently; the game never waits for the network. To publish the pack:
+   zip the maps flat (wood.png, wood_normal.png, ceramic_tile.png, …),
+   create the release `textures-v1`, attach the zip as `textures.zip`.
+
+**Testing.** Night 1 CI set: bugs 5, rules 4, physics 7, juice 13,
+sink 5, under 1 — all pass. Hides pass on nights 1–5, walk on night 1,
+cat on night 5, physics on nights 1 (7) and 5 (7). The physics "teeter"
+check fails on nights 2–4 — verified PRE-EXISTING (fails identically on
+the round-5 build): that check teleports her onto a kitchen table at
+(700, 420), which only exists in the kitchen nights. Same family as the
+known night-2 walk failure: the tester assumes kitchen geometry.
+

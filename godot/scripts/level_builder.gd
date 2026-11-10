@@ -300,8 +300,14 @@ static func surface_props(tex_name: String) -> Array:
 
 
 func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> StandardMaterial3D:
-	if ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
-		var m := mat(color, tex_name, tiling)
+	# round 6: the texture comes from TextureLib (CDN pack → repo file → painted
+	# in-engine by TextureGen) — no Python step and no heavy binaries in the repo
+	var tex := TextureLib.get_texture(tex_name)
+	if tex != null:
+		var m := mat(color)
+		m.albedo_texture = tex
+		m.uv1_scale = Vector3(tiling.x, tiling.y, 1)
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		m.set_meta("tile_m", 0.5)  # one texture tile ~ 0.5 m: box() scales the UV by the box size
 		var p := surface_props(tex_name)
 		m.roughness = float(p[0])
@@ -311,12 +317,13 @@ func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> Standar
 	return mat(color)
 
 
-## A hand-dropped <name>_normal.png (e.g. the normal map from a CC0 PBR set) is picked up
-## automatically next to the procedural <name>.png — see docs/DEMO_POLISH.md round 4.
+## A <name>_normal.png (e.g. the normal map from a CC0 PBR set) is picked up
+## automatically wherever TextureLib finds the colour map — CDN pack or repo file.
 static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
-	if ResourceLoader.exists("res://assets/textures/" + tex_name + "_normal.png"):
+	var n := TextureLib.get_texture(tex_name + "_normal", false)
+	if n != null:
 		m.normal_enabled = true
-		m.normal_texture = load("res://assets/textures/" + tex_name + "_normal.png") as Texture2D
+		m.normal_texture = n
 
 
 ## Give a placed model a real surface (demo polish, plan point 2): the generated texture laid over its
@@ -324,9 +331,9 @@ static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
 ## The tint is divided by the textures' average brightness (~0.45), so the result lands near the
 ## requested colour instead of going twice as dark. No texture file -> no change at all.
 func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
-	if n == null or not ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
+	var tex := TextureLib.get_texture(tex_name) if n != null else null
+	if tex == null:
 		return
-	var tex := load("res://assets/textures/" + tex_name + ".png") as Texture2D
 	var c := Color(clampf(tint.r / 0.45, 0.0, 1.0), clampf(tint.g / 0.45, 0.0, 1.0), clampf(tint.b / 0.45, 0.0, 1.0))
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
@@ -493,6 +500,30 @@ func _lighting() -> void:
 		flame.material_override = fmat
 		root.add_child(flame)
 		flame.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 2.0)
+		# round 6: the candle stood on AIR (a light at h=60 in an empty corner) — now a
+		# slim stand carries it down to the floor, so the light visibly stands on something
+		var lh := float(l.get("h", 60))
+		if lh > 12.0:
+			var pole := MeshInstance3D.new()
+			pole.name = "Candle stand"
+			var pm := CylinderMesh.new()
+			pm.top_radius = 0.013
+			pm.bottom_radius = 0.013
+			pm.height = (lh - 8.0) / 100.0
+			pole.mesh = pm
+			pole.material_override = mat(hex(0x2a2320))
+			root.add_child(pole)
+			pole.global_position = W(float(l.x), float(l.y), (lh - 8.0) / 2.0)
+			var foot := MeshInstance3D.new()
+			foot.name = "Candle stand foot"
+			var dm := CylinderMesh.new()
+			dm.top_radius = 0.075
+			dm.bottom_radius = 0.085
+			dm.height = 0.012
+			foot.mesh = dm
+			foot.material_override = mat(hex(0x2a2320))
+			root.add_child(foot)
+			foot.global_position = W(float(l.x), float(l.y), 0.6)
 
 	var room := OmniLight3D.new()  # the ceiling light: off at night, the owner switches it on
 	room.name = "Ceiling light"
@@ -529,46 +560,79 @@ func _make_door(section: Node3D) -> void:
 	g.door_pivot = pivot
 
 
-## A dark hole disc lying on the floor (a gap she slips through).
+## Round 6: an irregular dark blob (a seeded fan of points) with a chipped-plaster
+## rim behind it — the round flat discs read as pasted stickers; this reads as a hole.
+func _blob(hole_name: String, r: float, seed: int) -> Node3D:
+	var grp := Node3D.new()
+	grp.name = hole_name
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var radii: Array = []
+	for i in 10:
+		radii.append(r * rng.randf_range(0.7, 1.14))
+	var rim := MeshInstance3D.new()
+	rim.mesh = _blob_mesh(radii, 1.18)
+	rim.material_override = mat(hex(0x2b2119))
+	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rim.position.z = -0.004
+	grp.add_child(rim)
+	var dark := MeshInstance3D.new()
+	dark.mesh = _blob_mesh(radii, 1.0)
+	dark.material_override = mat(hex(0x050506))
+	dark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	grp.add_child(dark)
+	return grp
+
+
+func _blob_mesh(radii: Array, scl: float) -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var idx := PackedInt32Array()
+	verts.append(Vector3.ZERO)
+	norms.append(Vector3(0, 0, 1))
+	var n := radii.size()
+	for i in n:
+		var a := TAU * float(i) / n
+		verts.append(Vector3(cos(a), sin(a), 0) * float(radii[i]) * scl)
+		norms.append(Vector3(0, 0, 1))
+	for i in n:
+		idx.append_array([0, 1 + i, 1 + (i + 1) % n])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+## A hole in the floor (a gap she slips through).
 func _hole_disc(at: Vector3, r: float) -> void:
-	var mi := MeshInstance3D.new()
-	mi.name = "Hole"
-	var sm := SphereMesh.new()
-	sm.radius = r
-	sm.height = r * 2.0
-	mi.mesh = sm
-	mi.scale = Vector3(1, 0.22, 1)
-	mi.material_override = mat(hex(0x070708))
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(mi)
-	mi.global_position = at + Vector3.UP * 0.006
+	var grp := _blob("Hole", r, int(at.x * 131.0 + at.z * 57.0) + 7)
+	grp.rotation.x = -PI / 2.0
+	root.add_child(grp)
+	grp.global_position = at + Vector3.UP * 0.006
 
 
-## A dark hole disc ON a wall, at an elevated crack's height.
+## A hole ON a wall, at an elevated crack's height.
 func _hole_on_wall(wall: String, at: Vector3) -> void:
-	var mi := MeshInstance3D.new()
-	mi.name = "Hole (wall)"
-	var sm := SphereMesh.new()
-	sm.radius = 0.1
-	sm.height = 0.2
-	mi.mesh = sm
-	mi.material_override = mat(hex(0x070708))
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	root.add_child(mi)
+	var grp := _blob("Hole (wall)", 0.1, int(at.x * 131.0 + at.y * 57.0) + 13)
+	grp.scale = Vector3(1, 0.85, 1)
+	root.add_child(grp)
 	# pinned to the wall PLANE itself (the exit point sits d cm into the room, on the furniture)
 	match wall:
 		"n":
-			mi.scale = Vector3(1, 0.8, 0.25)
-			mi.global_position = Vector3(at.x, at.y + 0.15, -2.96)
+			grp.global_position = Vector3(at.x, at.y + 0.15, -2.955)
 		"s":
-			mi.scale = Vector3(1, 0.8, 0.25)
-			mi.global_position = Vector3(at.x, at.y + 0.15, 2.96)
+			grp.rotation.y = PI
+			grp.global_position = Vector3(at.x, at.y + 0.15, 2.955)
 		"w":
-			mi.scale = Vector3(0.25, 0.8, 1)
-			mi.global_position = Vector3(-4.76, at.y + 0.15, at.z)
+			grp.rotation.y = PI / 2.0
+			grp.global_position = Vector3(-4.755, at.y + 0.15, at.z)
 		_:
-			mi.scale = Vector3(0.25, 0.8, 1)
-			mi.global_position = Vector3(4.76, at.y + 0.15, at.z)
+			grp.rotation.y = -PI / 2.0
+			grp.global_position = Vector3(4.755, at.y + 0.15, at.z)
 
 
 ## Round 5: a WORKING wall clock (the wall_clock model's hands are baked into one mesh).
@@ -754,11 +818,13 @@ func _room() -> void:
 		smat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		smat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 		smat.render_priority = 1
-		if ResourceLoader.exists("res://assets/textures/shaft.png"):
-			smat.albedo_texture = load("res://assets/textures/shaft.png")
-			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.5)
+		# round 6: softer — a hint of a shaft, not a searchlight (asked for)
+		var stex := TextureLib.get_texture("shaft")
+		if stex != null:
+			smat.albedo_texture = stex
+			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.26)
 		else:
-			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.13)
+			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.07)
 		shaft_mats.append(smat)
 		var top := 2.18
 		var bot := 1.12

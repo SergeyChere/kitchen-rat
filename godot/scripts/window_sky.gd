@@ -105,7 +105,7 @@ func _process(dt: float) -> void:
 		_moon_mat.albedo_color = Color(lerpf(0.32, 0.93, f), lerpf(0.36, 0.96, f), lerpf(0.44, 1.0, f))
 		_halo_mat.albedo_color = Color(0.55, 0.65, 1.0, 0.16 * f)
 		for sm in _shaft_mats:
-			(sm as StandardMaterial3D).albedo_color.a = 0.5 * f
+			(sm as StandardMaterial3D).albedo_color.a = 0.26 * f  # round 6: softer shaft
 	if _branches:
 		_branches.rotation.z = 0.035 * sin(_t * 0.6) + 0.015 * sin(_t * 1.63 + 1.7)
 		_branches.rotation.x = 0.012 * sin(_t * 0.83 + 0.4)

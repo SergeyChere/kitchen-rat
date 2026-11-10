@@ -1312,8 +1312,9 @@ func _tick_props(dt: float) -> void:
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
 	for gb in garland:
-		var pulse := 0.25 + 0.75 * pow(0.5 + 0.5 * sin(t * 2.6 + float(gb[1])), 2.0)
-		(gb[0] as StandardMaterial3D).emission_energy_multiplier = 0.35 + 1.7 * pulse
+		# round 6: a slower, softer travelling wave (round 5's fast chase looked cheap)
+		var pulse := pow(0.5 + 0.5 * sin(t * 1.7 + float(gb[1])), 3.0)
+		(gb[0] as StandardMaterial3D).emission_energy_multiplier = 0.25 + 2.3 * pulse
 
 
 func _tick_lights(dt: float) -> void:
@@ -1331,7 +1332,7 @@ func _tick_lights(dt: float) -> void:
 			"tv":
 				l.light_energy = float(f[1]) * (1.9 if tv_on else 1.0) * (0.8 + 0.2 * sin(t * 3.0) * sin(t * 5.7 + 1.0))
 			"garland":
-				l.light_energy = float(f[1]) * (0.72 + 0.28 * sin(t * 2.6))  # the garland breathes, and its shadows with it
+				l.light_energy = float(f[1]) * _light_mul * (0.85 + 0.3 * pow(0.5 + 0.5 * sin(t * 1.7 - 1.2), 2.0))  # breathes WITH the bulbs' wave
 			_: l.light_energy = float(f[1]) * _light_mul
 
 

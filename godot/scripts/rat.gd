@@ -882,6 +882,17 @@ func _tick_jump(dt: float) -> void:
 
 ## Climbing up: she runs to the edge, rears up and grabs it with her front paws (body tipped nose-up, hind legs
 ## still on the floor), then pushes off with the hind legs and pulls herself over onto the top.
+## Piecewise-smooth keyframe curve (round 6, for the climb stages).
+func _keys(u: float, keys: Array) -> float:
+	for i in keys.size() - 1:
+		var a: Array = keys[i]
+		var b: Array = keys[i + 1]
+		if u <= float(b[0]):
+			var k := clampf((u - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.001), 0.0, 1.0)
+			return lerpf(float(a[1]), float(b[1]), smoothstep(0.0, 1.0, k))
+	return float(keys[keys.size() - 1][1])
+
+
 func _climb_pos(t: float) -> Vector3:
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
@@ -889,25 +900,27 @@ func _climb_pos(t: float) -> Vector3:
 	var base := _from + dirv * maxf(0.0, edge_d - 0.13)  # snout at the edge, hind paws under it
 	var dy := _to.y - _from.y
 	var reach := minf(dy, 0.13)  # how far up she stretches before the hop
-	if t < 0.30:  # run in and rear up
-		var k := t / 0.30
+	if t < 0.26:  # run in and rear up
+		var k := t / 0.26
 		var q := _from.lerp(base, smoothstep(0.0, 1.0, k))
-		q.y = _from.y + reach * 0.4 * smoothstep(0.5, 1.0, k)
+		q.y = _from.y + reach * 0.35 * smoothstep(0.4, 1.0, k)
 		return q
-	if t < 0.42:  # paws on the edge: a loaded crouch, not a pause — she dips, then springs
-		var k2 := (t - 0.30) / 0.12
+	if t < 0.40:  # the crouch: she loads her hind legs, nose up the face — THEN springs
+		var k2 := (t - 0.26) / 0.14
 		var q := base
-		q.y = _from.y + reach * (0.4 + 0.6 * k2) - 0.028 * sin(k2 * PI)
+		q.y = _from.y + reach * 0.35 - 0.034 * sin(k2 * PI * 0.5)
 		return q
-	var k := (t - 0.42) / 0.58  # the push: up the face first, then over the edge
-	# Round 3 split the diagonal glide into up-then-over; round 4 makes the rise itself ballistic:
-	# an ease-out cubic is fast off the push and soft at the top, the shape gravity gives a real
-	# scramble — smoothstep's slow start was what still read as floating.
-	var q := base.lerp(_to, smoothstep(0.32, 1.0, k))
-	var kr := clampf(k / 0.55, 0.0, 1.0)
-	var rise := 1.0 - pow(1.0 - kr, 3.0)
-	var settle := smoothstep(0.55, 1.0, k)
-	q.y = _from.y + reach + (dy - reach) * rise + 0.03 * rise * (1.0 - settle)
+	# Round 6, stage by stage as asked: spring up the face (front paws pull on the
+	# wall) — a hitch while the hind legs find the wall — kick off it — front paws
+	# over the edge and pull through. Two impulses with a hitch between them: one
+	# smooth curve, however eased, reads as a rocket; stages read as a scramble.
+	var u := (t - 0.40) / 0.60
+	var low := reach * 0.35 - 0.034
+	var rise := _keys(u, [[0.0, 0.0], [0.34, 0.52], [0.48, 0.58], [0.68, 0.88], [1.0, 1.0]])
+	var q := base.lerp(_to, smoothstep(0.5, 1.0, u))
+	var kick := sin(clampf((u - 0.42) / 0.30, 0.0, 1.0) * PI) * 0.035
+	q -= dirv * kick  # the hind-leg push off the wall face shoves her a touch AWAY from it
+	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.75, 1.0, u))
 	return q
 
 
@@ -942,6 +955,8 @@ func _pole_pos(t: float) -> Vector3:
 
 
 func _start_kind(kind: String, to: Vector3, edge: Vector3, dur: float) -> void:
+	if kind == "up" or kind == "grab":
+		dur *= 1.3  # round 6: the staged scramble (crouch, spring, wall kick) needs time to read
 	jumping = true
 	_jump_up = kind != "descend"
 	_kind = kind
@@ -1036,16 +1051,12 @@ func _try_pole() -> bool:
 
 
 func _climb_tilt(t: float) -> float:
-	if t < 0.30:
-		return 70.0 * smoothstep(0.4, 1.0, t / 0.30)
-	if t < 0.42:  # loading the push: leans in a touch further as she crouches
-		return 70.0 + 6.0 * sin((t - 0.30) / 0.12 * PI * 0.5)
-	var k := (t - 0.42) / 0.58
-	if k < 0.4:  # up the face: still nose-up, easing off
-		return 76.0 - 16.0 * smoothstep(0.0, 0.4, k)
-	if k < 0.8:  # over the edge: the body rolls forward as the hindquarters come up
-		return lerpf(60.0, -20.0, smoothstep(0.4, 0.8, k))
-	return lerpf(-20.0, 0.0, smoothstep(0.8, 1.0, k))
+	if t < 0.26:
+		return 66.0 * smoothstep(0.35, 1.0, t / 0.26)
+	if t < 0.40:  # crouching: nose tips further up the face as she loads the spring
+		return 66.0 + 14.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
+	# up the face nearly vertical, unrolling over the edge on the second kick
+	return _keys((t - 0.40) / 0.60, [[0.0, 80.0], [0.34, 76.0], [0.48, 72.0], [0.68, 46.0], [0.86, -16.0], [1.0, 0.0]])
 
 
 # ---------- animation ----------
