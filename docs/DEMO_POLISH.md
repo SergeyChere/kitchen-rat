@@ -302,3 +302,9 @@ Eleven points from the playtester, taken in order:
     the door leaf is node "door" in rooms/wall_door.glb; the clock's
     hands are baked — that model is decorative now).
 
+**Known issue (pre-existing, not from this round).** The night 2 walk test
+(chair → dining table jump targets) fails — and fails identically on the
+round-4 build, so it predates round 5 (likely older). The rat's target
+scanner doesn't offer the chair in the living room. Worth its own look:
+it smells like the same family as the sausage-at-the-edge problem.
+
