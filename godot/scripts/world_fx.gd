@@ -6,6 +6,7 @@ extends Node3D
 ##  · noise rings that spread from every sound.
 
 var g: Game
+var _steam_t := 0.0
 var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
 var _rings: Array = []  # [MeshInstance3D, t, life, max_r]
@@ -287,6 +288,11 @@ func _scent_marks(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_scent_marks(dt)
+	# round 5: the kettle on the stove steams — small white puffs, always rising
+	_steam_t -= dt
+	if g.kettle_pos != null and _steam_t <= 0.0:
+		_steam_t = 0.33
+		_particles(g.kettle_pos, 2, Color(0.95, 0.97, 1.0, 0.3), 0.045, 0.03, 0.22, 1.3, -0.12)
 	if _beacon:
 		_beacon.visible = not g.rat.carried.is_empty() and not g.rat.in_nest
 		if _beacon.visible:

@@ -227,3 +227,78 @@ https://ambientcg.com/a/Fabric081C — woven fabric) and Poly Haven
 categories). Note: re-running tools/make_textures.py overwrites <name>.png,
 so keep the downloads somewhere safe.
 
+## Round 5 — the playtest list (2026-11-10)
+
+Eleven points from the playtester, taken in order:
+
+1. **Sneak speed** 0.4 → 0.68 m/s. At 0.4 sneaking was a trap nobody used;
+   0.68 keeps it clearly slower than walking (0.9) but actually usable.
+2. **Tasks.** Main = the goal ("Fill the nest") + the chain, as before.
+   Side tasks (green) are now ALWAYS exactly two: the tracker keeps two
+   open, tops the night's list up from a built-in pool if it ships fewer
+   than six, and when one finishes or fails the next opens at once — and is
+   ANNOUNCED (green "+ New side task" at the top of the panel) instead of
+   silently materialising by the old "reveal after N steps" rule. Done or
+   failed side tasks leave the list (they flash in the announcements).
+3. **Kitchen wall paths** (nights 1 and 5) rebuilt to the requested graph,
+   now a cycle, not the old complete graph: floor crack SW → up inside the
+   wall to a COUNTERTOP exit → up to the CABINET TOPS → behind the FRIDGE
+   (east wall) → down to the SE baseboard → back to the start. Plus: the
+   table-side crack → straight into the NEST; and two plinth gaps under
+   the island, north ↔ south. Cracks can now be elevated (data: h = the
+   height she stands at, d = depth onto the surface) and can be plain
+   floor holes; elevated cracks get a dark hole disc on the wall. Hiding
+   works at elevated cracks (the cat waits below — WATCH mode exists for
+   exactly this). And whoever was CHASING her when she dives in now goes
+   to the entry crack and searches there (cat: SEARCH 3.2 s, pathing to
+   the crack; the owner checks it too if he's near) while she exits
+   elsewhere. Still teleports, not a crawlable interior — the wall runs
+   are instant, as before; the light remark is answered at the nest (7).
+4. **Moving things.** Kettle steams (world_fx puffs at the kettle's spot).
+   The sleeping cat breathes (a ~3.4 s swell) and Zzz's as before. A
+   garland on the living rooms' south wall: 17 coloured bulbs chasing,
+   one real light breathing with them (flicker kind "garland"). The TV
+   already flickered when on. The window curtains sway gently. The robot
+   vacuum's LED already blinked (night 16). Still static: the cobweb
+   (not added), the fireplace is light-flicker only, as before.
+5. **Hide props.** Under the kitchen table: a storage box + the kid's
+   backpack. Under the coffee table: a box. She now hides AMONG things.
+6. **The door moves.** wall_door.glb's leaf is its own node, but hinged at
+   its centre — the builder re-hangs it on a pivot at its edge, and the
+   game swings it: it opens as the owner arrives (COMING, last 0.9 s) and
+   while he's within 1.3 m of it coming or going, and eases shut behind
+   him. The rat still can't slip out (the section's collision walls the
+   doorway, and the owner at the door is the catch).
+7. **The burrow.** The nest light was a bare omni floating mid-air; now it
+   spills through the mouse hole (lamp just inside the hole, a warm glow
+   disc on the hole), and the burrow got bedding mounds and an old cloth
+   so it doesn't read as four flat boxes.
+8. **Wall clocks show the night's time.** The model's hands are baked
+   into one mesh, so the game now builds its own clock (rim, face, ticks,
+   two hand pivots) at the spots the static clock used (kitchen east
+   wall; living rooms via the picture-hanging spots). Hands follow the
+   HUD clock exactly: 23:00 → 06:00 over the night.
+9. **The sausage problem.** Cause found: while dragging, aimed jumps
+   were forbidden ENTIRELY — at a table's edge Space did nothing and she
+   wedged there. Down-jumps are now allowed while dragging (climbing UP
+   with a mouthful stays barred). And when food falls (she's caught), it
+   no longer drops straight down at the furniture's base: it scatters
+   sideways in an arc to clear floor (Food.toss_scatter), keeping its
+   proper scale.
+10. **No more crumbs.** "Crumb" in night data now spawns a PIECE of real
+    food — a cheese wedge, a pizza slice or a rusk chunk (deterministic
+    per spot), worth 2, weighing 1. Small food generally sits bigger
+    (world scales: pieces ~0.6–0.85 of models that were drawn larger,
+    other small foods ×1.22, big ×1.12) so it reads as food, not specks.
+    Task texts in the demo nights say "piece of food" now. Note: fed
+    counts value, so pieces (2) fill the nest a bit faster than crumbs
+    (1) did — goal numbers may want a nudge up after a playtest.
+11. **The cat's eyes + models.** The cat's Eyes are a separate mesh in
+    cat.glb (materials CatIris / Eye / EyeShine): in code they're now
+    8% smaller, the iris is a true amber with a faint night emission,
+    the eyeball near-black. All the game's models are already separate
+    .glb files; a zip of the whole models/ tree accompanies this round
+    for Blender work (the eyes are the "Eyes" node in characters/cat.glb;
+    the door leaf is node "door" in rooms/wall_door.glb; the clock's
+    hands are baked — that model is decorative now).
+

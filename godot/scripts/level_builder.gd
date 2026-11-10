@@ -510,6 +510,117 @@ static func _section(p: float) -> int:
 	return clampi(floori(p / 120.0), 0, 7)
 
 
+## Round 5: the door leaf is a separate node in wall_door.glb, but its origin is the door's
+## CENTRE — re-hang it on a pivot at its edge so the game can swing it when the owner comes
+## and goes. (The rat can never slip out: the section's collision still walls the doorway,
+## and the owner himself is the catch.)
+func _make_door(section: Node3D) -> void:
+	var door := section.find_child("door", true, false) as Node3D
+	if door == null:
+		return
+	var dpos := door.position
+	var pivot := Node3D.new()
+	pivot.name = "DoorPivot"
+	door.get_parent().add_child(pivot)
+	pivot.position = dpos + Vector3(-0.45, 0, 0)
+	door.reparent(pivot, true)
+	door.position = Vector3(0.45, dpos.y, dpos.z)
+	door.rotation = Vector3.ZERO
+	g.door_pivot = pivot
+
+
+## A dark hole disc lying on the floor (a gap she slips through).
+func _hole_disc(at: Vector3, r: float) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "Hole"
+	var sm := SphereMesh.new()
+	sm.radius = r
+	sm.height = r * 2.0
+	mi.mesh = sm
+	mi.scale = Vector3(1, 0.22, 1)
+	mi.material_override = mat(hex(0x070708))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	mi.global_position = at + Vector3.UP * 0.006
+
+
+## A dark hole disc ON a wall, at an elevated crack's height.
+func _hole_on_wall(wall: String, at: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "Hole (wall)"
+	var sm := SphereMesh.new()
+	sm.radius = 0.1
+	sm.height = 0.2
+	mi.mesh = sm
+	mi.material_override = mat(hex(0x070708))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	# pinned to the wall PLANE itself (the exit point sits d cm into the room, on the furniture)
+	match wall:
+		"n":
+			mi.scale = Vector3(1, 0.8, 0.25)
+			mi.global_position = Vector3(at.x, at.y + 0.15, -2.96)
+		"s":
+			mi.scale = Vector3(1, 0.8, 0.25)
+			mi.global_position = Vector3(at.x, at.y + 0.15, 2.96)
+		"w":
+			mi.scale = Vector3(0.25, 0.8, 1)
+			mi.global_position = Vector3(-4.76, at.y + 0.15, at.z)
+		_:
+			mi.scale = Vector3(0.25, 0.8, 1)
+			mi.global_position = Vector3(4.76, at.y + 0.15, at.z)
+
+
+## Round 5: a WORKING wall clock (the wall_clock model's hands are baked into one mesh).
+## Built from primitives at the spot the static clock used; the game turns the hands —
+## they show the night's own time (23:00 at the start, 06:00 at dawn, like the HUD clock).
+func add_working_clock(at: Vector3, rot_deg: float) -> void:
+	var grp := Node3D.new()
+	grp.name = "Wall clock (working)"
+	root.add_child(grp)
+	grp.global_position = at
+	grp.rotation.y = deg_to_rad(rot_deg)
+	var rim := MeshInstance3D.new()
+	var rc := CylinderMesh.new()
+	rc.top_radius = 0.185; rc.bottom_radius = 0.185; rc.height = 0.035
+	rim.mesh = rc
+	rim.rotation_degrees.x = 90.0
+	rim.material_override = mat_named("wood_dark", hex(0x4a3421))
+	grp.add_child(rim)
+	var face := MeshInstance3D.new()
+	var fc := CylinderMesh.new()
+	fc.top_radius = 0.168; fc.bottom_radius = 0.168; fc.height = 0.04
+	face.mesh = fc
+	face.rotation_degrees.x = 90.0
+	face.material_override = mat(Color(0.92, 0.88, 0.76))
+	grp.add_child(face)
+	var dark := mat(Color(0.12, 0.1, 0.1))
+	for k in 4:
+		var tick := MeshInstance3D.new()
+		var tb := BoxMesh.new()
+		tb.size = Vector3(0.014, 0.032, 0.006)
+		tick.mesh = tb
+		tick.material_override = dark
+		var ang := k * PI / 2.0
+		tick.position = Vector3(sin(ang) * 0.138, cos(ang) * 0.138, 0.024)
+		tick.rotation.z = -ang
+		grp.add_child(tick)
+	var hands := []
+	for spec in [[0.02, 0.088, 0.034], [0.013, 0.128, 0.052]]:
+		var pivot := Node3D.new()
+		pivot.position = Vector3(0, 0, 0.027)
+		grp.add_child(pivot)
+		var hand := MeshInstance3D.new()
+		var hb := BoxMesh.new()
+		hb.size = Vector3(spec[0], spec[1], 0.005)
+		hand.mesh = hb
+		hand.material_override = dark
+		hand.position = Vector3(0, spec[2], 0)
+		pivot.add_child(hand)
+		hands.append(pivot)
+	g.clock_hands = hands
+
+
 ## One sheet of the fake moon shaft (see _walls): a single quad, no shadow, additive.
 func _add_shaft_quad(verts: Array, uvs: Array, mat: Material) -> void:
 	var st := SurfaceTool.new()
@@ -562,9 +673,36 @@ func _room() -> void:
 	if float(win.get("w", 0)) > 0.0:
 		north[_section(float(win.x) + float(win.w) / 2.0)] = "wall_window"
 	south[1] = "wall_mousehole"
-	east[clampi(floori(float(night.get("door", 300)) / 120.0), 0, 4)] = "wall_door"
+	var door_j := clampi(floori(float(night.get("door", 300)) / 120.0), 0, 4)
+	east[door_j] = "wall_door"
 	for c in night.get("cracks", []):
+		if c.has("nest"):
+			g.cracks.append(W(130, 690))  # the path can end in the nest itself
+			continue
+		if c.has("floor"):
+			var fp := W(float(c.x), float(c.y))
+			g.cracks.append(fp)
+			_hole_disc(fp, 0.12)  # a dark gap in the floor (under the island's plinth, say)
+			_hide("crack", float(c.x), float(c.y), 42, 42)
+			continue
 		var cx := float(c.get("x", 0)); var cy := float(c.get("y", 0))
+		if float(c.get("h", 0)) > 0.0:
+			# round 5: an elevated crack — the exit is a hole in the wall at height h (cm, the
+			# height she STANDS at), pushed d cm into the room onto the surface below it (the
+			# counter, the cabinet tops). The wall sections can't show it (furniture is in the
+			# way), so it gets a dark disc on the wall instead of a wall_crack section.
+			var hh := float(c.h); var dd := float(c.get("d", 40))
+			var ep: Vector3
+			match str(c.wall):
+				"n": ep = W(cx, dd, hh)
+				"s": ep = W(cx, 600.0 - dd, hh)
+				"w": ep = W(dd, cy, hh)
+				_: ep = W(960.0 - dd, cy, hh)
+			g.cracks.append(ep)
+			_hole_on_wall(str(c.wall), ep)
+			var hz := add_zone(HideSpot, "Hide: crack", ep, Vector3(0.55, 0.6, 0.55)) as HideSpot
+			hz.id = "crack"
+			continue
 		match str(c.wall):
 			"s": g.cracks.append(W(cx, 588))
 			"n": g.cracks.append(W(cx, 12))
@@ -586,10 +724,19 @@ func _room() -> void:
 				if east[j] == null: east[j] = "wall_crack"
 				_hide("crack", 950, cy, 18, 44)
 	var walls := group("Walls")
-	for i in 8: _wall(north[i] if north[i] else "wall_section", 60 + 120 * i, -5, 0.0, walls, wall_mat)
+	for i in 8:
+		var nsec := _wall(north[i] if north[i] else "wall_section", 60 + 120 * i, -5, 0.0, walls, wall_mat)
+		if north[i] == "wall_window" and nsec:
+			for cn in ["curtain_l", "curtain_r"]:
+				var curt := nsec.find_child(cn, true, false) as Node3D
+				if curt:
+					g.curtains.append(curt)
 	for i in 8: _wall(south[i] if south[i] else "wall_section", 60 + 120 * i, 605, 180.0, walls, wall_mat)
 	for j in 5: _wall(west[j] if west[j] else "wall_section", -5, 60 + 120 * j, 90.0, walls, wall_mat)
-	for j in 5: _wall(east[j] if east[j] else "wall_section", 965, 60 + 120 * j, -90.0, walls, wall_mat)
+	for j in 5:
+		var esec := _wall(east[j] if east[j] else "wall_section", 965, 60 + 120 * j, -90.0, walls, wall_mat)
+		if j == door_j and esec:
+			_make_door(esec)
 	for p in [Vector2(-5, -5), Vector2(965, -5), Vector2(-5, 605), Vector2(965, 605)]:
 		box("Corner", W(p.x, p.y, 125), Vector3(0.1, 2.5, 0.1), trim, walls)
 	if float(win.get("w", 0)) > 0.0:
@@ -638,10 +785,10 @@ func _room() -> void:
 		shade.global_position.y = 2.5 - world_aabb(shade).size.y
 
 
-func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_mat: Material) -> void:
+func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_mat: Material) -> Node3D:
 	var n := spawn("rooms/" + model, W(x, y), rot, parent)
 	if n == null:
-		return
+		return null
 	collide(n)
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
@@ -649,6 +796,7 @@ func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_m
 			var src := m.mesh.surface_get_material(i)
 			if src and src.resource_name.begins_with(WALL_HEX):
 				m.set_surface_override_material(i, wall_mat)
+	return n
 
 
 func _hide(kind: String, x: float, y: float, w: float, d: float, rot := 0.0) -> void:
@@ -681,6 +829,10 @@ func _furniture() -> void:
 		if cloth and int(spec.get("cloth", 0)) == 0:
 			cloth.queue_free()
 	_hide("table", 720, 445, 184, 114)
+	# round 5: hiding under a bare table read as ridiculous — there are THINGS under it now:
+	# a storage box and the kid's backpack, and she ducks in among them
+	collide(spawn("props/small_box", W(655, 485), 18.0, decor))
+	spawn("props/backpack", W(778, 402), -35.0, decor)
 	for c in [[596, 420, 90], [596, 472, 90], [846, 446, -90]]:
 		furn_piece("furniture/chair", c[0], c[1], c[2], "chair")
 		_hide("chair", c[0], c[1], 28, 28)
@@ -743,12 +895,14 @@ func _kitchen_upper() -> void:
 				collide(jar)
 	var ket := spawn("rooms/kettle", on_top(260, 30), 180.0, decor)
 	collide(ket)
+	if ket:
+		g.kettle_pos = ket.global_position + Vector3.UP * 0.17  # world_fx steams here
 	var toast := spawn("furniture/toaster", on_top(340, 28), 180.0, decor)
 	if toast:
 		var tb := world_aabb(toast)
 		toast.global_position -= Vector3(tb.get_center().x - W(340, 28).x, 0, tb.get_center().z - W(340, 28).z)
 		collide(toast)
-	_wall_art("rooms/wall_clock", 958, 200, 195, -90.0)
+	add_working_clock(W(958, 200, 195), -90.0)  # round 5: working hands, the night's real time
 	_wall_art("rooms/wall_art_landscape", 2, 430, 160, 90.0)
 	_wall_art("rooms/wall_art_flowers", 2, 540, 160, 90.0)
 	_wall_art("rooms/wall_art_portrait", 720, 598, 165, 180.0)
@@ -1036,12 +1190,43 @@ func _nest() -> void:
 	box("Side", W(255, 690, 50), Vector3(0.1, 1.0, 1.9), earth, nest)
 	var roof := box("Roof", W(130, 690, 95), Vector3(2.6, 0.1, 1.9), earth, nest)
 	collide(spawn("rooms/nest", W(90, 725), 0.0, nest))
+	# round 5: the nest's light had no source (a bare omni mid-air) and the burrow read flat.
+	# Now the light SPILLS THROUGH THE MOUSE HOLE from the kitchen: the lamp sits just inside
+	# the hole, a warm glow disc marks the hole itself, and bedding mounds + a cloth give the
+	# burrow some shape.
+	var glow := MeshInstance3D.new()
+	glow.name = "Hole glow"
+	var gm := SphereMesh.new()
+	gm.radius = 0.13
+	gm.height = 0.26
+	glow.mesh = gm
+	glow.scale = Vector3(1.15, 0.85, 0.25)
+	var gmat := StandardMaterial3D.new()
+	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gmat.albedo_color = Color(1.0, 0.8, 0.55)
+	glow.material_override = gmat
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	nest.add_child(glow)
+	glow.global_position = W(180, 604, 40)
 	var light := OmniLight3D.new()
 	light.light_color = Color8(0xff, 0xd0, 0xa0)
-	light.light_energy = 0.7
-	light.omni_range = 3.0
+	light.light_energy = 0.95
+	light.omni_range = 2.8
 	nest.add_child(light)
-	light.global_position = W(140, 690, 45)
+	light.global_position = W(180, 622, 42)
+	for mnd in [[95, 705, 0.55, 0.42], [168, 712, 0.48, 0.38], [128, 660, 0.42, 0.34], [205, 668, 0.36, 0.3]]:
+		var mound := MeshInstance3D.new()
+		mound.name = "Bedding"
+		var mm := SphereMesh.new()
+		mm.radius = 0.3
+		mm.height = 0.6
+		mound.mesh = mm
+		mound.scale = Vector3(mnd[2], 0.16, mnd[3])
+		mound.material_override = earth
+		nest.add_child(mound)
+		mound.global_position = W(mnd[0], mnd[1], 2)
+	var cloth := box("Old cloth", W(140, 700, 1), Vector3(0.8, 0.025, 0.55), mat(Color(0.42, 0.2, 0.18)), nest)
+	cloth.rotation.y = 0.4
 	for p in [[70, 715, 20, "sleep"], [105, 735, -60, "sleep"], [80, 745, 150, "idle"], [125, 705, 200, "sniff"]]:
 		var o := W(p[0], p[1], 60)
 		var hit := g.ray(o, o + Vector3.DOWN * 1.0)  # on top of the nest bedding, not inside it

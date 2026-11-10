@@ -11,7 +11,7 @@ const CEILING := 2.5
 
 var walk_speed := 0.9
 var run_speed := 1.9
-var sneak_speed := 0.4
+var sneak_speed := 0.68  # round 5: 0.4 was so slow nobody sneaked — a real tradeoff needs a usable speed
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
 var max_jump_up := 0.62
@@ -418,7 +418,11 @@ func _push_things() -> void:
 
 
 func moving() -> bool: return move_speed > 0.05
-func hidden() -> bool: return hide_spot != null and global_position.y < 0.05 and not jumping
+func hidden() -> bool:
+	# floor spots count at floor level; an elevated crack (counter, cabinet top) counts at its own height
+	if hide_spot == null or jumping:
+		return false
+	return global_position.y < 0.05 or hide_spot.global_position.y > 0.1
 func hide_kind() -> String: return hide_spot.id if hidden() else ""
 func has_jump_target() -> bool: return _has_target
 func add_noise(v: float) -> void: noise_level = maxf(noise_level, v)
@@ -504,7 +508,7 @@ func drop_one() -> Food:
 	f.reparent(Game.I._builder.foods, true)
 	f.global_position = from
 	f.rotation = Vector3.ZERO
-	f.scale = Vector3.ONE
+	f.scale = Vector3.ONE * f.wscale
 	var roll := at + fw * 0.06
 	var hit2 := _ray(roll + Vector3.UP * 0.05, roll + Vector3.DOWN * 0.06)
 	if hit2.is_empty():
@@ -710,7 +714,9 @@ func _physics_process(dt: float) -> void:
 			pass
 		elif Game.I.use_tunnel():
 			pass
-		elif _has_target and not dragging():
+		elif _has_target and (not dragging() or not _target_up):
+			# round 5: dragging a sausage she may still jump DOWN (pulling it off a table was
+			# impossible before — she wedged at the edge for good); climbing UP with it stays barred
 			_start_jump(_target, _target_up)
 		elif _try_pole():
 			pass

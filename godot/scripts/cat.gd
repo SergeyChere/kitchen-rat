@@ -150,7 +150,48 @@ func _lift(dt: float) -> void:
 	m.position.y = move_toward(m.position.y, want, dt * 0.6) if dt > 0.0 else want
 
 
+var _breath_base := Vector3.ZERO
+var _eyes_done := false
+
+
+func _living_model(dt: float) -> void:
+	# round 5: a sleeping cat BREATHES (a slow swell, ~3.4 s a breath), and her eyes get a
+	# fix — the model's Eyes mesh is separate: slightly smaller, a true amber iris with a
+	# faint night shine, instead of the flat grey they shipped with.
+	if anim == null or anim.ap == null:
+		return
+	var m := anim.ap.get_parent() as Node3D
+	if m == null:
+		return
+	if _breath_base == Vector3.ZERO:
+		_breath_base = m.scale
+	if not _eyes_done:
+		_eyes_done = true
+		var eyes := find_child("Eyes", true, false) as MeshInstance3D
+		if eyes:
+			eyes.scale = Vector3.ONE * 0.92
+			for i in eyes.mesh.get_surface_count():
+				var src := eyes.get_active_material(i)
+				if src is BaseMaterial3D:
+					var d := (src as BaseMaterial3D).duplicate() as StandardMaterial3D
+					var nm := d.resource_name
+					if nm.contains("Iris"):
+						d.albedo_color = Color(0.95, 0.62, 0.15)
+						d.emission_enabled = true
+						d.emission = Color(0.9, 0.5, 0.1)
+						d.emission_energy_multiplier = 0.35
+					elif nm.contains("Eye"):
+						d.albedo_color = Color(0.07, 0.06, 0.06)
+					eyes.set_surface_override_material(i, d)
+	if mode == Mode.SLEEP:
+		var b := 1.0 + 0.02 * sin(Time.get_ticks_msec() / 1000.0 * TAU / 3.4)
+		m.scale = Vector3(_breath_base.x * (2.0 - b), _breath_base.y * b, _breath_base.z * (2.0 - b))
+	elif m.scale != _breath_base:
+		m.scale = _breath_base
+
+
 func _process(dt: float) -> void:
+	_living_model(dt)
 	_lift(dt)
 	if not G.playing() or mode == Mode.AWAY:
 		sees = false

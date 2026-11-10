@@ -222,7 +222,7 @@
     "reveal": -1
    },
    {
-    "text": "Pick up 3 crumbs in front of the sofa",
+    "text": "Pick up 3 pieces of food in front of the sofa",
     "hint": "Stay on the floor: jumping onto the sofa makes your claws scratch the fabric.",
     "type": "pickN",
     "arg": "sofa",
@@ -256,7 +256,7 @@
     "reveal": -1
    },
    {
-    "text": "Grab the crumb right next to the cat bed",
+    "text": "Grab the piece of food right next to the cat bed",
     "hint": "",
     "type": "pick",
     "arg": "bed",

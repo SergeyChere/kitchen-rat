@@ -133,6 +133,14 @@ func task_done(text: String, ok: bool) -> void:
 		_recent.pop_front()
 
 
+## A new side task opened (round 5): announced in green at the top of the panel, so a task
+## never just silently appears in the list any more.
+func task_new(text: String) -> void:
+	_recent.append(["+" + text, 4.0, true])
+	if _recent.size() > 4:
+		_recent.pop_front()
+
+
 func _tag(cam: Camera3D, s: float, at: Vector3, text: String, size: int, col: Color) -> void:
 	if cam.is_position_behind(at):
 		return
@@ -360,7 +368,9 @@ func _draw_tasks(g: Game, H: float) -> void:
 	var gdone := g.fed >= goal
 	rows.append(["✔" if gdone else "", CHEESE if gdone else none, CHEESE, "", t.goal_text + " · %d / %d" % [mini(g.fed, goal), goal], INK, 1.0, "bar"])
 	for r in _recent:
-		if r[2]:
+		if str(r[0]).begins_with("+"):
+			rows.append(["+", SAFE, SAFE, "New side task", str(r[0]).substr(1), SAFE, clampf(float(r[1]) / 4.0, 0.0, 1.0), ""])
+		elif r[2]:
 			rows.append(["✔", CHEESE, CHEESE, "", str(r[0]), CHEESE, clampf(float(r[1]), 0.0, 1.0), ""])
 	if t.has_tasks():
 		var ci := t.current_index()
@@ -378,10 +388,8 @@ func _draw_tasks(g: Game, H: float) -> void:
 	for i in t.side.size():
 		if not t.side_visible(i):
 			continue
-		if t.side_done.has(i):
-			rows.append(["✔", SAFE, SAFE, "Side", Keys.text(str(t.side[i].text)), SAFE, 1.0, ""])
-		elif t.side_failed.has(i):
-			rows.append(["✖", none, BAD, "Side", Keys.text(str(t.side[i].text)), MUTED, 1.0, ""])
+		if t.side_done.has(i) or t.side_failed.has(i):
+			continue  # done/failed side tasks flash in the announcements above, then leave the list
 		elif t.side[i].type == "keep":
 			# a rule for the whole night: nothing to wait for, it counts when the night ends
 			rows.append(["…", none, SAFE, "Side · counts when you finish the night", Keys.text(str(t.side[i].text)) + " (so far, so good)", Color(0.78, 0.92, 0.7), 1.0, ""])

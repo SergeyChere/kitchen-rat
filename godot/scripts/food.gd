@@ -4,8 +4,13 @@ extends Node3D
 ## and is worth 1, a cheese weighs 2 and is worth 5, big food (sausage, chicken…) weighs 3, is worth 6 and is dragged.
 
 const BIG := ["sausage", "chicken", "pizza", "cake", "potato", "fat", "biscuit", "salami"]
+## Round 5: no crumbs — she collects PIECES of real food. "crumb" in night data is remapped to
+## one of these at spawn (see game.spawn_food): a cheese wedge, a pizza slice, a rusk chunk.
+const LIGHT := ["crumb", "wedge", "slice", "chunk"]
+const PIECES := ["wedge", "slice", "chunk"]
 
 var type := "crumb"
+var wscale := 1.0  # world scale for this type (set at spawn; small food used to be unreadable)
 var id := ""
 var hidden := false
 var poison := false
@@ -17,8 +22,20 @@ var reveal_t := 0.0
 
 func big() -> bool: return BIG.has(type)
 func is_cheese() -> bool: return not is_find and type != "crumb"
-func weight() -> int: return 0 if is_find else (3 if big() else (1 if type == "crumb" else 2))
-func value() -> int: return 0 if (is_find or poison) else (6 if big() else (1 if type == "crumb" else 5))
+func weight() -> int: return 0 if is_find else (3 if big() else (1 if LIGHT.has(type) else 2))
+func value() -> int: return 0 if (is_find or poison) else (6 if big() else (1 if type == "crumb" else (2 if LIGHT.has(type) else 5)))
+
+
+## Floor presence per type: pieces and small foods sit bigger than life so they READ as food.
+static func world_scale(t: String) -> float:
+	match t:
+		"wedge": return 0.62
+		"slice": return 0.55
+		"chunk": return 0.85
+		"crumb": return 0.9
+	if BIG.has(t):
+		return 1.12
+	return 1.22
 
 
 func make_poison() -> void:
@@ -33,6 +50,25 @@ func make_poison() -> void:
 				m.set_surface_override_material(i, c)
 
 
+## Fling this food sideways off whatever it was on: an arc to a floor point 0.35–0.55 m to the
+## side, so a dropped sausage never wedges at a table's base (round 5, playtest: it stuck there).
+func toss_scatter() -> void:
+	var from := global_position
+	var side := Vector3(randf_range(-1.0, 1.0), 0, randf_range(-1.0, 1.0)).normalized()
+	if side.length() < 0.1:
+		side = Vector3.RIGHT
+	var at := from + side * randf_range(0.35, 0.55)
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 3.0)
+	var hit := space.intersect_ray(q)
+	if not hit.is_empty():
+		at = hit.position
+	set_meta("dropped_at", at)
+	var tw := create_tween()
+	tw.tween_method(func(t: float): global_position = from.lerp(at, t) + Vector3.UP * sin(t * PI) * 0.16, 0.0, 1.0, 0.38)
+	tw.tween_callback(func(): rotation = Vector3(0, randf() * TAU, 0))
+
+
 func _process(dt: float) -> void:
 	if reveal_t > 0.0:
 		reveal_t -= dt
@@ -42,7 +78,10 @@ func _process(dt: float) -> void:
 
 static func model_for(t: String) -> String:
 	match t:
-		"crumb": return "food/crumb"
+		"wedge": return "food/cheese"
+		"slice": return "food/pizza_slice"
+		"chunk": return "food/rusk"
+		"crumb": return "food/rusk"
 		"sausage", "salami": return "food/sausage"
 		"chicken": return "food/chicken_leg"
 		"pizza": return "food/pizza_slice"

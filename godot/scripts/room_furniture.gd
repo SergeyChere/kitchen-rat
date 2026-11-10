@@ -149,6 +149,9 @@ func build(list: Array) -> void:
 			"coffeeTable":
 				place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
+				# round 5: something to hide AMONG under the coffee table, not bare floor
+				# (at the zone's edge — the middle stays clear for her)
+				b.collide(b.spawn("props/small_box", W(float(f.x) + 26.0, float(f.y) + float(f.h) / 2.0), 12.0, b.furn))
 			"bench":
 				place("furniture/workbench", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
@@ -235,6 +238,37 @@ func build(list: Array) -> void:
 		b.furn.add_child(nl)
 		nl.global_position = W(ax, ay, 16)
 		light(W(ax, ay, 30), Color(1.0, 0.58, 0.28), 0.65, 2.6, "steady")
+		# round 5: a garland along the south wall — coloured bulbs chasing each other (the game
+		# pulses their emission and the one real light among them, kind "garland")
+		var wire := MeshInstance3D.new()
+		wire.name = "Garland wire"
+		var wm := BoxMesh.new()
+		wm.size = Vector3(7.5, 0.008, 0.008)
+		wire.mesh = wm
+		wire.material_override = b.mat(Color(0.05, 0.05, 0.06))
+		b.furn.add_child(wire)
+		wire.global_position = W(480, 588, 234)
+		var bulb_cols := [Color(1, 0.3, 0.2), Color(1, 0.75, 0.25), Color(0.35, 1, 0.45), Color(0.35, 0.55, 1)]
+		var bi := 0
+		for bx in range(120, 871, 45):
+			var bmat := StandardMaterial3D.new()
+			var bc: Color = bulb_cols[bi % bulb_cols.size()]
+			bmat.albedo_color = bc
+			bmat.emission_enabled = true
+			bmat.emission = bc
+			bmat.emission_energy_multiplier = 1.2
+			var bulb := MeshInstance3D.new()
+			bulb.name = "Garland bulb"
+			var sm := SphereMesh.new()
+			sm.radius = 0.021
+			sm.height = 0.042
+			bulb.mesh = sm
+			bulb.material_override = bmat
+			b.furn.add_child(bulb)
+			bulb.global_position = W(bx, 588, 228)
+			g.garland.append([bmat, float(bi) * 0.9])
+			bi += 1
+		light(W(480, 585, 205), Color(1.0, 0.8, 0.55), 1.05, 5.2, "garland")
 
 
 # ---------- decor ----------
@@ -270,7 +304,10 @@ func _hang(models: Array) -> void:
 				tall = true
 		if tall:
 			continue
-		_art(models[i], x, 175.0)
+		if models[i] == "rooms/wall_clock":
+			b.add_working_clock(W(x, 4, 175), 0.0)  # round 5: working hands, the night's real time
+		else:
+			_art(models[i], x, 175.0)
 		i += 1
 
 
