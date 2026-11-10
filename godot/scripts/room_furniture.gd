@@ -210,6 +210,31 @@ func build(list: Array) -> void:
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)
+	# round 3: a plug-in night light in the living rooms — a small warm source you can actually see
+	# by the wall, so the room's light reads: moon from the window, this amber glow below
+	var living := false
+	var anchor: Dictionary = {}
+	for f2 in list:
+		if str(f2.t) in ["sofa", "tvStand", "armchair"]:
+			living = true
+		if str(f2.t) == "tvStand":
+			anchor = f2
+	if living:
+		var af: Dictionary = anchor if not anchor.is_empty() else list[0]
+		var ax := float(af.x) + float(af.get("w", 40)) / 2.0
+		var ay := float(af.y) + float(af.get("h", 40)) + 6.0
+		var nl_mat := StandardMaterial3D.new()
+		nl_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		nl_mat.albedo_color = Color(1.0, 0.62, 0.3)
+		var nl := MeshInstance3D.new()
+		nl.name = "Night light"
+		var nm := BoxMesh.new()
+		nm.size = Vector3(0.07, 0.1, 0.04)
+		nl.mesh = nm
+		nl.material_override = nl_mat
+		b.furn.add_child(nl)
+		nl.global_position = W(ax, ay, 16)
+		light(W(ax, ay, 30), Color(1.0, 0.58, 0.28), 0.65, 2.6, "steady")
 
 
 # ---------- decor ----------

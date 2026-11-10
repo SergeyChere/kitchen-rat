@@ -11,6 +11,7 @@ var _mat: ShaderMaterial
 var _threat := 0.0      # 0…1, eased
 var _beat_t := 0.0
 var _pulse := 0.0       # flashes with each heartbeat
+var beats := 0          # heartbeat count (the tester reads it; the pulse is what the player sees)
 var _was_chased := false
 var _slow_until := 0.0
 var _lp: AudioEffectLowPassFilter
@@ -99,7 +100,7 @@ func _process(_dt: float) -> void:
 			near = maxf(near, nn)
 			if is_chase: chaser_near = maxf(chaser_near, nn)
 	if chased and not _was_chased:
-		slowmo(0.3, 0.4)  # spotted!
+		# round 3: no slow motion on being spotted (asked for) — the heartbeat throb below carries it
 		g.cam.shake(0.25)
 	_was_chased = chased
 	# a chase is never mild, but how bad it feels now scales with how close the hunter actually is
@@ -115,10 +116,12 @@ func _process(_dt: float) -> void:
 			_beat_t = lerpf(1.0, 0.34, _threat)
 			Sfx.play("heartbeat", null, lerpf(-15.0, -0.5, _threat), 1.0, 0.0)
 			_pulse = 1.0
+			beats += 1
 	else:
 		_beat_t = 0.0
-	_pulse = move_toward(_pulse, 0.0, real_dt * 4.0)
-	_mat.set_shader_parameter("amount", clampf(_threat * 0.85 + _pulse * _threat * 0.30, 0.0, 1.0))
+	_pulse = move_toward(_pulse, 0.0, real_dt * 3.2)
+	# the red edge throbs with the heartbeat: every beat (_pulse = 1) swells it, then it ebbs away
+	_mat.set_shader_parameter("amount", clampf(_threat * 0.68 + _pulse * _threat * 0.45, 0.0, 1.0))
 	# hiding: the room sounds muffled
 	if _lp:
 		var target := 900.0 if g.rat.hidden() else 20000.0

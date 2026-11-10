@@ -285,10 +285,27 @@ func on_top(x: float, y: float) -> Vector3:
 ## when it has been generated into assets/textures/, the flat colour until then — so the game never breaks
 ## on a missing texture. Names: wood, wood_dark, fabric, leather, ceramic_tile, metal_matte, cardboard,
 ## plastic, counter_stone.
+## How each named surface behaves as a material: [roughness, metallic]. Round 3: every surface is
+## finished on its own instead of sharing the toon defaults — tile and stone are smooth enough to
+## catch the moon patch, metal conducts, fabric and cardboard drink the light.
+const SURFACE_PROPS := {
+	"wood": [0.72, 0.0], "wood_dark": [0.78, 0.0], "fabric": [0.96, 0.0], "leather": [0.55, 0.0],
+	"ceramic_tile": [0.3, 0.0], "metal_matte": [0.38, 0.65], "cardboard": [0.92, 0.0],
+	"plastic": [0.5, 0.0], "counter_stone": [0.27, 0.0],
+}
+
+
+static func surface_props(tex_name: String) -> Array:
+	return SURFACE_PROPS.get(tex_name, [0.85, 0.0])
+
+
 func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> StandardMaterial3D:
 	if ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
 		var m := mat(color, tex_name, tiling)
 		m.set_meta("tile_m", 0.5)  # one texture tile ~ 0.5 m: box() scales the UV by the box size
+		var p := surface_props(tex_name)
+		m.roughness = float(p[0])
+		m.metallic = float(p[1])
 		return m
 	return mat(color)
 
@@ -312,6 +329,9 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 			t.albedo_texture = tex
 			t.albedo_color = c
 			t.uv1_scale = Vector3(2.0, 2.0, 1.0)
+			var p := surface_props(tex_name)
+			t.roughness = float(p[0])
+			t.metallic = float(p[1])
 			m.set_surface_override_material(i, t)
 
 
@@ -467,6 +487,7 @@ func _room() -> void:
 		# demo polish: real tile (tools/make_textures.py) instead of the placeholder pattern, tinted down
 		# to the old floor's tone (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before
 		floor_mat = mat(Color(0.30, 0.32, 0.45), "ceramic_tile", Vector2(6, 3.75))
+		floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	var trim := mat(hex(0x7a4a2a))
 
@@ -522,6 +543,14 @@ func _room() -> void:
 	for j in 5: _wall(east[j] if east[j] else "wall_section", 965, 60 + 120 * j, -90.0, walls, wall_mat)
 	for p in [Vector2(-5, -5), Vector2(965, -5), Vector2(-5, 605), Vector2(965, 605)]:
 		box("Corner", W(p.x, p.y, 125), Vector3(0.1, 2.5, 0.1), trim, walls)
+	if float(win.get("w", 0)) > 0.0:
+		# round 3: a living sky outside the window — the moon, clouds drifting past it, branches
+		# swaying (window_sky.gd). The clouds also dim the moonlight itself, via Game.moon_cloud.
+		var sky := WindowSky.new()
+		sky.name = "Window sky"
+		root.add_child(sky)
+		sky.global_position = Vector3(W(float(win.x) + float(win.w) / 2.0, 0).x, 0.0, -3.02)
+		sky.build_sky(g, hash(str(night.get("id", "night"))))
 
 	var lamp := str(night.get("lamp", ""))
 	var shade := spawn("rooms/chandelier" if lamp == "chandelier" else ("rooms/lamp_bulb" if lamp == "bulb" else "rooms/lamp_shade"), W(480, 300), 0.0, decor)
@@ -598,6 +627,30 @@ func _kitchen_upper() -> void:
 				var bb := world_aabb(c)
 				c.global_position += W(blk[0] + cw * (i + 0.5), 17.5, 145) - Vector3(bb.get_center().x, bb.position.y, bb.get_center().z)
 				collide_box(c, "cabinet")
+	# round 3: under-cabinet strip lights — a warm source you can see, washing the worktop, so the
+	# kitchen's light reads: cold moon from the window, warm strips over the counter
+	var strip_mat := StandardMaterial3D.new()
+	strip_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	strip_mat.albedo_color = Color(1.0, 0.8, 0.52)
+	for blk2 in [[0.0, 400.0], [640.0, 830.0]]:
+		var bcx: float = (float(blk2[0]) + float(blk2[1])) / 2.0
+		var strip := MeshInstance3D.new()
+		strip.name = "Cabinet light strip"
+		var sm := BoxMesh.new()
+		sm.size = Vector3((float(blk2[1]) - float(blk2[0])) / 100.0 * 0.92, 0.015, 0.05)
+		strip.mesh = sm
+		strip.material_override = strip_mat
+		furn.add_child(strip)
+		strip.global_position = W(bcx, 30, 143)
+		var spot := SpotLight3D.new()
+		spot.name = "Cabinet spot"
+		spot.light_color = Color(1.0, 0.76, 0.47)
+		spot.light_energy = 1.5
+		spot.spot_range = 1.7
+		spot.spot_angle = 58.0
+		spot.rotation_degrees = Vector3(-90, 0, 0)
+		furn.add_child(spot)
+		spot.global_position = W(bcx, 30, 141)
 	var wood := mat_named("wood", hex(0x8a5a34))
 	box("Shelf over the window", W(520, 13, 213.5), Vector3(2.4, 0.03, 0.26), wood, furn).get_child(0).set_meta("surface", "shelf")
 	for sh in [[195.0, 138.5], [100.0, 178.5]]:  # [y centre, top − 1.5]

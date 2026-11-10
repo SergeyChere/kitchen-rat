@@ -981,9 +981,10 @@ func _juice(host: Node) -> void:
 		g.cat.mode = CatAI.Mode.CHASE
 		await host.get_tree().process_frame
 		await host.get_tree().process_frame
-		var slowed := Engine.time_scale < 1.0
+		var beats0: int = g.feel.beats
 		await _wait(host, 0.6)
-		_check("spotted: a moment of slow motion", slowed)
+		_check("spotted: no slow motion any more", Engine.time_scale == 1.0, "scale %.2f" % Engine.time_scale)
+		_check("chased: the heartbeat is beating", g.feel.beats > beats0, "beats %d -> %d" % [beats0, g.feel.beats])
 		_check("chased: the screen edge goes red", float(g.feel._mat.get_shader_parameter("amount")) > 0.1, "%.2f" % float(g.feel._mat.get_shader_parameter("amount")))
 		g.cat.mode = CatAI.Mode.SLEEP
 	# hiding muffles the room

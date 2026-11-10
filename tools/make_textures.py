@@ -123,13 +123,17 @@ def wood(size, seed, base=(138, 90, 52), dark=(96, 58, 30), light=(172, 122, 76)
                 col = tuple(lerp(col[i], dark[i], (1 - d / 0.12) * ring * 0.8)
                             for i in range(3))
         fine = n2.at(u * 16, v * 16) * 0.12
-        return tuple(clamp(c + (fine - 0.06) * 255 * 0.4) for c in col)
+        col = tuple(c + (fine - 0.06) * 255 * 0.4 for c in col)
+        # fine pores along the grain: v*48 with period 2 (48 is a multiple of 2, so it still tiles)
+        pore = n_g.at(u * 2 + wobble, v * 48) * 0.07
+        return tuple(clamp(c * (0.965 + pore)) for c in col)
 
     return make_image(size, fn)
 
 
 def fabric(size, seed, base=(96, 104, 96)):
     n = Noise(seed, period=16)
+    mottle = Noise(seed + 7, period=4)  # at(u*4, v*4): 4 is a multiple of 4
 
     def fn(u, v):
         # woven threads: alternating over/under pattern + fibre noise
@@ -137,7 +141,9 @@ def fabric(size, seed, base=(96, 104, 96)):
         tv = 0.5 + 0.5 * math.sin(v * math.pi * 2 * 32)
         weave = 0.85 + 0.15 * (tu * tv)
         fuzz = n.at(u * 32, v * 32) * 0.25  # 32 is a multiple of period 16
-        return shade(base, weave * (0.85 + fuzz))
+        # broad worn patches, so a whole sofa does not read as one flat weave
+        patch = 0.93 + mottle.at(u * 4, v * 4) * 0.12
+        return shade(base, weave * (0.85 + fuzz) * patch)
 
     return make_image(size, fn)
 
@@ -149,7 +155,12 @@ def leather(size, seed, base=(122, 74, 52)):
     def fn(u, v):
         blotch = n.fbm(u * 6, v * 6, 3)  # 6 is a multiple of period 6
         grain = n2.at(u * 24, v * 24)  # 24 is a multiple of period 24
-        f = 0.8 + blotch * 0.35 + (grain - 0.5) * 0.12
+        # pebbled cells: two crossed waves warped by the blotch noise (22 full
+        # cycles across the tile, so the pattern wraps exactly)
+        warp = blotch * 5.0
+        peb = (math.sin(u * math.pi * 2 * 22 + warp) *
+               math.sin(v * math.pi * 2 * 22 + warp * 0.7))
+        f = 0.8 + blotch * 0.35 + (grain - 0.5) * 0.12 + peb * 0.045
         return shade(base, f)
 
     return make_image(size, fn)
@@ -164,27 +175,41 @@ def ceramic_tile(size, seed, base=(214, 210, 198), grout=(120, 116, 108)):
     # is a grout line, exactly like every internal tile boundary.
     tiles = 4
     phase = (seed % tiles) * math.pi / 2
+    glaze = Noise(seed + 3, period=4)   # at(u*4, v*4): within-tile clouding
+    gnoise = Noise(seed + 8, period=8)  # at(u*8, v*8): grout is not uniform either
+    rng = random.Random(seed + 13)
+    speck = [(rng.random(), rng.random()) for _ in range(46)]
 
     def fn(u, v):
         tu, tv = u * tiles, v * tiles
         fx, fy = tu - int(tu), tv - int(tv)
-        if fx < 0.06 or fy < 0.06:  # grout lines
-            return grout
+        if fx < 0.06 or fy < 0.06:  # grout lines, slightly irregular
+            return shade(grout, 0.88 + gnoise.at(u * 8, v * 8) * 0.24)
         ti, tj = int(tu) % tiles, int(tv) % tiles
         s = (0.92 + 0.05 * math.cos(2 * math.pi * ti / tiles + phase)
              + 0.05 * math.cos(2 * math.pi * tj / tiles + phase))
-        return shade(base, s)
+        col = shade(base, s * (0.965 + glaze.at(u * 4, v * 4) * 0.06))
+        for sx, sy in speck:  # kiln speckles, toroidal so they tile
+            if wrap_dist(u, sx) < 0.003 and wrap_dist(v, sy) < 0.003:
+                return shade(col, 0.82)
+        return col
 
     return make_image(size, fn)
 
 
 def metal_matte(size, seed, base=(168, 170, 174)):
     n = Noise(seed, period=2)  # brushed: u*40, v*2 — multiples of 2
+    rng = random.Random(seed + 6)
+    scratches = [rng.random() for _ in range(7)]
 
     def fn(u, v):
         # brushed vertically: long streaks, almost no horizontal variation
         streak = n.fbm(u * 40, v * 2, 3)
-        return shade(base, 0.9 + streak * 0.18)
+        f = 0.9 + streak * 0.18
+        for sx in scratches:  # a few fine vertical scratches, toroidal in u
+            if wrap_dist(u, sx) < 0.0016:
+                f *= 0.84
+        return shade(base, f)
 
     return make_image(size, fn)
 
@@ -195,7 +220,9 @@ def cardboard(size, seed, base=(178, 140, 96)):
     flecks = [(rng.random(), rng.random()) for _ in range(60)]
 
     def fn(u, v):
-        f = 0.85 + n.fbm(u * 6, v * 6, 3) * 0.3
+        # the fluting underneath shows through as faint horizontal bands
+        flute = 1.0 + math.sin(v * math.pi * 2 * 18) * 0.028
+        f = (0.85 + n.fbm(u * 6, v * 6, 3) * 0.3) * flute
         col = shade(base, f)
         for fx, fy in flecks:
             # toroidal distance: a fleck cut by one edge continues on the other
@@ -208,9 +235,12 @@ def cardboard(size, seed, base=(178, 140, 96)):
 
 def plastic(size, seed, base=(226, 224, 218)):
     n = Noise(seed, period=8)
+    peel = Noise(seed + 2, period=32)  # at(u*32, v*32): orange-peel grain
 
     def fn(u, v):
-        return shade(base, 0.96 + n.at(u * 8, v * 8) * 0.07)
+        f = 0.96 + n.at(u * 8, v * 8) * 0.07
+        f *= 0.985 + peel.at(u * 32, v * 32) * 0.03
+        return shade(base, f)
 
     return make_image(size, fn)
 
@@ -220,7 +250,8 @@ def counter_stone(size, seed, base=(188, 186, 180)):
     n2 = Noise(seed + 3, period=16)
     rng = random.Random(seed + 4)
     speck = [(rng.random(), rng.random(), rng.random() < 0.5)
-             for _ in range(500)]
+             for _ in range(900)]
+    flecks = [(rng.random(), rng.random()) for _ in range(26)]
 
     def fn(u, v):
         vein = n.fbm(u * 3 + 2.5, v * 3, 3)
@@ -229,6 +260,9 @@ def counter_stone(size, seed, base=(188, 186, 180)):
         for sx, sy, dark in speck:
             if wrap_dist(u, sx) < 0.0025 and wrap_dist(v, sy) < 0.0025:
                 return (90, 88, 84) if dark else (235, 233, 228)
+        for fx, fy in flecks:  # larger quartz flecks
+            if wrap_dist(u, fx) < 0.006 and wrap_dist(v, fy) < 0.006:
+                return (208, 204, 196)
         return col
 
     return make_image(size, fn)

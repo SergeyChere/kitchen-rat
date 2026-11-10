@@ -105,6 +105,7 @@ var _mud := 0.0
 var _light_mul := 1.0
 var _ambient := 1.0
 var _moon_e := 0.5
+var moon_cloud := 1.0  # round 3: how much moon the drifting clouds leave (window_sky.gd writes this)
 
 
 func _init(id := "kitchen") -> void:
@@ -1260,7 +1261,7 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 	if env:
 		env.ambient_light_energy = _ambient * (0.55 if _blackout else 1.0) + _flash_t * 4.0
 	if moon:
-		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) + _flash_t * 5.0
+		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) * moon_cloud + _flash_t * 5.0
 	var bo := float(night.get("blackout", 0))
 	if bo > 0.0 and not _blackout and night_time > float(night.get("seconds", 900)) * bo:
 		_blackout = true

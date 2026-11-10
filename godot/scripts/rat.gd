@@ -820,7 +820,7 @@ func _start_jump(to: Vector3, up: bool) -> void:
 	_dur = clampf(0.3 + _from.distance_to(_to) * 0.35, 0.35, 0.8)
 	if up:
 		_climb_edge = _edge
-		_dur = clampf(0.55 + (_to.y - _from.y) * 0.9, 0.6, 1.1)
+		_dur = clampf(0.42 + (_to.y - _from.y) * 0.5, 0.5, 0.8)  # round 3: brisker — a scramble, not a lift ride
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	if flat.length() > 0.01:
 		rotation.y = Nights.yaw_to(flat)
@@ -890,9 +890,15 @@ func _climb_pos(t: float) -> Vector3:
 		var q := base
 		q.y = _from.y + reach * (0.4 + 0.6 * (t - 0.35) / 0.2)
 		return q
-	var k := (t - 0.55) / 0.45  # the hop: up and over
-	var q := base.lerp(_to, smoothstep(0.0, 1.0, k))
-	q.y = _from.y + reach + (dy - reach) * sin(minf(1.0, k * 1.3) * PI * 0.5)
+	var k := (t - 0.55) / 0.45  # the scramble: up the face first, then over the edge
+	# Round 3: she used to glide diagonally up like on a lift ("she takes off", said the playtest).
+	# Now the horizontal move waits until she is up the face: hind legs push her UP along the side,
+	# front paws over the edge, and only then does she pull herself over — with a small overshoot
+	# at the top and a settle as the hindquarters land.
+	var q := base.lerp(_to, smoothstep(0.45, 1.0, k))
+	var rise := smoothstep(0.0, 0.55, k)
+	var settle := smoothstep(0.55, 1.0, k)
+	q.y = _from.y + reach + (dy - reach) * rise + 0.035 * rise * (1.0 - settle)
 	return q
 
 
@@ -914,8 +920,11 @@ func _pole_pos(t: float) -> Vector3:
 	if t < 0.12:
 		return _from.lerp(base, t / 0.12)
 	if t < 0.78:
+		var kk := (t - 0.12) / 0.66
 		var q := base
-		q.y = lerpf(_from.y, _to.y - 0.04, smoothstep(0.0, 1.0, (t - 0.12) / 0.66))
+		# little grip pulses on the way up: she climbs the leg in pushes, not on a lift
+		var push := smoothstep(0.0, 1.0, kk) + sin(kk * PI * 3.0) * 0.012 * sin(kk * PI)
+		q.y = lerpf(_from.y, _to.y - 0.04, clampf(push, 0.0, 1.0))
 		return q
 	var k := (t - 0.78) / 0.22
 	var q := Vector3(base.x, _to.y - 0.04, base.z).lerp(_to, smoothstep(0.0, 1.0, k))
@@ -1022,7 +1031,12 @@ func _climb_tilt(t: float) -> float:
 		return 70.0 * smoothstep(0.4, 1.0, t / 0.35)
 	if t < 0.55:
 		return 70.0
-	return 70.0 * (1.0 - smoothstep(0.0, 1.0, (t - 0.55) / 0.45))
+	var k := (t - 0.55) / 0.45
+	if k < 0.5:  # scrambling up the face: nose still up against it, easing off a little
+		return 70.0 - 10.0 * smoothstep(0.0, 0.5, k)
+	if k < 0.85:  # over the edge: the body rolls forward as the hindquarters come up
+		return lerpf(60.0, -18.0, smoothstep(0.5, 0.85, k))
+	return lerpf(-18.0, 0.0, smoothstep(0.85, 1.0, k))
 
 
 # ---------- animation ----------

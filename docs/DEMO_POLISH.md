@@ -136,3 +136,49 @@ Stronger, and driven by the hunter's distance, as asked:
 - the red edge is stronger (0.85 base + 0.30 pulse, cap 1.0 — was 0.55 + 0.18, cap 0.8) and creeps
   further in from the edges (smoothstep starts at 0.28, was 0.38).
 
+## Round 3 (same day, second look)
+
+### The climb, not the lift (rat.gd)
+Playtest verdict on round 1/2: jumping onto a table / island / countertop still read as taking
+off. The problem was the hop phase of `_climb_pos`: horizontal and vertical progress ran together
+on smoothsteps, so she glided diagonally up at a steady 70° pitch. Now the scramble is split the
+way a real rat does it: horizontal movement waits (`smoothstep(0.45, 1, k)`) while the vertical
+runs first (`smoothstep(0, 0.55, k)`) — she goes UP the face, paws over the edge, then pulls over
+with a 3.5 cm overshoot and settle; `_climb_tilt` rolls the body from nose-up 70° through −18°
+as the hindquarters come over instead of levelling out in mid-air. The whole climb is brisker
+(`_dur` 0.42 + 0.5·dy, cap 0.8 s; was 0.55 + 0.9·dy, cap 1.1 s). Leg climbs (`_pole_pos`) got
+little grip pulses instead of one smooth rise.
+
+### No slow motion when spotted; the red throbs (game_feel.gd, tester.gd)
+The `slowmo(0.3, 0.4)` on chase start is gone (the trap snap and being caught keep theirs). The
+red edge now pulses with the heartbeat itself: each beat sets `_pulse = 1` and the vignette is
+`0.68·threat + 0.45·pulse·threat`, decaying at 3.2/s — a swell on every beat, ebbing between.
+GameFeel counts `beats`; the juice test now asserts *no* slow motion, a beating heart and the
+red edge, instead of the old slow-mo check.
+
+### Every surface finished on its own (level_builder.gd, tools/make_textures.py)
+Materials stopped sharing the toon defaults: `SURFACE_PROPS` gives each named surface its own
+roughness/metallic, applied in `mat_named()` and `apply_texture()` — ceramic tile 0.30 and
+counter stone 0.27 roughness (the moon patch reads on them), metal 0.38/0.65 metallic, leather
+0.55, plastic 0.50, wood 0.72–0.78, fabric 0.96, cardboard 0.92. The generator's textures each
+grew their own detail: pores along the wood grain, worn patches over the fabric weave, pebbled
+cells in the leather, glaze clouding + kiln speckles + irregular grout in the ceramic, fine
+scratches in the brushed metal, flute bands under the cardboard, orange-peel in the plastic,
+denser speckle and quartz flecks in the stone. All still tile (the built-in check passes) and
+are byte-reproducible from the fixed seeds.
+
+### A living sky (new: godot/scripts/window_sky.gd)
+Every night with a window gets a sky outside the north wall: an unshaded moon with a halo,
+three dark clouds drifting across it, and near-black branch silhouettes in the top corner
+swaying on two sine waves (they cast shadows, so their movement can ghost through the light
+patch). The clouds write `Game.moon_cloud` from how much of the moon they cover, and game.gd
+multiplies the moonlight by it — the moon dims to ~22% under a cloud and comes back, disc,
+halo and floor patch together.
+
+### Light you can read (level_builder.gd, room_furniture.gd)
+Two new secondary sources, both with a visible fixture: under-cabinet strip lights in the
+kitchens (emissive strip + warm SpotLight, 1.5 energy, over each cabinet block, washing the
+worktop) and a plug-in night light in the living rooms (amber emissive box by the TV wall +
+steady OmniLight 0.65). The rooms now read as: cold moon from the window, warm practicals
+inside — the It Takes Two rule that you always see what is lit by what.
+
