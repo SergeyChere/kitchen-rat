@@ -41,7 +41,7 @@ static func side_rot(s: String) -> float:
 
 
 ## A model fitted to the rect (its front toward the room), with collision and a surface id.
-func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = null) -> Node3D:
+func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = null, tex := "") -> Node3D:
 	var x := float(f.x); var y := float(f.y)
 	var w := float(f.get("w", 0)); var d := float(f.get("h", 0))
 	var r: float = rot if rot != null else side_rot(side(x, y, w, d))
@@ -55,6 +55,11 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 	if height > 0.0:
 		_fit_height(n, height)
 	b.collide(n, surface)
+	if tex != "":
+		# demo polish: a real surface for the model (fabric sofa, cardboard box, ...), tinted by the
+		# night's own colour for the piece when it has one
+		var tint := LevelBuilder.hex(int(f.get("color", 0xffffff))) if f.has("color") else Color.WHITE
+		b.apply_texture(n, tex, tint)
 	return n
 
 
@@ -119,12 +124,12 @@ func build(list: Array) -> void:
 				for i in n:
 					var seg := {"x": x + w / n * i, "y": y, "w": w / n, "h": d}
 					place("furniture/counter_section", seg, "counter", 0.0, 0.0)
-			"fridge": place("furniture/fridge", f, "fridge")
+			"fridge": place("furniture/fridge", f, "fridge", 0.0, null, "metal_matte")
 			"island": place("furniture/kitchen_island", f, "island", 0.0, 180.0)
 			"box":
 				var ht := float(f.get("ht", 44))
-				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht)
-			"crate": place("furniture/crate", f, "crate", float(f.get("ht", 40)))
+				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht, null, "cardboard")
+			"crate": place("furniture/crate", f, "crate", float(f.get("ht", 40)), null, "wood_dark")
 			"table":
 				var ht := float(f.get("ht", 79))
 				var model := "furniture/table_dining" if bool(f.get("dining", false)) else "furniture/table_kitchen"
@@ -142,10 +147,10 @@ func build(list: Array) -> void:
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)
 			"coffeeTable":
-				place("furniture/coffee_table", f, "table", 0.0, 0.0)
+				place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
 			"bench":
-				place("furniture/workbench", f, "table", 0.0, 0.0)
+				place("furniture/workbench", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
 			"chair":
 				var cf := {"x": x, "y": y, "w": 32, "h": 32}
@@ -167,41 +172,41 @@ func build(list: Array) -> void:
 			"sofa", "armchair":
 				var face := str(f.get("face", "s"))
 				var r := 180.0 if face == "n" else (90.0 if face == "e" else (-90.0 if face == "w" else 0.0))
-				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r)
+				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
 				hide("sofa", f, 12.0)
 				low_roof(f, 4.0)
 			"wall":
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)
 			"tvStand":
-				place("furniture/tv_stand", f, "tv")
+				place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
 				var tv := light(W(cx, y + d + 70, 90), Color(0.56, 0.7, 1.0), 1.6, 4.6, "tv")
 				g.tv_light = tv
 				tv.visible = not bool(g.night.get("tvOff", false))
-			"bookcase": place("furniture/bookcase", f, "bookcase")
+			"bookcase": place("furniture/bookcase", f, "bookcase", 0.0, null, "wood_dark")
 			"fireplace":
 				place("furniture/fireplace", f, "fireplace")
 				var out := W(x + w + 30, cy, 40) if side(x, y, w, d) == "w" else W(cx, cy, 40)
 				light(out, Color8(0xff, 0x8a, 0x3a), 2.2, 4.2)
-			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)))
+			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
 				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
 				light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
 			"plant": b.collide(b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn))
-			"washer": place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer")
-			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)))
+			"washer": place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)), null, "plastic")
 			"cans": place("furniture/cans_stack", f, "cans", float(f.get("ht", 30)))
-			"shelfUnit": place("furniture/shelf_unit", f, "shelf")
+			"shelfUnit": place("furniture/shelf_unit", f, "shelf", 0.0, null, "wood")
 			"boiler":
 				place("furniture/boiler", f, "boiler", 0.0, -90.0 if x > 480.0 else 90.0)
 				light(W(cx - 50, cy, 40), Color8(0xff, 0x8a, 0x3a), 1.4, 3.0)
-			"sideboard": place("furniture/sideboard", f, "sideboard")
+			"sideboard": place("furniture/sideboard", f, "sideboard", 0.0, null, "wood_dark")
 			"cabinetTall":
 				# modelled long along its own Z, front toward +X: as is against the west wall
 				var n := b.spawn("furniture/cabinet_tall", W(cx, cy), 0.0 if x < 480.0 else 180.0, b.furn)
 				b.fit(n, w, d)
 				b.collide(n)
-			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0)
+			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)

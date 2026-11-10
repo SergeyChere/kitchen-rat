@@ -23,7 +23,7 @@ uniform vec4 tint : source_color = vec4(0.32, 0.0, 0.03, 1.0);
 void fragment() {
 	vec2 uv = UV - 0.5;
 	float d = length(uv * vec2(1.5, 1.0));
-	float v = smoothstep(0.38, 0.92, d);
+	float v = smoothstep(0.28, 0.92, d);
 	COLOR = vec4(tint.rgb, v * amount);
 }
 """
@@ -84,35 +84,41 @@ func _process(_dt: float) -> void:
 		return
 	var chased := false
 	var near := 0.0
+	var chaser_near := 0.0
 	for a in [g.cat, g.owner_ai, g.dog]:
 		if a == null or not is_instance_valid(a) or not (a as Node3D).visible:
 			continue
 		var m: int = a.get("mode")
-		if a is CatAI and m == CatAI.Mode.CHASE: chased = true
-		elif a is OwnerAI and m == OwnerAI.Mode.CHASE: chased = true
-		elif a is DogAI and m == DogAI.Mode.CHASE: chased = true
+		var is_chase := (a is CatAI and m == CatAI.Mode.CHASE) or (a is OwnerAI and m == OwnerAI.Mode.CHASE) or (a is DogAI and m == DogAI.Mode.CHASE)
+		if is_chase: chased = true
 		var awake := not (a is CatAI) or (a as CatAI).awake()
 		if awake:
-			near = maxf(near, clampf((2.2 - (a as Agent).dist_rat()) / 1.6, 0.0, 1.0))
+			# demo polish: the danger is felt from farther out (3.4 m, was 2.2) and the curve is steeper,
+			# so the last metre before a catch counts much more than a hunter across the room
+			var nn := pow(clampf((3.4 - (a as Agent).dist_rat()) / 2.6, 0.0, 1.0), 1.5)
+			near = maxf(near, nn)
+			if is_chase: chaser_near = maxf(chaser_near, nn)
 	if chased and not _was_chased:
 		slowmo(0.3, 0.4)  # spotted!
 		g.cam.shake(0.25)
 	_was_chased = chased
-	var want := 1.0 if chased else near * 0.7
+	# a chase is never mild, but how bad it feels now scales with how close the hunter actually is
+	var want := clampf(0.72 + 0.38 * chaser_near, 0.0, 1.0) if chased else near * 0.85
 	if g.rat.hidden():
 		want *= 0.4
-	_threat = move_toward(_threat, want, real_dt * (2.5 if want > _threat else 0.8))
-	# heartbeat: faster and louder the closer the danger
-	if _threat > 0.12:
+	_threat = move_toward(_threat, want, real_dt * (4.5 if want > _threat else 1.1))
+	# heartbeat: faster and louder the closer the danger (demo polish: it starts earlier, beats faster
+	# at the top end and plays louder — at full threat it is the loudest quiet sound in the game)
+	if _threat > 0.08:
 		_beat_t -= real_dt
 		if _beat_t <= 0.0:
-			_beat_t = lerpf(1.05, 0.42, _threat)
-			Sfx.play("heartbeat", null, lerpf(-16.0, -3.0, _threat), 1.0, 0.0)
+			_beat_t = lerpf(1.0, 0.34, _threat)
+			Sfx.play("heartbeat", null, lerpf(-15.0, -0.5, _threat), 1.0, 0.0)
 			_pulse = 1.0
 	else:
 		_beat_t = 0.0
 	_pulse = move_toward(_pulse, 0.0, real_dt * 4.0)
-	_mat.set_shader_parameter("amount", clampf(_threat * 0.55 + _pulse * _threat * 0.18, 0.0, 0.8))
+	_mat.set_shader_parameter("amount", clampf(_threat * 0.85 + _pulse * _threat * 0.30, 0.0, 1.0))
 	# hiding: the room sounds muffled
 	if _lp:
 		var target := 900.0 if g.rat.hidden() else 20000.0

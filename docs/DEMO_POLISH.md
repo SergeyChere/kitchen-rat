@@ -96,3 +96,43 @@ Until it runs, `mat_named` quietly falls back to the old flat colours.)
 Then play nights 1–3 and judge three things: does a hop onto the table feel
 steerable, does the camera feel calm rather than twitchy, and in night 3 —
 can you actually escape the cat through a wall path?
+
+## Round 2 (same day, after the first look)
+
+### Textures, properly (plan point 2)
+`LevelBuilder.apply_texture(node, name, tint)` lays a generated texture over a placed model's toon
+materials; `RoomFurniture.place()` gained a `tex` argument, tinted by the night's own `color` for the
+piece when it has one (the tint is divided by the textures' average brightness, ~0.45, so a purple
+sofa stays purple instead of going twice as dark). Wired up: sofa/armchair/ottoman → `fabric`,
+cardboard boxes → `cardboard`, crate/workbench/coffee table/bookcase/side table/tv stand/sideboard →
+`wood_dark` (shelf unit → `wood`), fridge → `metal_matte`, washer/dryer/laundry basket → `plastic`.
+`mat_named()` materials now carry a `tile_m` meta (one tile ≈ 0.5 m) and `box()` duplicates them with
+UV scaled by the box size, so the wood grain keeps its scale on any shelf. Kitchen floors (`pal.floor
+== "tile"`, nights 1 and 5) use the real `ceramic_tile` texture instead of the placeholder
+`floor_tile` pattern, tinted to the old floor's measured tone (0.30, 0.32, 0.45) so the night stays
+exactly as dark. Everything still falls back silently when the PNGs are not generated yet.
+
+Not done: kitchen counters/island keep their model materials — one texture over the whole section
+would turn the cabinet fronts to stone too; they need per-surface work.
+
+### Gravity (rat.gd)
+`gravity` 12.0 → 18.0: she no longer floats on hops and falls. `hop_impulse` 1.7 → 2.08 and
+`hop_hold_force` 6.0 → 9.0 scale with it, so the hop apex is unchanged (2.08²/(2·18) = 1.7²/(2·12));
+the low-roof hop already derives from gravity. Aimed jumps are timed arcs and do not use gravity.
+
+### More tunnels (nights 1–5 + game.gd)
+The demo networks are now complete graphs: every crack links to every other crack (6 pairs in the
+4-crack nights, 3 pairs in the 3-crack nights). Because a crack can now have several exits,
+`use_tunnel()` chooses: farthest exit from whoever is chasing her (cat / owner / dog); with no chase
+on, the first link as before. New helper `_tunnel_exits()`; `_tunnel_from()` keeps its contract.
+
+### The chase feeling (game_feel.gd)
+Stronger, and driven by the hunter's distance, as asked:
+- danger is felt from 3.4 m out (was 2.2 m) with a steeper curve (power 1.5), so the last metre
+  before a catch counts far more;
+- a chase starts at 0.72 threat and rises to 1.0 as the hunter closes in (was a flat 1.0);
+- threat rises faster (4.5/s) and the heartbeat starts earlier (0.08), beats faster at the top
+  (0.34 s, was 0.42 s) and louder (−0.5 dB at full threat, was −3 dB);
+- the red edge is stronger (0.85 base + 0.30 pulse, cap 1.0 — was 0.55 + 0.18, cap 0.8) and creeps
+  further in from the edges (smoothstep starts at 0.28, was 0.38).
+

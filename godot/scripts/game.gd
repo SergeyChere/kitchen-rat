@@ -1102,17 +1102,52 @@ func _tick_sticky(dt: float) -> void:
 			return
 
 
-## The crack the rat stands in, if it leads somewhere through the wall (night tunnels). -1 if none.
-func _tunnel_from() -> int:
+## Every crack linked to the one the rat stands in (demo polish: the demo nights are full networks
+## now, so a crack can have several exits). Empty when she is not in a linked crack.
+func _tunnel_exits() -> Array:
+	var out: Array = []
 	var tl: Array = night.get("tunnels", [])
 	if tl.is_empty() or rat.jumping or rat.global_position.y > 0.05:
-		return -1
+		return out
+	var from := -1
 	for i in cracks.size():
 		if Vector2(cracks[i].x - rat.global_position.x, cracks[i].z - rat.global_position.z).length() < 0.3:
-			for t in tl:
-				if int(t.a) == i: return int(t.b)
-				if int(t.b) == i: return int(t.a)
-	return -1
+			from = i
+			break
+	if from < 0:
+		return out
+	for t in tl:
+		if int(t.a) == from and not out.has(int(t.b)):
+			out.append(int(t.b))
+		elif int(t.b) == from and not out.has(int(t.a)):
+			out.append(int(t.a))
+	return out
+
+
+## The crack the rat stands in, if it leads somewhere through the wall (night tunnels). -1 if none.
+## With several exits she takes the one farthest from whoever is chasing her (the cat, the owner,
+## the dog) — a tunnel is an escape first. Nobody chasing: the first link, as before.
+func _tunnel_from() -> int:
+	var exits := _tunnel_exits()
+	if exits.is_empty():
+		return -1
+	var hunter: Node3D = null
+	if cat and cat.mode == CatAI.Mode.CHASE:
+		hunter = cat
+	elif owner_ai and owner_ai.mode == OwnerAI.Mode.CHASE:
+		hunter = owner_ai
+	elif dog and dog.mode == DogAI.Mode.CHASE:
+		hunter = dog
+	if hunter == null:
+		return int(exits[0])
+	var best := -1
+	var best_d := -1.0
+	for e in exits:
+		var d := (cracks[int(e)] as Vector3).distance_squared_to(hunter.global_position)
+		if d > best_d:
+			best_d = d
+			best = int(e)
+	return best
 
 
 ## Called by the rat when Space is pressed: crawl through the wall if she's in a linked crack.

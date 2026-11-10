@@ -287,8 +287,32 @@ func on_top(x: float, y: float) -> Vector3:
 ## plastic, counter_stone.
 func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> StandardMaterial3D:
 	if ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
-		return mat(color, tex_name, tiling)
+		var m := mat(color, tex_name, tiling)
+		m.set_meta("tile_m", 0.5)  # one texture tile ~ 0.5 m: box() scales the UV by the box size
+		return m
 	return mat(color)
+
+
+## Give a placed model a real surface (demo polish, plan point 2): the generated texture laid over its
+## toon materials, tinted by `tint` (the furniture's own colour from the night data, white = as authored).
+## The tint is divided by the textures' average brightness (~0.45), so the result lands near the
+## requested colour instead of going twice as dark. No texture file -> no change at all.
+func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
+	if n == null or not ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
+		return
+	var tex := load("res://assets/textures/" + tex_name + ".png") as Texture2D
+	var c := Color(clampf(tint.r / 0.45, 0.0, 1.0), clampf(tint.g / 0.45, 0.0, 1.0), clampf(tint.b / 0.45, 0.0, 1.0))
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			if src == null:
+				continue
+			var t := src.duplicate() as BaseMaterial3D
+			t.albedo_texture = tex
+			t.albedo_color = c
+			t.uv1_scale = Vector3(2.0, 2.0, 1.0)
+			m.set_surface_override_material(i, t)
 
 
 func mat(color: Color, texture := "", tiling := Vector2.ONE) -> StandardMaterial3D:
@@ -308,7 +332,14 @@ func box(name: String, center: Vector3, size: Vector3, m: Material, parent: Node
 	var bm := BoxMesh.new()
 	bm.size = size
 	mi.mesh = bm
-	mi.material_override = m
+	if m is StandardMaterial3D and (m as StandardMaterial3D).has_meta("tile_m"):
+		# a named material: keep the grain/weave scale constant whatever the box size (demo polish)
+		var tile: float = (m as StandardMaterial3D).get_meta("tile_m")
+		var dup := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
+		dup.uv1_scale = Vector3(maxf(size.x, size.z) / tile, maxf(size.y, size.z) / tile, 1.0)
+		mi.material_override = dup
+	else:
+		mi.material_override = m
 	parent.add_child(mi)
 	mi.global_position = center
 	if solid:
@@ -432,6 +463,10 @@ func _room() -> void:
 	if not ResourceLoader.exists("res://assets/textures/" + floor_tex + ".png"): floor_tex = "floor_tile"
 	if not ResourceLoader.exists("res://assets/textures/" + wall_tex + ".png"): wall_tex = "wall_stripes"
 	var floor_mat := mat(Color.WHITE, floor_tex, Vector2(6, 3.75))
+	if str(pal.get("floor", "")) == "tile" and ResourceLoader.exists("res://assets/textures/ceramic_tile.png"):
+		# demo polish: real tile (tools/make_textures.py) instead of the placeholder pattern, tinted down
+		# to the old floor's tone (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before
+		floor_mat = mat(Color(0.30, 0.32, 0.45), "ceramic_tile", Vector2(6, 3.75))
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	var trim := mat(hex(0x7a4a2a))
 
