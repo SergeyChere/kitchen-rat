@@ -669,3 +669,28 @@ Two textures from the pack turned out to be wired to NOTHING:
 **Testing.** Import clean; night 1 CI set and walk pass; boots
 nights 2, 4, 8 clean.
 
+## Round 13 — the characters get fur and finishes (2026-11-10)
+
+The rat and the cat shipped as flat colour. Both models have UVs,
+so TextureGen now paints fur: a strand field (fast across the
+grain, slow along it) plus a soft mottle, painted near-white so
+each model's own colour carries the hue; the cat's version adds
+tabby blotches. `_dress_character` in game.gd lays it over the fur
+surfaces only — matched by the model's authored colours — and
+compensates the paint's ~0.8 mean brightness, so the animals keep
+their tuned tones. Markings keep their shape under the same grain;
+bare pink skin (the rat's tail, ears, paws) goes satin, near-black
+surfaces go glossy (wet nose, eyes), and a matching fur normal
+(scale 0.35) lets the light break over the grain.
+
+The owner is different: his file has NO UVs on any surface
+(checked in the GLB), so no texture can map onto him at all. His
+upgrade is per-surface finish — skin slightly sheened, dark hair
+glossier than cloth, cloth matte. A genuinely new owner (or new
+geometry for any of them) needs the model file itself replaced
+locally: the push channel carries text only, and the animation
+clips live in these rigs.
+
+**Testing.** Import clean; night 1 CI set and walk pass; stride
+nights 2 and 7, cat night 5 pass.
+

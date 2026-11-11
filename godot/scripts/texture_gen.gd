@@ -12,7 +12,7 @@ const S := 256
 
 ## All paintable material names (the shaft gradient is separate: make("shaft")).
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
-	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese"]
+	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese", "fur_rat", "fur_cat"]
 
 
 static func make(tex_name: String) -> Texture2D:
@@ -38,6 +38,10 @@ static func make_image(tex_name: String) -> Image:
 		"counter_stone": img = _stone()
 		"cheese": img = _cheese()
 		"cheese_normal": img = _cheese_normal()
+		"fur_rat": img = _fur(211, false)
+		"fur_cat": img = _fur(223, true)
+		"fur_rat_normal": img = _fur_normal(211, false)
+		"fur_cat_normal": img = _fur_normal(223, true)
 		"shaft": img = _shaft()
 		_: return null
 	if img == null:
@@ -367,5 +371,61 @@ static func _cheese_normal() -> Image:
 			var gx := _cheese_dip(u + e, v, holes) - _cheese_dip(u - e, v, holes)
 			var gy := _cheese_dip(u, v + e, holes) - _cheese_dip(u, v - e, holes)
 			var n := Vector3(gx * 1.6, gy * 1.6, 1.0).normalized()
+			_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	return _img(data)
+
+
+## Round 13: fur for the characters. The rat and the cat ship as flat-coloured
+## low-poly; a strand field (fast across the grain, slow along it) plus a soft
+## mottle is painted near-white so the model's own colour carries the hue —
+## the dress pass in game.gd lays it over the fur surfaces only. The cat gets
+## tabby blotches on top. The height is shared with the normal map, so the
+## grain the light catches is the grain the eye sees.
+static func _vn2(u: float, v: float, px: int, py: int, seed: int) -> float:
+	var x := u * px
+	var y := v * py
+	var xi := int(floor(x))
+	var yi := int(floor(y))
+	var xf := x - xi
+	var yf := y - yi
+	var sx := xf * xf * (3.0 - 2.0 * xf)
+	var sy := yf * yf * (3.0 - 2.0 * yf)
+	var a := _h2(wrapi(xi, 0, px), wrapi(yi, 0, py), seed)
+	var b := _h2(wrapi(xi + 1, 0, px), wrapi(yi, 0, py), seed)
+	var c := _h2(wrapi(xi, 0, px), wrapi(yi + 1, 0, py), seed)
+	var d := _h2(wrapi(xi + 1, 0, px), wrapi(yi + 1, 0, py), seed)
+	return lerpf(lerpf(a, b, sx), lerpf(c, d, sx), sy)
+
+
+static func _fur_height(u: float, v: float, seed: int, tabby: bool) -> float:
+	var strand := _vn2(u, v, 64, 6, seed) * 0.65 + _vn2(u, v, 32, 12, seed + 7) * 0.35
+	var h := strand * 0.75 + _vn2(u, v, 5, 5, seed + 13) * 0.25
+	if tabby:
+		h -= 0.30 * smoothstep(0.58, 0.78, _vn2(u, v, 4, 4, seed + 29))
+	return h
+
+
+static func _fur(seed: int, tabby: bool) -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var warm := Color(1.0, 0.99, 0.965)
+	for y in S:
+		for x in S:
+			var h := _fur_height(float(x) / S, float(y) / S, seed, tabby)
+			_put(data, x, y, warm * (0.55 + 0.55 * h))
+	return _img(data)
+
+
+static func _fur_normal(seed: int, tabby: bool) -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var e := 1.5 / S
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			var gx := _fur_height(u + e, v, seed, tabby) - _fur_height(u - e, v, seed, tabby)
+			var gy := _fur_height(u, v + e, seed, tabby) - _fur_height(u, v - e, seed, tabby)
+			var n := Vector3(-gx * 1.1, -gy * 1.1, 1.0).normalized()
 			_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
 	return _img(data)

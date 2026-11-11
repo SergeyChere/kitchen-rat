@@ -251,6 +251,7 @@ func _make_rat() -> void:
 	model.position = Vector3.UP * 0.018  # the paws dip a little in the run and sneak clips
 	rat.anim = ClipPlayer.new(model)
 	rat.model = model
+	_dress_character(model, "rat")  # round 13: fur + finishes
 	var b := LevelBuilder.aabb_of(model)
 	rat.mouth = Node3D.new()
 	var mouth_at := Vector3(0, model.position.y + b.size.y * 0.33, b.end.z - 0.012)  # (a model without a head bone)
@@ -312,12 +313,14 @@ func _make_agents() -> void:
 	var cm := _builder.spawn("characters/cat", Vector3.ZERO, 0.0, cat)
 	cm.position = Vector3.ZERO
 	cat.anim = ClipPlayer.new(cm)
+	_dress_character(cm, "cat")  # round 13: fur + finishes
 	owner_ai = OwnerAI.new()
 	owner_ai.name = "Owner"
 	add_child(owner_ai)
 	var om := _builder.spawn("characters/owner", Vector3.ZERO, 0.0, owner_ai)
 	om.position = Vector3.ZERO
 	owner_ai.anim = ClipPlayer.new(om)
+	_dress_character(om, "owner")  # round 13: finishes (he has no UVs — see below)
 	owner_ai.body = om
 	var fl := SpotLight3D.new()
 	fl.spot_angle = 22.0
@@ -1453,6 +1456,65 @@ func _loose_food() -> int:
 	for f in foods:
 		if not f.carried and not f.is_find: n += 1
 	return n
+
+
+## Round 13: dress a character. The rat and the cat get the painted fur
+## (TextureGen "fur_rat" / "fur_cat") on their fur surfaces — matched by the
+## model's own colours, so markings, pink skin and eyes keep their materials;
+## the fur's mean brightness is ~0.8, so the authored colour is divided back
+## up to land where the model was tuned. Bare pink skin goes satin, near-black
+## goes glossy (wet nose, eyes). The owner has NO UVs in his file (checked):
+## no texture can map onto him at all, so his upgrade is per-surface finish —
+## skin sheen, darker hair glossier than cloth, cloth matte.
+func _dress_character(model: Node3D, kind: String) -> void:
+	if model == null:
+		return
+	var fur_tex: Texture2D = null
+	var fur_nrm: Texture2D = null
+	var targets: Array = []
+	if kind == "rat":
+		fur_tex = TextureLib.get_texture("fur_rat")
+		fur_nrm = TextureLib.get_texture("fur_rat_normal")
+		targets = [Color.html("563b30")]
+	elif kind == "cat":
+		fur_tex = TextureLib.get_texture("fur_cat")
+		fur_nrm = TextureLib.get_texture("fur_cat_normal")
+		targets = [Color.html("b2470f"), Color.html("cccccc")]
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var src := m.get_active_material(i) as BaseMaterial3D
+			if src == null:
+				continue
+			var c := src.albedo_color
+			var d: StandardMaterial3D = null
+			if fur_tex != null:
+				for t in targets:
+					var tc := t as Color
+					if absf(c.r - tc.r) < 0.06 and absf(c.g - tc.g) < 0.06 and absf(c.b - tc.b) < 0.06:
+						d = src.duplicate() as StandardMaterial3D
+						d.albedo_texture = fur_tex
+						d.albedo_color = Color(minf(c.r / 0.8, 1.0), minf(c.g / 0.8, 1.0), minf(c.b / 0.8, 1.0))
+						if fur_nrm != null:
+							d.normal_enabled = true
+							d.normal_texture = fur_nrm
+							d.normal_scale = 0.35
+						d.roughness = 0.92
+						break
+			if d == null:
+				var mx := maxf(c.r, maxf(c.g, c.b))
+				if c.r > 0.6 and c.g > 0.35 and c.g < 0.65 and c.b > 0.3 and c.b < 0.6 and mx < 0.9:
+					d = src.duplicate() as StandardMaterial3D
+					d.roughness = 0.55  # bare skin: the rat's tail, ears and paws
+				elif mx < 0.06:
+					d = src.duplicate() as StandardMaterial3D
+					d.roughness = 0.15  # wet gloss: noses and eyes
+				elif kind == "owner":
+					d = src.duplicate() as StandardMaterial3D
+					var skin := absf(c.r - 0.494) < 0.06 and absf(c.g - 0.318) < 0.06 and absf(c.b - 0.165) < 0.06
+					d.roughness = (0.5 if skin else (0.65 if mx < 0.12 else 0.92))
+			if d != null:
+				m.set_surface_override_material(i, d)
 
 
 func spawn_model_food(model: String, at: Vector3) -> Food:
