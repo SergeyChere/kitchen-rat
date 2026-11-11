@@ -767,3 +767,23 @@ drifts 64 slow dust motes through the moon patch.
 nights 2, 3, 4, 6, 8, 9, 10 and hides night 4 pass. Countertop
 probe verified on night 1 (see above).
 
+## Round 14b — the new cat, ready to drop in (point 15)
+
+Web research (live pages) found the stand-out candidate: the cat
+from Vuena's "Cute Pets" set on itch.io — its animation set
+matches ours (sit, look around, meow, pounce, groom, eat).
+A GLB still cannot travel through this branch's text-only push
+channel, so the swap is prepared instead: if a file exists at
+`godot/assets/models/characters/cat_alt.glb`, the game spawns IT
+as the cat — ClipPlayer resolves her clips through an alias map
+(Walk/Run/Sit/Sleep/Meow/Pounce/… plus a head-word fallback; an
+unmatched clip just doesn't play), she is scaled to the old
+cat's height (0.524 m), and the stock cat with her round-13 fur
+remains the fallback when the file is absent. Once the file is
+in the repo, a follow-up pass can tune the map to her exact clip
+names and dress her fur by her own palette.
+
+**Testing.** Import clean; night 1 bugs and physics, night 5
+cat pass (the stock-cat path is byte-identical when no alt file
+exists).
+

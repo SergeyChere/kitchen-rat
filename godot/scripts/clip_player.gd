@@ -7,6 +7,7 @@ const ONE_SHOT := ["jump_up", "jump_down", "land", "wake_up", "pounce", "swat", 
 
 var ap: AnimationPlayer
 var current := ""
+var aliases: Dictionary = {}  # round 14b: game clip name -> the replacement model's own names
 
 
 func _init(model: Node) -> void:
@@ -18,17 +19,48 @@ func _init(model: Node) -> void:
 		a.loop_mode = Animation.LOOP_NONE if ONE_SHOT.has(n) else Animation.LOOP_LINEAR
 
 
+## Round 14b: a replacement model (the new cat) names its clips its own way.
+## set_aliases() maps the game's names to candidates; resolution is exact
+## match first, then the alias list, then a head-word substring match. A clip
+## that resolves to nothing simply does not play — the game never breaks.
+func set_aliases(map: Dictionary) -> void:
+	aliases = map
+	if ap == null:
+		return
+	for game_name in aliases:
+		var real := _resolve(str(game_name))
+		if real != "" and ap.has_animation(real):
+			ap.get_animation(real).loop_mode = Animation.LOOP_NONE if ONE_SHOT.has(str(game_name)) else Animation.LOOP_LINEAR
+
+
+func _resolve(clip: String) -> String:
+	if ap == null:
+		return ""
+	if ap.has_animation(clip):
+		return clip
+	for cand in aliases.get(clip, []):
+		if ap.has_animation(str(cand)):
+			return str(cand)
+	var head := clip.split("_")[0].to_lower()
+	if head.length() >= 3:
+		for n in ap.get_animation_list():
+			if n.to_lower().contains(head):
+				return n
+	return ""
+
+
 func has(clip: String) -> bool:
-	return ap != null and ap.has_animation(clip)
+	return _resolve(clip) != ""
 
 
 func play(clip: String, blend := 0.15, restart := false) -> void:
-	if ap == null or not ap.has_animation(clip):
+	var real := _resolve(clip)
+	if real == "":
 		return
 	if clip == current and not restart:
 		return
 	current = clip
-	ap.play(clip, blend)
+	ap.play(real, blend)
 	if restart:
 		ap.seek(0.0, true)
 

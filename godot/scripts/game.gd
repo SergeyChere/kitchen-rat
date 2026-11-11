@@ -311,10 +311,33 @@ func _make_agents() -> void:
 	cat = CatAI.new()
 	cat.name = "Cat"
 	add_child(cat)
-	var cm := _builder.spawn("characters/cat", Vector3.ZERO, 0.0, cat)
+	# round 14b (point 15: a better cat): a replacement model dropped in by
+	# hand at characters/cat_alt.glb takes over automatically — ClipPlayer
+	# matches her clips by alias, she is scaled to the old cat's height, and
+	# the stock cat (with her round-13 fur) stays as the fallback.
+	var alt_cat := ResourceLoader.exists(LevelBuilder.MODELS + "characters/cat_alt.glb")
+	var cm := _builder.spawn("characters/cat_alt" if alt_cat else "characters/cat", Vector3.ZERO, 0.0, cat)
 	cm.position = Vector3.ZERO
 	cat.anim = ClipPlayer.new(cm)
-	_dress_character(cm, "cat")  # round 13: fur + finishes
+	if alt_cat:
+		cat.anim.set_aliases({
+			"walk": ["Walk", "Walking", "CatWalk"],
+			"run": ["Run", "Running", "Gallop", "FastWalk"],
+			"idle_sit": ["IdleSit", "Sit", "Sitting", "SitIdle", "Idle_Sit", "Idle"],
+			"sleep": ["Sleep", "Sleeping", "Lie", "Lying", "Rest"],
+			"look_around": ["LookAround", "Look", "IdleLook", "HeadLook"],
+			"meow": ["Meow", "Call", "Cry"],
+			"pounce": ["Pounce", "Jump", "Attack", "Leap"],
+			"groom": ["Groom", "Lick", "Clean", "Wash"],
+			"eat": ["Eat", "Eating", "Drink"],
+			"head_up": ["HeadUp", "Alert", "SitUp"],
+			"wake_up": ["WakeUp", "GetUp", "StandUp"],
+			"stir": ["Stir", "Twitch"],
+			"carry_pup": ["CarryPup", "Carry", "WalkCarry"],
+		})
+		_fit_height(cm, 0.524)
+	else:
+		_dress_character(cm, "cat")  # round 13: fur + finishes
 	owner_ai = OwnerAI.new()
 	owner_ai.name = "Owner"
 	add_child(owner_ai)
@@ -1473,6 +1496,16 @@ func _loose_food() -> int:
 ## goes glossy (wet nose, eyes). The owner has NO UVs in his file (checked):
 ## no texture can map onto him at all, so his upgrade is per-surface finish —
 ## skin sheen, darker hair glossier than cloth, cloth matte.
+## Round 14b: scale a swapped-in character model to the height of the one
+## it replaces, so speeds, catch ranges and the camera still fit her.
+func _fit_height(n: Node3D, want: float) -> void:
+	if n == null:
+		return
+	var bb := _builder.world_aabb(n)
+	if bb.size.y > 0.01:
+		n.scale *= want / bb.size.y
+
+
 func _dress_character(model: Node3D, kind: String) -> void:
 	if model == null:
 		return
