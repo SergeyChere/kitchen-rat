@@ -29,6 +29,13 @@ var flickers: Array = []  # [light, base energy, "fire" | "tv" | "steady"]
 var tv_light: OmniLight3D
 var tv_on := false
 var cracks: Array[Vector3] = []
+var door_pivot: Node3D  # the door leaf, re-hung on a hinge by the builder (round 5)
+var clock_hands: Array = []  # [hour pivot, minute pivot] of the working wall clock
+var curtains: Array = []  # the window's curtain nodes — they sway
+var plants: Array = []  # round 12: houseplants — [node, base rotation, phase]; they sway too, gently
+var kettle_pos: Variant = null  # the kettle's spot; world_fx steams here
+var garland: Array = []  # [bulb material, phase] — the living-room garland (round 5)
+var _door_a := 0.0
 var noisy: Array = []
 var gnaws: Array = []
 var exit_point := Vector3.ZERO
@@ -105,6 +112,7 @@ var _mud := 0.0
 var _light_mul := 1.0
 var _ambient := 1.0
 var _moon_e := 0.5
+var moon_cloud := 1.0  # round 3: how much moon the drifting clouds leave (window_sky.gd writes this)
 
 
 func _init(id := "kitchen") -> void:
@@ -120,6 +128,7 @@ func _ready() -> void:
 		night.sleepSense = float(night.get("sleepSense", 1.0)) * 0.7
 	tasks = TaskTracker.new(night.get("tasks", {}))
 	tasks.completed.connect(func(t): hud.task_done(t, true); Sfx.play("task"))
+	tasks.revealed.connect(func(t): hud.task_new(t))
 	tasks.failed.connect(func(t): hud.task_done(t, false); Sfx.play("fail"))
 	tasks.on_surface = func(a): return not rat.jumping and rat.surface_id.begins_with(a)
 	tasks.hidden_in = func(a): return rat.hide_kind() == a
@@ -313,12 +322,43 @@ func _make_agents() -> void:
 	var fl := SpotLight3D.new()
 	fl.spot_angle = 22.0
 	fl.spot_range = 6.0
+	fl.spot_attenuation = 1.1  # round 10: the beam's pool tightens at its edge
 	fl.light_energy = 4.0
 	fl.light_color = Color(1, 0.95, 0.8)
 	fl.shadow_enabled = true
 	fl.visible = false
 	owner_ai.add_child(fl)
 	fl.position = Vector3(0.15, 1.3, 0.2)
+	# Round 10: a visible beam. A patrol you can only see by its floor pool reads
+	# flat; films show the cone in the air. Additive cone, brightest at the lamp,
+	# fresnel-edged so it glows when it crosses your view, gone when he turns it
+	# off (it is a child of the light: its visibility follows).
+	var beam := MeshInstance3D.new()
+	beam.name = "Flashlight beam"
+	var bmesh := CylinderMesh.new()
+	bmesh.top_radius = 0.035
+	bmesh.bottom_radius = 0.8
+	bmesh.height = 3.4
+	bmesh.radial_segments = 20
+	beam.mesh = bmesh
+	var bsh := Shader.new()
+	bsh.code = """
+shader_type spatial;
+render_mode blend_add, cull_disabled, unshaded;
+varying float axial;
+void vertex() { axial = clamp(VERTEX.y / 3.4 + 0.5, 0.0, 1.0); }
+void fragment() {
+	float f = abs(dot(NORMAL, VIEW));
+	ALBEDO = vec3(1.0, 0.93, 0.78) * pow(axial, 1.8) * pow(f, 1.6) * 0.5;
+}
+"""
+	var bmat := ShaderMaterial.new()
+	bmat.shader = bsh
+	beam.material_override = bmat
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fl.add_child(beam)
+	beam.rotation_degrees = Vector3(90, 0, 0)  # the cylinder's small end at the lamp, opening down the beam
+	beam.position = Vector3(0, 0, -1.7)
 	owner_ai.flashlight = fl
 	owner_ai.room_light = room_light
 
@@ -551,7 +591,8 @@ func caught(text: String, at: Vector3) -> void:
 		var hit := ray(p, p + Vector3.DOWN * 3.0)
 		f.global_position = hit.position if not hit.is_empty() else Vector3(p.x, 0, p.z)
 		f.rotation = Vector3.ZERO
-		f.scale = Vector3.ONE
+		f.scale = Vector3.ONE * f.wscale
+		f.toss_scatter()  # round 5: it flies off to the side, never wedges at a table's base
 	rat.carried.clear()
 	rat.teleport(hole + Vector3(0.22, 0.02, -0.22), PI * 0.75)
 	cam.snap(PI * 0.75)
@@ -1102,17 +1143,52 @@ func _tick_sticky(dt: float) -> void:
 			return
 
 
-## The crack the rat stands in, if it leads somewhere through the wall (night tunnels). -1 if none.
-func _tunnel_from() -> int:
+## Every crack linked to the one the rat stands in (demo polish: the demo nights are full networks
+## now, so a crack can have several exits). Empty when she is not in a linked crack.
+func _tunnel_exits() -> Array:
+	var out: Array = []
 	var tl: Array = night.get("tunnels", [])
 	if tl.is_empty() or rat.jumping or rat.global_position.y > 0.05:
-		return -1
+		return out
+	var from := -1
 	for i in cracks.size():
 		if Vector2(cracks[i].x - rat.global_position.x, cracks[i].z - rat.global_position.z).length() < 0.3:
-			for t in tl:
-				if int(t.a) == i: return int(t.b)
-				if int(t.b) == i: return int(t.a)
-	return -1
+			from = i
+			break
+	if from < 0:
+		return out
+	for t in tl:
+		if int(t.a) == from and not out.has(int(t.b)):
+			out.append(int(t.b))
+		elif int(t.b) == from and not out.has(int(t.a)):
+			out.append(int(t.a))
+	return out
+
+
+## The crack the rat stands in, if it leads somewhere through the wall (night tunnels). -1 if none.
+## With several exits she takes the one farthest from whoever is chasing her (the cat, the owner,
+## the dog) — a tunnel is an escape first. Nobody chasing: the first link, as before.
+func _tunnel_from() -> int:
+	var exits := _tunnel_exits()
+	if exits.is_empty():
+		return -1
+	var hunter: Node3D = null
+	if cat and cat.mode == CatAI.Mode.CHASE:
+		hunter = cat
+	elif owner_ai and owner_ai.mode == OwnerAI.Mode.CHASE:
+		hunter = owner_ai
+	elif dog and dog.mode == DogAI.Mode.CHASE:
+		hunter = dog
+	if hunter == null:
+		return int(exits[0])
+	var best := -1
+	var best_d := -1.0
+	for e in exits:
+		var d := (cracks[int(e)] as Vector3).distance_squared_to(hunter.global_position)
+		if d > best_d:
+			best_d = d
+			best = int(e)
+	return best
 
 
 ## Called by the rat when Space is pressed: crawl through the wall if she's in a linked crack.
@@ -1120,6 +1196,14 @@ func use_tunnel() -> bool:
 	var to := _tunnel_from()
 	if to < 0 or to >= cracks.size():
 		return false
+	# round 5: whoever was on her tail goes to the crack she vanished into and waits there,
+	# digging at it — while she comes out somewhere else entirely
+	if cat and cat.mode == CatAI.Mode.CHASE:
+		cat.mode = CatAI.Mode.SEARCH
+		cat._search = 3.2
+		cat.path_to(rat.global_position)
+	if owner_ai and owner_ai.in_room():
+		owner_ai.hear(rat.global_position, 3.2, false)
 	rat.teleport(cracks[to], rat.rotation.y + PI)
 	tasks.flag("tunnel")
 	Sfx.play("scrape")
@@ -1192,6 +1276,7 @@ func _tick_world(dt: float) -> void:
 				if pp.lost() or pp.global_position.distance_to(exit_point) > 0.75: all = false
 			if all: tasks.set_flag("allOut")
 	_tick_lights(dt)
+	_tick_props(dt)
 	_last_rp = rp
 
 
@@ -1225,7 +1310,7 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 	if env:
 		env.ambient_light_energy = _ambient * (0.55 if _blackout else 1.0) + _flash_t * 4.0
 	if moon:
-		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) + _flash_t * 5.0
+		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) * moon_cloud + _flash_t * 5.0
 	var bo := float(night.get("blackout", 0))
 	if bo > 0.0 and not _blackout and night_time > float(night.get("seconds", 900)) * bo:
 		_blackout = true
@@ -1238,6 +1323,40 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 		Sfx.play("light_switch")
 		if rat.in_nest or rp.distance_to(hole) < 0.6:
 			tasks.set_flag("homeAtBlackout")
+
+
+## Round 5's moving set-dressing: the door swings for the owner, the wall clock shows the
+## night's own time, the curtains sway, the garland bulbs chase each other.
+func _tick_props(dt: float) -> void:
+	if door_pivot:
+		var want := 0.0
+		if owner_ai.mode == OwnerAI.Mode.COMING:
+			want = -1.85  # round 8: the door opens as he arrives and he steps straight in
+		elif owner_ai.in_room() and owner_ai.global_position.distance_to(owner_ai.door) < 1.3:
+			want = -1.85
+		_door_a = lerpf(_door_a, want, clampf(dt * 5.0, 0.0, 1.0))
+		door_pivot.rotation.y = float(door_pivot.get_meta("base_yaw", 0.0)) + _door_a
+	if clock_hands.size() == 2:
+		var th := 23.0 + 7.0 * clampf(night_time / float(night.get("seconds", 900)), 0.0, 1.0)
+		(clock_hands[0] as Node3D).rotation.z = -fmod(th, 12.0) / 12.0 * TAU
+		(clock_hands[1] as Node3D).rotation.z = -fmod(th * 60.0, 60.0) / 60.0 * TAU
+	var t := Time.get_ticks_msec() / 1000.0
+	for i in curtains.size():
+		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
+	for pl in plants:
+		# round 12: a houseplant breathes — a slow two-axis tilt around its base
+		# rotation, a couple of degrees at most, each on its own phase
+		var pn := pl[0] as Node3D
+		var base := pl[1] as Vector3
+		var ph := float(pl[2])
+		pn.rotation.x = base.x + sin(t * 0.8 + ph) * 0.03
+		pn.rotation.z = base.z + cos(t * 0.61 + ph * 1.7) * 0.03
+	for gb in garland:
+		# round 7: a real chase — four groups switching in turn, bulbs mostly OFF
+		# between their beats, so the switching is SEEN (round 6's gentle all-lit
+		# wave read as nothing happening at all)
+		var pulse := pow(0.5 + 0.5 * sin(t * 2.3 + float(gb[1])), 6.0)
+		(gb[0] as StandardMaterial3D).emission_energy_multiplier = 0.1 + 2.7 * pulse
 
 
 func _tick_lights(dt: float) -> void:
@@ -1254,6 +1373,8 @@ func _tick_lights(dt: float) -> void:
 					Sfx.play("crackle", l.global_position, 0.0, 1.0, 0.2)
 			"tv":
 				l.light_energy = float(f[1]) * (1.9 if tv_on else 1.0) * (0.8 + 0.2 * sin(t * 3.0) * sin(t * 5.7 + 1.0))
+			"garland":
+				l.light_energy = float(f[1]) * _light_mul * (0.85 + 0.3 * pow(0.5 + 0.5 * sin(t * 2.3 - 1.2), 2.0))  # breathes WITH the bulbs' chase
 			_: l.light_energy = float(f[1]) * _light_mul
 
 
@@ -1343,13 +1464,30 @@ func spawn_model_food(model: String, at: Vector3) -> Food:
 	if m:
 		m.position = Vector3.ZERO
 		m.rotation = Vector3.ZERO
+	if model == "food/cheese":
+		# round 12 (asked): the cheese model's flat yellow read as plastic — it
+		# wears the painted cheese now, holes and their dips included (TextureGen)
+		var cm := StandardMaterial3D.new()
+		cm.albedo_texture = TextureLib.get_texture("cheese")
+		var cn := TextureLib.get_texture("cheese_normal")
+		if cn:
+			cm.normal_texture = cn
+			cm.normal_scale = 0.6
+		cm.roughness = 0.55
+		for mi in f.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).set_surface_override_material(0, cm)
 	foods.append(f)
 	return f
 
 
 func spawn_food(type: String, at: Vector3, tag: String, poison: bool) -> Food:
+	if type == "crumb":
+		# round 5: no crumbs — a piece of real food, chosen deterministically per spot
+		type = Food.PIECES[abs(int(at.x * 7.0 + at.z * 13.0)) % Food.PIECES.size()]
 	var f := spawn_model_food(Food.model_for(type), at)
 	f.type = type
+	f.wscale = Food.world_scale(type)
+	f.scale = Vector3.ONE * f.wscale
 	f.id = tag
 	if poison:
 		f.make_poison()
@@ -1358,7 +1496,9 @@ func spawn_food(type: String, at: Vector3, tag: String, poison: bool) -> Food:
 
 func spawn_random(type: String) -> bool:
 	if type == "":
-		type = "cheese" if randf() < 0.3 else "crumb"
+		# round 12: random finds are not all cheese either
+		var r := randf()
+		type = "cheese" if r < 0.22 else ("cookie" if r < 0.32 else ("cake" if r < 0.38 else "crumb"))
 	var cheese := type == "cheese"
 	var open := bool(night.get("openFood", false))
 	var high := not high_surfaces.is_empty() and randf() < ((0.45 if open else 0.8) if cheese else 0.25)

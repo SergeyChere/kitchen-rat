@@ -76,7 +76,7 @@
  "food": {
   "spots": [
    {
-    "type": "cheese",
+    "type": "pizza",
     "x": 372,
     "y": 28,
     "tag": "q1",
@@ -89,10 +89,11 @@
     "y": 252,
     "tag": "q2",
     "hidden": false,
-    "floor": false
+    "floor": false,
+    "plate": true
    },
    {
-    "type": "cheese",
+    "type": "cookie",
     "x": 175,
     "y": 175,
     "tag": "q3",
@@ -100,7 +101,7 @@
     "floor": false
    },
    {
-    "type": "cheese",
+    "type": "potato",
     "x": 770,
     "y": 470,
     "tag": "q4",
@@ -108,7 +109,7 @@
     "floor": false
    },
    {
-    "type": "cheese",
+    "type": "treat",
     "x": 300,
     "y": 562,
     "tag": "treat",
@@ -148,12 +149,12 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "chunk",
     "x": 620,
     "y": 560,
     "tag": "",
     "hidden": false,
-    "floor": false
+    "floor": true
    },
    {
     "type": "crumb",
@@ -446,7 +447,20 @@
  "sleepers": [],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 0,
+   "b": 2
+  },
+  {
+   "a": 1,
+   "b": 2
+  }
+ ],
  "music": {
   "root": 53,
   "minor": true,

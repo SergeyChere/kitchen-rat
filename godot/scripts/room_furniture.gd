@@ -6,6 +6,7 @@ extends RefCounted
 
 var b: LevelBuilder
 var g: Game
+var _lamp_done := false  # the pantry wall lamp goes up once, by the first washer
 
 
 func _init(builder: LevelBuilder) -> void:
@@ -41,7 +42,7 @@ static func side_rot(s: String) -> float:
 
 
 ## A model fitted to the rect (its front toward the room), with collision and a surface id.
-func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = null) -> Node3D:
+func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = null, tex := "") -> Node3D:
 	var x := float(f.x); var y := float(f.y)
 	var w := float(f.get("w", 0)); var d := float(f.get("h", 0))
 	var r: float = rot if rot != null else side_rot(side(x, y, w, d))
@@ -55,6 +56,11 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 	if height > 0.0:
 		_fit_height(n, height)
 	b.collide(n, surface)
+	if tex != "":
+		# demo polish: a real surface for the model (fabric sofa, cardboard box, ...), tinted by the
+		# night's own colour for the piece when it has one
+		var tint := LevelBuilder.hex(int(f.get("color", 0xffffff))) if f.has("color") else Color.WHITE
+		b.apply_texture(n, tex, tint)
 	return n
 
 
@@ -86,11 +92,96 @@ func low_roof(f: Dictionary, inset: float) -> void:
 	slab.visible = false
 
 
+## Round 7 (asked): a small wall lamp on the north wall by the washing machines —
+## the pantry had NO light sources of its own at all. Plate, enamel shade, warm bulb.
+func _washer_wall_lamp(lx: float) -> void:
+	b.box("Wall lamp plate", W(lx, 3, 168), Vector3(0.12, 0.2, 0.03), b.mat(LevelBuilder.hex(0x2e2a26)), b.furn, false)
+	var shade := MeshInstance3D.new()
+	shade.name = "Wall lamp shade"
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.035
+	cm.bottom_radius = 0.08
+	cm.height = 0.09
+	shade.mesh = cm
+	shade.material_override = b.mat(LevelBuilder.hex(0x274435))
+	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.furn.add_child(shade)
+	shade.global_position = W(lx, 10, 161)
+	var bulb := MeshInstance3D.new()
+	bulb.name = "Wall lamp bulb"
+	var sm := SphereMesh.new()
+	sm.radius = 0.02
+	sm.height = 0.04
+	bulb.mesh = sm
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.albedo_color = Color8(0xff, 0xc2, 0x7a)
+	bulb.material_override = bmat
+	b.furn.add_child(bulb)
+	bulb.global_position = W(lx, 10, 156)
+	light(W(lx, 16, 148), Color8(0xff, 0xc2, 0x7a), 0.95, 3.4, "steady")
+
+
+## Round 8 (asked): a MOVING fire in the fireplace — the flickering light alone
+## read as a lamp behind glass. CPU flame particles: they rise, shrink and die,
+## orange to ember-red, additively blended over the logs.
+func _fire(at: Vector3, w_cm: float) -> void:
+	var e := CPUParticles3D.new()
+	e.name = "Fireplace fire"
+	e.amount = 26
+	e.lifetime = 0.75
+	e.local_coords = false
+	e.direction = Vector3.UP
+	e.spread = 13.0
+	e.gravity = Vector3(0, 0.32, 0)
+	e.initial_velocity_min = 0.22
+	e.initial_velocity_max = 0.42
+	e.damping_min = 0.3
+	e.damping_max = 0.6
+	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	e.emission_sphere_radius = 0.15
+	e.scale_amount_min = 0.7
+	e.scale_amount_max = 1.25
+	var sc := Curve.new()
+	sc.add_point(Vector2(0, 0.35)); sc.add_point(Vector2(0.3, 1.0)); sc.add_point(Vector2(1, 0.1))
+	e.scale_amount_curve = sc
+	var gr := Gradient.new()
+	gr.set_color(0, Color(1.0, 0.6, 0.14, 0.8))
+	gr.set_color(1, Color(0.9, 0.2, 0.03, 0.0))
+	e.color_ramp = gr
+	var q := QuadMesh.new()
+	q.size = Vector2(0.11, 0.11)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = _soft_disc()
+	q.material = m
+	e.mesh = q
+	b.furn.add_child(e)
+	e.global_position = at
+	e.scale = Vector3(maxf(w_cm, 60.0) / 90.0, 0.55, 0.75)
+
+
+func _soft_disc() -> Texture2D:
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			var r := Vector2(x - 15.5, y - 15.5).length() / 15.5
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - r, 0.0, 1.0) ** 1.5))
+	return ImageTexture.create_from_image(img)
+
+
 func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire") -> OmniLight3D:
 	var l := OmniLight3D.new()
 	l.light_color = color
 	l.light_energy = energy
 	l.omni_range = rng
+	# round 10 (the lighting pass): every practical falls off into a pool — the
+	# fire tightest, the TV softest — so rooms read as islands of motivated light
+	l.omni_attenuation = {"fire": 1.35, "tv": 1.15, "garland": 1.25}.get(kind, 1.3)
 	l.shadow_enabled = kind != "tv"
 	b.root.add_child(l)
 	l.global_position = at
@@ -119,12 +210,12 @@ func build(list: Array) -> void:
 				for i in n:
 					var seg := {"x": x + w / n * i, "y": y, "w": w / n, "h": d}
 					place("furniture/counter_section", seg, "counter", 0.0, 0.0)
-			"fridge": place("furniture/fridge", f, "fridge")
+			"fridge": place("furniture/fridge", f, "fridge", 0.0, null, "metal_matte")
 			"island": place("furniture/kitchen_island", f, "island", 0.0, 180.0)
 			"box":
 				var ht := float(f.get("ht", 44))
-				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht)
-			"crate": place("furniture/crate", f, "crate", float(f.get("ht", 40)))
+				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht, null, "cardboard")
+			"crate": place("furniture/crate", f, "crate", float(f.get("ht", 40)), null, "wood_dark")
 			"table":
 				var ht := float(f.get("ht", 79))
 				var model := "furniture/table_dining" if bool(f.get("dining", false)) else "furniture/table_kitchen"
@@ -138,14 +229,30 @@ func build(list: Array) -> void:
 					var cloth := n.find_child("tablecloth*", true, false) as Node3D if n else null
 					if cloth and int(f.get("cloth", 0)) == 0:
 						cloth.queue_free()
+					elif cloth and bool(f.get("dining", false)):
+						# round 11 (asked, night 8): the model's pale cloth threw the
+						# ceiling light back like a mirror. A deep wine cloth, fully
+						# matte — the glare is gone and the dining room gains a colour.
+						var clothmat := StandardMaterial3D.new()
+						clothmat.albedo_color = Color(0.4, 0.12, 0.15)
+						clothmat.albedo_texture = TextureLib.get_texture("fabric")
+						if clothmat.albedo_texture:
+							clothmat.uv1_scale = Vector3(4, 4, 4)
+						clothmat.roughness = 0.96
+						clothmat.metallic_specular = 0.08
+						for mi in cloth.find_children("*", "MeshInstance3D", true, false):
+							(mi as MeshInstance3D).material_override = clothmat
 					if bool(f.get("dining", false)):
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)
 			"coffeeTable":
-				place("furniture/coffee_table", f, "table", 0.0, 0.0)
+				place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
+				# round 5: something to hide AMONG under the coffee table, not bare floor
+				# (at the zone's edge — the middle stays clear for her)
+				b.collide(b.spawn("props/small_box", W(float(f.x) + 26.0, float(f.y) + float(f.h) / 2.0), 12.0, b.furn))
 			"bench":
-				place("furniture/workbench", f, "table", 0.0, 0.0)
+				place("furniture/workbench", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
 			"chair":
 				var cf := {"x": x, "y": y, "w": 32, "h": 32}
@@ -167,44 +274,138 @@ func build(list: Array) -> void:
 			"sofa", "armchair":
 				var face := str(f.get("face", "s"))
 				var r := 180.0 if face == "n" else (90.0 if face == "e" else (-90.0 if face == "w" else 0.0))
-				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r)
+				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
 				hide("sofa", f, 12.0)
 				low_roof(f, 4.0)
 			"wall":
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)
 			"tvStand":
-				place("furniture/tv_stand", f, "tv")
+				place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
 				var tv := light(W(cx, y + d + 70, 90), Color(0.56, 0.7, 1.0), 1.6, 4.6, "tv")
 				g.tv_light = tv
 				tv.visible = not bool(g.night.get("tvOff", false))
-			"bookcase": place("furniture/bookcase", f, "bookcase")
+			"bookcase": place("furniture/bookcase", f, "bookcase", 0.0, null, "wood_dark")
 			"fireplace":
 				place("furniture/fireplace", f, "fireplace")
 				var out := W(x + w + 30, cy, 40) if side(x, y, w, d) == "w" else W(cx, cy, 40)
 				light(out, Color8(0xff, 0x8a, 0x3a), 2.2, 4.2)
-			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)))
+				_fire(W(cx, cy, 16), w)
+			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
 				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
-				light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
-			"plant": b.collide(b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn))
-			"washer": place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer")
-			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)))
+				# round 8 (asked): in the living room the floor lamp sits by the garland
+				# and out-shouts it — dimmed there, untouched elsewhere
+				if str(g.night.get("decor", "")) == "living":
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 0.7, 3.0, "steady")
+				else:
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
+			"plant":
+				var pn := b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn)
+				b.collide(pn)
+				if pn:
+					g.plants.append([pn, pn.rotation, randf() * TAU])  # round 12: it sways
+			"washer":
+				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				if not _lamp_done:
+					_lamp_done = true
+					_washer_wall_lamp(x - 160.0)
+			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)), null, "plastic")
 			"cans": place("furniture/cans_stack", f, "cans", float(f.get("ht", 30)))
-			"shelfUnit": place("furniture/shelf_unit", f, "shelf")
+			"shelfUnit": place("furniture/shelf_unit", f, "shelf", 0.0, null, "wood")
 			"boiler":
 				place("furniture/boiler", f, "boiler", 0.0, -90.0 if x > 480.0 else 90.0)
 				light(W(cx - 50, cy, 40), Color8(0xff, 0x8a, 0x3a), 1.4, 3.0)
-			"sideboard": place("furniture/sideboard", f, "sideboard")
+			"sideboard": place("furniture/sideboard", f, "sideboard", 0.0, null, "wood_dark")
 			"cabinetTall":
 				# modelled long along its own Z, front toward +X: as is against the west wall
 				var n := b.spawn("furniture/cabinet_tall", W(cx, cy), 0.0 if x < 480.0 else 180.0, b.furn)
 				b.fit(n, w, d)
 				b.collide(n)
-			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0)
+			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)
+	# round 3: a plug-in night light in the living rooms — a small warm source you can actually see
+	# by the wall, so the room's light reads: moon from the window, this amber glow below
+	var living := false
+	var anchor: Dictionary = {}
+	for f2 in list:
+		if str(f2.t) in ["sofa", "tvStand", "armchair"]:
+			living = true
+		if str(f2.t) == "tvStand":
+			anchor = f2
+	if living:
+		var af: Dictionary = anchor if not anchor.is_empty() else list[0]
+		var ax := float(af.x) + float(af.get("w", 40)) / 2.0
+		var ay := float(af.y) + float(af.get("h", 40)) + 6.0
+		var nl_mat := StandardMaterial3D.new()
+		nl_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		nl_mat.albedo_color = Color(1.0, 0.62, 0.3)
+		var nl := MeshInstance3D.new()
+		nl.name = "Night light"
+		var nm := BoxMesh.new()
+		nm.size = Vector3(0.07, 0.1, 0.04)
+		nl.mesh = nm
+		nl.material_override = nl_mat
+		b.furn.add_child(nl)
+		nl.global_position = W(ax, ay, 16)
+		light(W(ax, ay, 30), Color(1.0, 0.58, 0.28), 0.65, 2.6, "steady")
+		# rounds 5-6: a garland along the south wall in TWO SAGGING SWAGS (a dead-straight
+		# wire at the ceiling read as decoration in a shop window) — coloured bulbs on
+		# little drops, pulsing in a slow travelling wave (game.gd pulses the emission
+		# and the one real light among them, kind "garland")
+		var bulb_cols := [Color(1, 0.3, 0.2), Color(1, 0.75, 0.25), Color(0.35, 1, 0.45), Color(0.35, 0.55, 1)]
+		var pts: Array = []
+		var SEG := 28
+		for i in SEG + 1:
+			var fx := lerpf(120.0, 840.0, float(i) / SEG)
+			var hang := 0.5 - 0.5 * cos(TAU * 2.0 * float(i) / SEG)  # 0 at the pins, 1 at a swag's bottom
+			pts.append(Vector2(fx, 234.0 - hang * 34.0))
+		var wire_mat := b.mat(Color(0.05, 0.05, 0.06))
+		for i in SEG:
+			var p0: Vector2 = pts[i]
+			var p1: Vector2 = pts[i + 1]
+			var seg := MeshInstance3D.new()
+			seg.name = "Garland wire"
+			var bm := BoxMesh.new()
+			bm.size = Vector3(p0.distance_to(p1) / 100.0 + 0.01, 0.008, 0.008)
+			seg.mesh = bm
+			seg.material_override = wire_mat
+			b.furn.add_child(seg)
+			seg.global_position = W((p0.x + p1.x) / 2.0, 588, (p0.y + p1.y) / 2.0)
+			seg.rotation.z = atan2(p1.y - p0.y, p1.x - p0.x)
+		var bi := 0
+		for i in range(0, SEG + 1, 2):
+			var p: Vector2 = pts[i]
+			var sock := MeshInstance3D.new()
+			sock.name = "Garland socket"
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.008
+			cm.bottom_radius = 0.01
+			cm.height = 0.05
+			sock.mesh = cm
+			sock.material_override = wire_mat
+			b.furn.add_child(sock)
+			sock.global_position = W(p.x, 588, p.y - 2.5)
+			var bmat := StandardMaterial3D.new()
+			var bc: Color = bulb_cols[bi % bulb_cols.size()]
+			bmat.albedo_color = bc
+			bmat.emission_enabled = true
+			bmat.emission = bc
+			bmat.emission_energy_multiplier = 1.2
+			var bulb := MeshInstance3D.new()
+			bulb.name = "Garland bulb"
+			var sm := SphereMesh.new()
+			sm.radius = 0.026
+			sm.height = 0.052
+			bulb.mesh = sm
+			bulb.material_override = bmat
+			b.furn.add_child(bulb)
+			bulb.global_position = W(p.x, 588, p.y - 7.5)
+			g.garland.append([bmat, float(bi % 4) * (TAU / 4.0)])  # round 7: four switching groups, not a phase smear
+			bi += 1
+		light(W(480, 585, 205), Color(1.0, 0.8, 0.55), 1.05, 5.2, "garland")
 
 
 # ---------- decor ----------
@@ -240,7 +441,10 @@ func _hang(models: Array) -> void:
 				tall = true
 		if tall:
 			continue
-		_art(models[i], x, 175.0)
+		if models[i] == "rooms/wall_clock":
+			b.add_working_clock(W(x, 4, 175), 0.0)  # round 5: working hands, the night's real time
+		else:
+			_art(models[i], x, 175.0)
 		i += 1
 
 
@@ -293,7 +497,7 @@ func dress(kind: String) -> void:
 				break
 			if _art_at(wall, float(along), arts[ai % arts.size()]):
 				ai += 1
-	var extras := ["furniture/plant", "furniture/floor_lamp"]
+	var extras := ["furniture/plant", "furniture/plant", "furniture/floor_lamp"]  # round 12 (asked): more houseplants — two per dressed room, not one
 	var ei := 0
 	for c in [[60, 60], [900, 60], [60, 540], [900, 540], [480, 560], [60, 300]]:
 		if ei >= extras.size():
@@ -395,7 +599,7 @@ func _shelf(wall: String, along: float, top_cm: float, props: Array) -> void:
 	var side := wall in ["w", "e"]
 	var c := _wall_pt(wall, along, 12.0, top_cm - 1.5)
 	var size := Vector3(0.24, 0.03, 0.7) if side else Vector3(0.7, 0.03, 0.24)
-	var wood := b.mat(LevelBuilder.hex(0x8a5a34))
+	var wood := b.mat_named("wood", LevelBuilder.hex(0x8a5a34))
 	var sh := b.box("Wall shelf", c, size, wood, b.furn)
 	sh.get_child(0).set_meta("surface", "shelf")
 	for br in [-0.25, 0.25]:  # brackets
@@ -426,4 +630,6 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 	var n := b.spawn(model, p, randf() * 360.0, b.furn)
 	if n:
 		b.collide(n)
+		if model == "furniture/plant":
+			g.plants.append([n, n.rotation, randf() * TAU])  # round 12: it sways
 	return n != null

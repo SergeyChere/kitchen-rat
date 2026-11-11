@@ -77,7 +77,7 @@
  "food": {
   "spots": [
    {
-    "type": "cheese",
+    "type": "cake",
     "x": 600,
     "y": 36,
     "tag": "h1",
@@ -93,7 +93,7 @@
     "floor": true
    },
    {
-    "type": "cheese",
+    "type": "cookie",
     "x": 760,
     "y": 470,
     "tag": "h3",
@@ -109,7 +109,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "wedge",
     "x": 300,
     "y": 200,
     "tag": "",
@@ -125,12 +125,12 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "chunk",
     "x": 680,
     "y": 560,
     "tag": "",
     "hidden": false,
-    "floor": false
+    "floor": true
    },
    {
     "type": "crumb",
@@ -405,19 +405,44 @@
    "y": 0
   },
   {
-   "wall": "w",
-   "x": 0,
-   "y": 420
+   "wall": "n",
+   "x": 170,
+   "h": 92,
+   "d": 50
+  },
+  {
+   "wall": "n",
+   "x": 170,
+   "h": 216,
+   "d": 30
   },
   {
    "wall": "e",
    "x": 0,
-   "y": 230
+   "y": 60
   },
   {
    "wall": "s",
-   "x": 760,
+   "x": 860,
    "y": 0
+  },
+  {
+   "wall": "s",
+   "x": 700,
+   "y": 0
+  },
+  {
+   "nest": true
+  },
+  {
+   "x": 480,
+   "y": 246,
+   "floor": true
+  },
+  {
+   "x": 480,
+   "y": 344,
+   "floor": true
   }
  ],
  "secrets": [
@@ -444,7 +469,36 @@
  "sleepers": [],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 1,
+   "b": 2
+  },
+  {
+   "a": 2,
+   "b": 3
+  },
+  {
+   "a": 3,
+   "b": 4
+  },
+  {
+   "a": 4,
+   "b": 0
+  },
+  {
+   "a": 5,
+   "b": 6
+  },
+  {
+   "a": 7,
+   "b": 8
+  }
+ ],
  "music": {
   "root": 50,
   "minor": true,

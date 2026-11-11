@@ -70,7 +70,7 @@
  "food": {
   "spots": [
    {
-    "type": "cheese",
+    "type": "salami",
     "x": 560,
     "y": 360,
     "tag": "cache1",
@@ -86,7 +86,7 @@
     "floor": false
    },
    {
-    "type": "cheese",
+    "type": "fat",
     "x": 680,
     "y": 525,
     "tag": "cache3",
@@ -102,7 +102,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "cookie",
     "x": 420,
     "y": 520,
     "tag": "",
@@ -118,7 +118,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "slice",
     "x": 900,
     "y": 250,
     "tag": "",
@@ -437,7 +437,32 @@
  "sleepers": [],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 0,
+   "b": 2
+  },
+  {
+   "a": 0,
+   "b": 3
+  },
+  {
+   "a": 1,
+   "b": 2
+  },
+  {
+   "a": 1,
+   "b": 3
+  },
+  {
+   "a": 2,
+   "b": 3
+  }
+ ],
  "music": {
   "root": 52,
   "minor": true,

@@ -11,9 +11,25 @@ const CEILING := 2.5
 
 var walk_speed := 0.9
 var run_speed := 1.9
-var sneak_speed := 0.4
-var gravity := 12.0
-var max_jump_up := 0.62
+var sneak_speed := 0.68  # round 5: 0.4 was so slow nobody sneaked — a real tradeoff needs a usable speed
+# The clips' OWN foot speeds at playback 1.0 (m/s), measured from the paws on the
+# floor with the stride tester (round 8). They are TINY — the rig was authored
+# ambling (walk feet: 0.09 m/s against her 0.9 m/s body speed, a 10x mismatch) —
+# which is exactly why she ice-skated ("swam") when just walking. The gaits are
+# now sped from these numbers, so the feet travel at the body's speed.
+const WALK_CLIP := 0.09
+const RUN_CLIP := 0.63
+const SNEAK_CLIP := 0.055
+const CARRY_CLIP := 0.08
+# Round 9 (asked): at slow gaits the true stride rate made her legs look SHORT —
+# a blur of tiny steps. The slow gaits run at 80% of the stride rate (slightly
+# fewer steps; a whisper of slide returns, worth it). The run was approved
+# exactly as measured — it is NOT softened.
+var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
+# hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
+var max_jump_up := 0.54  # round 11: the tall wall climb is DELETED (the user's call) — one spring
+# is all she has; anything higher is reached over other furniture (chair 0.41 → counter
+# 0.92 is a 0.51 step; the pantry crates climb in 0.40 steps; a 0.52 stool tops the bench)
 var max_jump_reach := 0.9
 var capacity := 3
 
@@ -54,11 +70,11 @@ const JUMP_BUFFER := 0.15 # s before landing that Space is remembered
 var _coyote := 0.0
 var _low_roof := false  # hopping under something: no higher hop for holding Space
 var _jump_buf := 0.0
-var air_acceleration := 2.0
+var air_acceleration := 6.0  # demo polish: was 2.0, a hop could not be corrected in the air at all
 var rotation_speed := 12.0
 var stopping_speed := 0.05
-var hop_impulse := 1.7
-var hop_hold_force := 6.0
+var hop_impulse := 2.08  # scaled with gravity: same hop apex (2.08^2 / (2*18) = 1.7^2 / (2*12))
+var hop_hold_force := 9.0  # scaled with gravity, so holding Space stretches the hop as much as before
 var _last_strong_dir := Vector3.BACK
 var _was_on_floor := true
 var _air_top := 0.0
@@ -75,7 +91,7 @@ var _target_up := false
 var _target := Vector3.ZERO
 var _edge := Vector3.ZERO  # where the surface she climbs onto begins
 var _climb_edge := Vector3.ZERO
-var _kind := ""  # up (climb an edge), grab (caught an edge in the air), down (jump down), descend (climb down), pole (up a leg)
+var _kind := ""  # up (one spring onto an edge), grab (caught an edge in the air), down (jump down), descend (climb down)
 var _grabbed := false  # one ledge grab per hop
 var _hopping := false  # in the air after her own hop (only then she reaches for an edge)
 
@@ -84,7 +100,7 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1
 	floor_max_angle = deg_to_rad(50.0)
-	floor_snap_length = 0.05
+	floor_snap_length = 0.12  # demo polish: was 0.05, she un-stuck and micro-fell stepping off shelves
 	_make_dust()
 
 
@@ -417,7 +433,11 @@ func _push_things() -> void:
 
 
 func moving() -> bool: return move_speed > 0.05
-func hidden() -> bool: return hide_spot != null and global_position.y < 0.05 and not jumping
+func hidden() -> bool:
+	# floor spots count at floor level; an elevated crack (counter, cabinet top) counts at its own height
+	if hide_spot == null or jumping:
+		return false
+	return global_position.y < 0.05 or hide_spot.global_position.y > 0.1
 func hide_kind() -> String: return hide_spot.id if hidden() else ""
 func has_jump_target() -> bool: return _has_target
 func add_noise(v: float) -> void: noise_level = maxf(noise_level, v)
@@ -503,7 +523,7 @@ func drop_one() -> Food:
 	f.reparent(Game.I._builder.foods, true)
 	f.global_position = from
 	f.rotation = Vector3.ZERO
-	f.scale = Vector3.ONE
+	f.scale = Vector3.ONE * f.wscale
 	var roll := at + fw * 0.06
 	var hit2 := _ray(roll + Vector3.UP * 0.05, roll + Vector3.DOWN * 0.06)
 	if hit2.is_empty():
@@ -522,6 +542,8 @@ func teleport(p: Vector3, yaw: float) -> void:
 	if water:
 		stop_swim()
 	jumping = false
+	if model != null and _rig_done:
+		model.position = _model_home  # round 7: no leftover root-motion offset
 	carrier = null
 	stuck_t = 0.0
 	global_position = p
@@ -709,10 +731,10 @@ func _physics_process(dt: float) -> void:
 			pass
 		elif Game.I.use_tunnel():
 			pass
-		elif _has_target and not dragging():
+		elif _has_target and (not dragging() or not _target_up):
+			# round 5: dragging a sausage she may still jump DOWN (pulling it off a table was
+			# impossible before — she wedged at the edge for good); climbing UP with it stays barred
 			_start_jump(_target, _target_up)
-		elif _try_pole():
-			pass
 		elif grounded and not dragging():
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			_coyote = 0.0
@@ -754,7 +776,7 @@ func _find_jump_target() -> void:
 		var p0 := global_position
 		var f := global_transform.basis.z.normalized()
 		var dd := 0.14
-		while dd <= max_jump_reach and not _has_target:
+		while dd <= max_jump_reach and not _has_target and not dragging():  # round 12: no up-offers while hauling — the dispatch bars them anyway, and one would hide the drop behind her
 			var o := p0 + f * dd + Vector3.UP * (max_jump_up + 0.2)
 			o.y = minf(o.y, CEILING - 0.03)  # start under the ceiling, not on top of it
 			var hit := _ray(o, Vector3(o.x, p0.y - 0.5, o.z))
@@ -767,18 +789,25 @@ func _find_jump_target() -> void:
 					_has_target = true
 			dd += 0.04
 		if not _has_target and surface_id != "floor":
-			dd = 0.12
-			while dd <= 0.6:
-				var o := p0 + f * dd + Vector3.UP * 0.1
-				var hit := _ray(o, o + Vector3.DOWN * 4.0)
-				dd += 0.04
-				if hit.is_empty() or p0.y - hit.position.y <= 0.12:
-					continue
-				if hit.normal.y > 0.75 and _clear(hit.position):
-					_target = hit.position
-					_target_up = false
-					_has_target = true
-				break
+			# round 12: while dragging she walks BACKWARDS, facing away from where
+			# she's going — so the drop she is backing toward is behind her facing.
+			# Scan the way she faces first, then the way she is actually moving.
+			var dirs := [f, -f] if dragging() else [f]
+			for df in dirs:
+				if _has_target:
+					break
+				dd = 0.12
+				while dd <= 0.6:
+					var o: Vector3 = p0 + df * dd + Vector3.UP * 0.1
+					var hit := _ray(o, o + Vector3.DOWN * 4.0)
+					dd += 0.04
+					if hit.is_empty() or p0.y - hit.position.y <= 0.12:
+						continue
+					if hit.normal.y > 0.75 and _clear(hit.position):
+						_target = hit.position
+						_target_up = false
+						_has_target = true
+					break
 	_show_marker(_has_target)
 
 
@@ -819,7 +848,7 @@ func _start_jump(to: Vector3, up: bool) -> void:
 	_dur = clampf(0.3 + _from.distance_to(_to) * 0.35, 0.35, 0.8)
 	if up:
 		_climb_edge = _edge
-		_dur = clampf(0.55 + (_to.y - _from.y) * 0.9, 0.6, 1.1)
+		_dur = clampf(0.36 + (_to.y - _from.y) * 0.4, 0.42, 0.66)  # round 4: snappier still — a spring, not a ride
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	if flat.length() > 0.01:
 		rotation.y = Nights.yaw_to(flat)
@@ -834,7 +863,6 @@ func _tick_jump(dt: float) -> void:
 	match _kind:
 		"up", "grab": p = _climb_pos(t)
 		"descend": p = _descend_pos(t)
-		"pole": p = _pole_pos(t)
 		_: p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
 	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops
 	if _kind == "down":
@@ -845,15 +873,20 @@ func _tick_jump(dt: float) -> void:
 			jumping = false
 			if model:
 				model.rotation.x = 0.0
+				model.position = _model_home  # round 7: no leftover root-motion offset
 			velocity = away.normalized() * 0.4 + Vector3.DOWN * 0.5
 			Sfx.play("thud", global_position, -10.0, 1.6)
 			return
 	global_position = p
+	# round 7: cancel the clip's root motion (see _climb_rig) — the path moves her,
+	# the clip only poses her
+	if _root_bone >= 0 and model != null:
+		model.position = _model_home - _skel.get_bone_pose_position(_root_bone)
+
 	if model:
 		var tilt := 0.0
 		match _kind:
 			"up", "grab": tilt = _climb_tilt(t)
-			"pole": tilt = 85.0 * (1.0 - smoothstep(0.75, 1.0, t)) * smoothstep(0.0, 0.15, t)
 			"descend": tilt = -60.0 * smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(0.85, 1.0, t))
 		model.rotation.x = -deg_to_rad(tilt)
 	if t < 1.0:
@@ -861,7 +894,10 @@ func _tick_jump(dt: float) -> void:
 	jumping = false
 	if model:
 		model.rotation.x = 0.0
+		model.position = _model_home  # round 7: hand the model node back from the root-motion cancel
 	velocity = Vector3(0, -0.5, 0)
+	if _kind == "up" or _kind == "grab":
+		_pop(Vector3(1.12, 0.78, 1.08))  # round 4: landing squash after a climb — weight, not a glide-stop
 	var drop := _from.y - _to.y
 	_land_t = clampf(0.12 + drop * 0.35, 0.12, 0.5) if _kind == "down" else 0.1
 	add_noise(0.35 if _kind == "down" else 0.12)
@@ -873,6 +909,38 @@ func _tick_jump(dt: float) -> void:
 
 ## Climbing up: she runs to the edge, rears up and grabs it with her front paws (body tipped nose-up, hind legs
 ## still on the floor), then pushes off with the hind legs and pulls herself over onto the top.
+# Round 7: the climb rig. The baked clips carry ROOT MOTION — jump_up's root bone
+# translates through its own little arc. Stacked on the parametric path, that arc
+# played TWICE (hers + the clip's), which is most of why climbs looked puppeted.
+# During a climb the path is the only transport: the root's pose offset is
+# cancelled out of the model node every frame and the clip becomes pure acting.
+var _skel: Skeleton3D
+var _root_bone := -1
+var _model_home := Vector3(0.0, 0.018, 0.0)
+var _rig_done := false
+
+
+func _climb_rig() -> void:
+	if _rig_done or model == null:
+		return
+	_rig_done = true
+	_model_home = model.position
+	_skel = model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _skel != null:
+		_root_bone = _skel.find_bone("root")
+
+
+## Piecewise-smooth keyframe curve (round 6, for the climb stages).
+func _keys(u: float, keys: Array) -> float:
+	for i in keys.size() - 1:
+		var a: Array = keys[i]
+		var b: Array = keys[i + 1]
+		if u <= float(b[0]):
+			var k := clampf((u - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.001), 0.0, 1.0)
+			return lerpf(float(a[1]), float(b[1]), smoothstep(0.0, 1.0, k))
+	return float(keys[keys.size() - 1][1])
+
+
 func _climb_pos(t: float) -> Vector3:
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
@@ -880,18 +948,25 @@ func _climb_pos(t: float) -> Vector3:
 	var base := _from + dirv * maxf(0.0, edge_d - 0.13)  # snout at the edge, hind paws under it
 	var dy := _to.y - _from.y
 	var reach := minf(dy, 0.13)  # how far up she stretches before the hop
-	if t < 0.35:  # run in and rear up
-		var k := t / 0.35
+	if t < 0.26:  # run in and rear up
+		var k := t / 0.26
 		var q := _from.lerp(base, smoothstep(0.0, 1.0, k))
-		q.y = _from.y + reach * 0.4 * smoothstep(0.5, 1.0, k)
+		q.y = _from.y + reach * 0.35 * smoothstep(0.4, 1.0, k)
 		return q
-	if t < 0.55:  # paws on the edge, gathering
+	if t < 0.40:  # the crouch: she loads her hind legs, nose up the face — THEN springs
+		var k2 := (t - 0.26) / 0.14
 		var q := base
-		q.y = _from.y + reach * (0.4 + 0.6 * (t - 0.35) / 0.2)
+		q.y = _from.y + reach * 0.35 - 0.026 * sin(k2 * PI * 0.5)
 		return q
-	var k := (t - 0.55) / 0.45  # the hop: up and over
-	var q := base.lerp(_to, smoothstep(0.0, 1.0, k))
-	q.y = _from.y + reach + (dy - reach) * sin(minf(1.0, k * 1.3) * PI * 0.5)
+	var u := (t - 0.40) / 0.60
+	var low := reach * 0.35 - 0.026
+	# Round 11: EVERY climb is the one approved spring now. The tall wall climb —
+	# and its fold and two-jump successors — is deleted on the user's call, and
+	# the scanner's cap (max_jump_up) means a face this code sees is never more
+	# than one spring tall. High places are reached over other furniture.
+	var q := base.lerp(_to, smoothstep(0.55, 1.0, u))
+	var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
+	q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
 	return q
 
 
@@ -908,21 +983,8 @@ func _descend_pos(t: float) -> Vector3:
 
 
 ## Up a chair or table leg: straight up its side, then over onto the top.
-func _pole_pos(t: float) -> Vector3:
-	var base := _climb_edge  # at the leg, on the floor
-	if t < 0.12:
-		return _from.lerp(base, t / 0.12)
-	if t < 0.78:
-		var q := base
-		q.y = lerpf(_from.y, _to.y - 0.04, smoothstep(0.0, 1.0, (t - 0.12) / 0.66))
-		return q
-	var k := (t - 0.78) / 0.22
-	var q := Vector3(base.x, _to.y - 0.04, base.z).lerp(_to, smoothstep(0.0, 1.0, k))
-	q.y = lerpf(_to.y - 0.04, _to.y, k)
-	return q
-
-
 func _start_kind(kind: String, to: Vector3, edge: Vector3, dur: float) -> void:
+	_climb_rig()
 	jumping = true
 	_jump_up = kind != "descend"
 	_kind = kind
@@ -965,7 +1027,10 @@ func _try_ledge_grab() -> void:
 
 ## Walking (not running) off a raised surface: she climbs down the side instead of dropping.
 func _try_descend(d: Vector3) -> bool:
-	if running or dragging() or surface_id == "floor" or d.length() < 0.2:
+	# round 12 (playtest): dragging is NO bar here any more — hauling a chicken leg
+	# DOWN off a table is the whole point of dragging, and with this refused she
+	# could only back blindly off the edge and fall with it
+	if running or surface_id == "floor" or d.length() < 0.2:
 		return false
 	var f := d.normalized()
 	var p0 := global_position
@@ -990,38 +1055,16 @@ func _try_descend(d: Vector3) -> bool:
 	return true
 
 
-## Space right at a chair / table / stool that's too high to jump onto: climb up its side or leg to the top
-## (up to 1.2 m).
-func _try_pole() -> bool:
-	if dragging() or not is_on_floor():
-		return false
-	var p0 := global_position
-	var f := global_transform.basis.z.normalized()
-	var dd := 0.06
-	while dd <= 0.3:
-		var o := p0 + f * dd + Vector3.UP * 1.3
-		o.y = minf(o.y, CEILING - 0.03)
-		var hit := _ray(o, Vector3(o.x, p0.y + 0.25, o.z))
-		dd += 0.03
-		if hit.is_empty():
-			continue
-		var dy: float = hit.position.y - p0.y
-		var what := Game.surface_of(hit.collider)
-		if dy > 0.28 and dy <= 1.2 and hit.normal.y > 0.75 and what != "fridge" and hit.position.y < CEILING - 0.25 \
-				and _clear(hit.position) and _ray(p0 + Vector3.UP * 0.1, Vector3(p0.x, hit.position.y + 0.12, p0.z)).is_empty():
-			var at := p0 + f * maxf(0.0, dd - 0.03 - 0.09)  # snout at the side
-			_start_kind("pole", _inward(hit.position, f), at, 0.55 + dy * 1.1)
-			return true
-		break
-	return false
-
-
 func _climb_tilt(t: float) -> float:
-	if t < 0.35:
-		return 70.0 * smoothstep(0.4, 1.0, t / 0.35)
-	if t < 0.55:
-		return 70.0
-	return 70.0 * (1.0 - smoothstep(0.0, 1.0, (t - 0.55) / 0.45))
+	# round 7: the warped clip poses the body now — round 6's 76-80 degrees ON TOP
+	# of the clip's own pitch doubled the rotation into a backflip. This is only a
+	# lean: into the face on the spring, rolling over the edge at the end.
+	if t < 0.26:
+		return 30.0 * smoothstep(0.35, 1.0, t / 0.26)
+	if t < 0.40:  # crouching: leans in a touch further as she loads the spring
+		return 30.0 + 8.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
+	var u := (t - 0.40) / 0.60
+	return _keys(u, [[0.0, 36.0], [0.45, 20.0], [0.85, -12.0], [1.0, 0.0]])  # round 11: the one spring's lean, for every climb
 
 
 # ---------- animation ----------
@@ -1053,5 +1096,23 @@ func _play_anim() -> void:
 		_fast = false
 	var gait := ["walk", "run", "carry_walk", "sneak", "drag"]
 	anim.play(clip, 0.3 if gait.has(clip) and gait.has(anim.current) else 0.15)  # long cross-fade between gaits
-	var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
-	anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() and not jumping else (0.15 if clip == "sneak" else 1.0))
+	if jumping:
+		# round 7: warp the one-shot onto the jump's length — its crouch, launch
+		# and pull-over land with the path's stages instead of ending at 0.42 s
+		# and freezing for the rest of the way up
+		anim.set_speed(clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8))
+	else:
+		# round 8: feet must match the GROUND, not the intent — the clip is sped
+		# from her ACTUAL velocity against the clips' own measured foot speeds
+		# (WALK_CLIP & co, tester --test=stride); intent-speed was the ice-skating
+		var cbase := 0.0
+		match clip:
+			"walk": cbase = WALK_CLIP
+			"run": cbase = RUN_CLIP
+			"sneak": cbase = SNEAK_CLIP
+			"carry_walk": cbase = CARRY_CLIP
+		var hspd := Vector3(velocity.x, 0.0, velocity.z).length()
+		if cbase > 0.0 and is_on_floor() and hspd > 0.05:
+			anim.set_speed(clampf(hspd / cbase * (1.0 if clip == "run" else 0.8), 0.3, 14.0))
+		else:
+			anim.set_speed(0.15 if clip == "sneak" else 1.0)

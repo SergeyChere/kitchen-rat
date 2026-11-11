@@ -316,7 +316,7 @@ func _run(host: Node) -> void:
 		return
 	if name == "stride":
 		await _wait(host, 0.5)
-		for a in [g.cat, g.owner_ai, g.dog]:
+		for a in [g.rat, g.cat, g.owner_ai, g.dog]:
 			if a == null: continue
 			a.process_mode = Node.PROCESS_MODE_DISABLED
 			_stride(a)
@@ -699,6 +699,11 @@ func _bugs(host: Node) -> void:
 			cup = k
 			break
 	_check("there is a mug to knock", cup != null)
+	# round 7: the door leaf hangs on its hinge at door height (round 5's pivot math
+	# re-applied the leaf's own 1.06 m offset inside the pivot — it drifted up)
+	if g.door_pivot != null and g.door_pivot.get_child_count() > 0:
+		var leaf := g.door_pivot.get_child(0) as Node3D
+		_check("the door leaf hangs at door height", leaf != null and absf(leaf.global_position.y - 1.06) < 0.08, "leaf y %.2f" % (leaf.global_position.y if leaf != null else -1.0))
 	if cup:
 		var to := Vector3(0.6, 0.0, 0.4)  # push it toward the nearest edge of whatever it stands on
 		var p := cup.global_position
@@ -868,7 +873,7 @@ func _stride(a: Node3D) -> void:
 				leaves.append([(sk.get_bone_global_rest(b)).origin.y, b])
 		leaves.sort()
 		for i in mini(4, leaves.size()): feet.append(leaves[i][1])
-	for clip in ["walk", "run"]:
+	for clip in ["walk", "run", "sneak", "carry_walk"]:
 		if not ap.has_animation(clip): continue
 		ap.play(clip)
 		var len := ap.get_animation(clip).length
@@ -893,7 +898,7 @@ func _stride(a: Node3D) -> void:
 					tot += absf(pos[i + 1][f].z - pos[i][f].z) / (len / n); cnt += 1
 			if cnt > 0: speeds.append(tot / cnt)
 		speeds.sort()
-		print("STRIDE %s %s feet %d  ground speed %s  set %.2f" % [a.name, clip, feet.size(), str(speeds), a.walk_clip_speed if clip == "walk" else a.run_clip_speed])
+		print("STRIDE %s %s feet %d  ground speed %s  set %s" % [a.name, clip, feet.size(), str(speeds), str(a.get("walk_clip_speed") if clip == "walk" else a.get("run_clip_speed"))])
 
 
 ## Game feel: forgiving jumps, quick stop, footsteps by surface, camera, danger, head turning, muffled hiding.
@@ -977,13 +982,17 @@ func _juice(host: Node) -> void:
 	# danger: chase -> slow motion, heartbeat, red edge
 	if g.cat and g.cat.has_method("wake_up"):
 		g.cat.visible = true
-		g.cat.global_position = r.global_position + Vector3(0.8, 0, 0)
+		# 2.5 m, not 0.8: at 0.8 the cat REACHES her inside the 0.6 s window on a fast
+		# machine and the (deliberate) caught slow-mo trips this check — a race, not a
+		# regression. 2.5 m keeps the full chase threat; she cannot be caught mid-check.
+		g.cat.global_position = r.global_position + Vector3(2.5, 0, 0)
 		g.cat.mode = CatAI.Mode.CHASE
 		await host.get_tree().process_frame
 		await host.get_tree().process_frame
-		var slowed := Engine.time_scale < 1.0
+		var beats0: int = g.feel.beats
 		await _wait(host, 0.6)
-		_check("spotted: a moment of slow motion", slowed)
+		_check("spotted: no slow motion any more", Engine.time_scale == 1.0, "scale %.2f" % Engine.time_scale)
+		_check("chased: the heartbeat is beating", g.feel.beats > beats0, "beats %d -> %d" % [beats0, g.feel.beats])
 		_check("chased: the screen edge goes red", float(g.feel._mat.get_shader_parameter("amount")) > 0.1, "%.2f" % float(g.feel._mat.get_shader_parameter("amount")))
 		g.cat.mode = CatAI.Mode.SLEEP
 	# hiding muffles the room

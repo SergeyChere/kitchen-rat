@@ -87,7 +87,7 @@ func hear(at: Vector3, _radius: float, big: bool) -> void:
 func _start_visit() -> void:
 	_visit += 1
 	_plan_active = true; _plan_started = false; _chased = false
-	mode = Mode.COMING; _t = 2.4
+	mode = Mode.COMING; _t = 0.9  # round 8: the door opens and he steps straight in — no waiting in the hall
 	var water := str(_plan.type) == "water"
 	G.bubble_at("Stomp… stomp… *yawn*" if water else "Click. A flashlight…", door + Vector3.UP * 1.2, 2.2)
 	G.banner("The owner is coming!" if water else "Flashlight patrol!", "Hide under furniture or in a crack until he leaves.", 3.5)
@@ -110,7 +110,7 @@ func _process(dt: float) -> void:
 		_start_visit()
 	if mode == Mode.AWAY:
 		if G.stars >= _star():
-			mode = Mode.COMING; _t = 2.4
+			mode = Mode.COMING; _t = 0.9  # round 8: the door opens and he steps straight in — no waiting in the hall
 			G.bubble_at("Stomp… stomp… stomp…", door + Vector3.UP * 1.2, 2.2)
 		return
 	if mode == Mode.COMING:

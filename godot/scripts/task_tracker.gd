@@ -7,6 +7,20 @@ extends RefCounted
 
 signal completed(text: String)
 signal failed(text: String)
+signal revealed(text: String)  # a NEW side task opened — the HUD announces it (round 5)
+
+## Round 5: side tasks used to appear by an invisible "reveal after N steps" rule, in random
+## counts, silently. Now exactly TWO are open at any time; when one finishes or fails the next
+## opens at once and is announced. If a night ships too few, this pool tops it up.
+const POOL := [
+	{"text": "Sneak past the cat", "type": "flag", "arg": "passCat"},
+	{"text": "Hide while the cat watches", "type": "flag", "arg": "hidNearCat"},
+	{"text": "Slip through a wall path", "type": "count", "arg": "tunnel", "n": 1},
+	{"text": "Sniff out hidden food", "type": "flag", "arg": "sniffed"},
+	{"text": "Collect 5 pieces of food", "type": "count", "arg": "collected", "n": 5},
+	{"text": "Disarm a mousetrap", "type": "flag", "arg": "disarm"},
+]
+var _open := {}  # side index → true: revealed and available
 
 var chain: Array = []
 var side: Array = []
@@ -30,7 +44,16 @@ var keep_broken: Callable = func(_a): return false
 
 func _init(tasks: Dictionary) -> void:
 	chain = tasks.get("chain", [])
-	side = tasks.get("side", [])
+	side = tasks.get("side", []).duplicate()
+	var texts := {}
+	for t in side:
+		texts[str(t.get("text", ""))] = true
+	for t in POOL:
+		if side.size() >= 6:
+			break
+		if not texts.has(str(t.text)):
+			side.append(t)
+	_open_more(false)
 	secret = tasks.get("secret", [])
 	goal_text = tasks.get("goal", "Fill the nest")
 
@@ -45,8 +68,23 @@ func current_index() -> int:
 	return -1
 func current(): return chain[current_index()] if current_index() >= 0 else null
 func side_visible(i: int) -> bool:
-	var r := int(side[i].get("reveal", -1))
-	return r < 0 or step >= r or side_done.has(i)
+	return _open.has(i) or side_done.has(i) or side_failed.has(i)
+
+
+## Keep exactly two side tasks open; announce ones opened after the night started.
+func _open_more(announce := true) -> void:
+	var active := 0
+	for i in side.size():
+		if _open.has(i) and not side_done.has(i) and not side_failed.has(i):
+			active += 1
+	for i in side.size():
+		if active >= 2:
+			break
+		if not _open.has(i):
+			_open[i] = true
+			active += 1
+			if announce:
+				revealed.emit(str(side[i].text))
 
 
 func flag(n: String, add := 1) -> void:
@@ -102,6 +140,7 @@ func tick() -> void:
 		if not secret_done.has(i) and _check(secret[i]):
 			secret_done[i] = true
 			completed.emit("Secret: " + str(secret[i].text))
+	_open_more()
 
 
 func finish_night() -> void:

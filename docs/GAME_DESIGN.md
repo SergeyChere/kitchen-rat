@@ -63,7 +63,7 @@ n-th star unlocks the n-th threat. Stars beyond the list make everyone faster ("
 | 3 · Traps | 11–15 | Mousetraps, sticky traps, the kids' room, a party, poison |
 | 4 · Siege | 16–20 | Robot vacuum, a dog that follows your scent, sealed cracks, the whole floor, moving out |
 
-Playable now: nights 1–3. Target length per night in the final game: 15–20 minutes.
+Playable now: all 20 nights in the Godot version (the demo is nights 1–5, being polished — see DEMO_POLISH.md). Target length per night in the final game: 15–20 minutes; the demo aims at 8–12.
 
 ### Noise and the sleeping cat
 
@@ -107,7 +107,8 @@ See the main README.
 ### Next
 - [ ] Pups grow between nights and ask for different food
 - [ ] Traversal paths between rooms (inside walls, pipes) as short linear levels
-- [ ] Gamepad support
+- [x] Gamepad support (in the Godot version)
+- [ ] Demo polish: nights 1–5 to done (physics feel, named materials, wall tunnels as escapes) — see DEMO_POLISH.md
 - [ ] More owner behaviour: sets traps where you were last seen, calls for help at 5 stars
 
 ### Godot version

@@ -18,6 +18,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	Sfx.setup(self)
+	TextureLib.boot(self)  # round 6: CDN texture pack + background painter (never blocks)
 	if "--pad" in OS.get_cmdline_user_args():
 		Keys.pad = true
 	Settings.load_all()
@@ -36,6 +37,10 @@ func _ready() -> void:
 		if _args.get("screen", "") == "nights": show_nights()
 		elif _args.get("screen", "") == "settings": UI.settings_panel(self, show_menu)
 		elif _args.get("screen", "") == "controls": UI.controls_panel(self, show_menu)
+
+
+func _exit_tree() -> void:
+	TextureLib.shutdown()
 
 
 func _process(_dt: float) -> void:
