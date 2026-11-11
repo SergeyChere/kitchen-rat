@@ -599,3 +599,19 @@ Playtest reports, three of them:
 pass; nights 2, 3, 4, 8 boot clean; hides nights 2 and 4, cat and
 physics night 5 pass.
 
+## Round 12b — the wooden TV (2026-11-10)
+
+First playtest of the real CDN pack: "why did you make the TV
+wooden?!" Because the `tv_stand` model is the stand AND the TV in
+one file, and the per-furniture texture pass paints every mesh it
+finds — screen included. The generated wood was too subtle to
+notice; the real boards were not. Fixes: `apply_texture` never
+textures a mesh named like a screen, and the tvStand case gives
+the screen a deliberate material — dark glossy glass, faintly
+glowing from inside when the night has the TV on (dark when
+`tvOff`), which also agrees with the flickering TV light beside
+it. The stand keeps its dark wood.
+
+**Testing.** Import clean; night 1 CI set all pass; bugs night 2
+and boots nights 2–3 clean.
+

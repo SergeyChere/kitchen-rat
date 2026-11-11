@@ -337,6 +337,8 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 	var c := Color(clampf(tint.r / 0.45, 0.0, 1.0), clampf(tint.g / 0.45, 0.0, 1.0), clampf(tint.b / 0.45, 0.0, 1.0))
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
+		if "screen" in m.name.to_lower():
+			continue  # round 12b: a screen is glass, not furniture — never texture one
 		for i in m.mesh.get_surface_count():
 			var src := m.get_active_material(i) as BaseMaterial3D
 			if src == null:

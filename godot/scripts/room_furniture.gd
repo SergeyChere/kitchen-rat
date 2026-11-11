@@ -281,7 +281,24 @@ func build(list: Array) -> void:
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)
 			"tvStand":
-				place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
+				var stand := place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
+				if stand:
+					# round 12b (playtest: "why is the TV wooden?!"): the model is
+					# stand + TV in ONE file, and the wood pass painted the screen
+					# too — invisible with the subtle generated wood, hilarious
+					# with the real CDN boards. The screen gets its glass back:
+					# dark, glossy, faintly lit from inside when the TV is on.
+					var scr := stand.find_child("screen", true, false) as MeshInstance3D
+					if scr:
+						var sm := StandardMaterial3D.new()
+						sm.albedo_color = Color(0.05, 0.07, 0.10)
+						sm.roughness = 0.22
+						sm.metallic = 0.3
+						if not bool(g.night.get("tvOff", false)):
+							sm.emission_enabled = true
+							sm.emission = Color(0.35, 0.5, 0.75)
+							sm.emission_energy_multiplier = 0.35
+						scr.set_surface_override_material(0, sm)
 				var tv := light(W(cx, y + d + 70, 90), Color(0.56, 0.7, 1.0), 1.6, 4.6, "tv")
 				g.tv_light = tv
 				tv.visible = not bool(g.night.get("tvOff", false))
