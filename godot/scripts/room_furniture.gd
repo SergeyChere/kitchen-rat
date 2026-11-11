@@ -719,6 +719,10 @@ func dress(kind: String) -> void:
 				break
 			if _art_at(wall, float(along), arts[ai % arts.size()]):
 				ai += 1
+	if kind == "living" or kind == "dining":
+		# round 16: a rug under the room's middle — bare floors were half of why the
+		# rooms read flat. TextureLib "carpet" (pack v2 photo, painted fallback).
+		b.box("Rug", W(480, 305, 0.6), Vector3(3.6, 0.012, 2.5), b.mat_named("carpet", Color(0.92, 0.88, 0.82)), b.furn, false)
 	var extras := ["furniture/plant", "furniture/plant", "furniture/floor_lamp"]  # round 12 (asked): more houseplants — two per dressed room, not one
 	var ei := 0
 	for c in [[60, 60], [900, 60], [60, 540], [900, 540], [480, 560], [60, 300]]:

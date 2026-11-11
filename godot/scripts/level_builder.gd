@@ -315,6 +315,7 @@ func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> Standar
 		m.roughness = float(p[0])
 		m.metallic = float(p[1])
 		_add_normal(m, tex_name)
+		_add_rough(m, tex_name)
 		return m
 	return mat(color)
 
@@ -326,6 +327,16 @@ static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
 	if n != null:
 		m.normal_enabled = true
 		m.normal_texture = n
+
+
+## Round 16: a <name>_rough map from the pack (ambientCG Roughness / Poly Haven
+## Rough) replaces the flat roughness constant — the map carries the values, so
+## the scalar goes to 1.0 and the surface stops shining uniformly.
+static func _add_rough(m: StandardMaterial3D, tex_name: String) -> void:
+	var r := TextureLib.get_texture(tex_name + "_rough", false)
+	if r != null:
+		m.roughness = 1.0
+		m.roughness_texture = r
 
 
 ## Give a placed model a real surface (demo polish, plan point 2): the generated texture laid over its
@@ -1196,6 +1207,28 @@ func _room() -> void:
 			floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 			floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
 			_add_normal(floor_mat, "ceramic_tile")
+			_add_rough(floor_mat, "ceramic_tile")
+	if str(pal.get("floor", "")) == "wood":
+		# round 16: wood floors come from the pack too (floor_wood), like the tile
+		var wt := TextureLib.get_texture("floor_wood", false)
+		if wt != null:
+			floor_mat = mat(Color(0.55, 0.52, 0.48))  # warm-neutral, keeps the nights as dark as the old PNG floor
+			floor_mat.albedo_texture = wt
+			floor_mat.uv1_scale = Vector3(6, 3.75, 1)
+			floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			floor_mat.roughness = 0.62
+			_add_normal(floor_mat, "floor_wood")
+			_add_rough(floor_mat, "floor_wood")
+	if str(pal.get("floor", "")) == "concrete":
+		var ct2 := TextureLib.get_texture("floor_concrete", false)
+		if ct2 != null:
+			floor_mat = mat(Color(0.52, 0.50, 0.47))
+			floor_mat.albedo_texture = ct2
+			floor_mat.uv1_scale = Vector3(6, 3.75, 1)
+			floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			floor_mat.roughness = 0.9
+			_add_normal(floor_mat, "floor_concrete")
+			_add_rough(floor_mat, "floor_concrete")
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	# round 14 (asked: walls the same blue everywhere): a painted wallpaper
 	# (TextureGen) tinted by THIS night's wallA replaces the bundled pattern,

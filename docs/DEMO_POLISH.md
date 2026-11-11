@@ -829,3 +829,26 @@ spill beside the bowl — no more uniform brown beads.
 **Owner (night 7).** The flashlight hangs at his right hand (0.30,
 1.02) with a visible torch — body, head, lit lens — parented to the
 light, so the sweep carries the torch and the beam starts in the lens.
+
+## Round 16 — texture pack v2 plumbing (2026-11-11)
+
+The v2 pack (Sergii downloads the set from the prepared list and
+publishes release `textures-v2`) needed code to actually reach the
+floors it was meant for:
+
+- **Wood and concrete floors read the pack.** Only tile floors used
+  TextureLib; wood/concrete loaded two committed PNGs. They now take
+  `floor_wood` / `floor_concrete` (+ normal, + rough) when the pack
+  carries them, warm-tinted to keep the nights as dark as before.
+- **Roughness maps.** A `<name>_rough` file (ambientCG Roughness /
+  Poly Haven Rough) is picked up by mat_named, the countertop and all
+  three floor paths; when present it replaces the flat roughness
+  constant, so surfaces stop shining uniformly.
+- **Rugs.** Living and dining rooms get a carpet under the middle of
+  the room (`carpet` texture; TextureGen paints a fallback carpet —
+  speckle pile over a soft diamond lattice — until the pack lands).
+- **Versioned pack marker.** `.cdn_done` now stores the pack URL; when
+  cdn.json moves to a new release the marker mismatches and the game
+  re-downloads by itself. cdn.json points at textures-v2.
+- **Anisotropic filtering 8×** in project settings — floors and
+  countertops stop swimming at grazing camera angles.

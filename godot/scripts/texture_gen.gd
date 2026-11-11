@@ -14,7 +14,7 @@ const S := 256
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
 	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese", "fur_rat", "fur_cat",
 	"wallpaper_stripes", "wallpaper_damask", "wallpaper_panel", "wallpaper_brick", "crinkle",
-	"tablecloth", "kibble"]
+	"tablecloth", "kibble", "carpet"]
 
 
 static func make(tex_name: String) -> Texture2D:
@@ -51,6 +51,8 @@ static func make_image(tex_name: String) -> Image:
 		"tablecloth": img = _tablecloth()
 		"kibble": img = _kibble()
 		"kibble_normal": img = _kibble_normal()
+		"carpet": img = _carpet()
+		"carpet_normal": img = _carpet_normal()
 		"crinkle_normal": img = _crinkle(true)
 		"fur_cat_normal": img = _fur_normal(223, true)
 		"shaft": img = _shaft()
@@ -227,6 +229,38 @@ static func _fabric() -> Image:
 ## Round 15 (asked: the tablecloth is one flat colour): a woven gingham —
 ## stripes both ways make the checks; painted near-white so the night's
 ## own cloth colour does the tinting.
+static func _carpet_height(x: int, y: int, f: PackedFloat32Array) -> float:
+	# pile speckle + a soft diamond lattice (tiles cleanly at S)
+	var d := absf(sin(PI * float(x) / float(S) * 2.0) * sin(PI * float(y) / float(S) * 2.0))
+	return 0.55 * f[y * S + x] + 0.45 * d
+
+
+static func _carpet() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var f := _field(5, 123)
+	for y in S:
+		for x in S:
+			var h := _carpet_height(x, y, f)
+			var c := Color(0.46, 0.33, 0.22) * (0.72 + 0.5 * h)
+			_put(data, x, y, c)
+	var img := Image.create_from_data(S, S, false, Image.FORMAT_RGBA8, data)
+	return img
+
+
+static func _carpet_normal() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var f := _field(5, 123)
+	for y in S:
+		for x in S:
+			var gx := _carpet_height((x + 1) % S, y, f) - _carpet_height((x - 1 + S) % S, y, f)
+			var gy := _carpet_height(x, (y + 1) % S, f) - _carpet_height(x, (y - 1 + S) % S, f)
+			_put(data, x, y, Color(0.5 + gx * 1.1, 0.5 + gy * 1.1, 1.0))
+	var img := Image.create_from_data(S, S, false, Image.FORMAT_RGBA8, data)
+	return img
+
+
 static func _tablecloth() -> Image:
 	var data := PackedByteArray()
 	data.resize(S * S * 4)

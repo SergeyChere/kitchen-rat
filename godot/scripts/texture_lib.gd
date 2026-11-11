@@ -18,6 +18,7 @@ const GEN_DIR := "user://gen_textures"
 static var _cache: Dictionary = {}
 static var _booted := false
 static var _http: HTTPRequest = null
+static var _pack_url := ""
 static var _thread: Thread = null
 
 
@@ -74,8 +75,6 @@ static func boot(parent: Node) -> void:
 	_booted = true
 	_thread = Thread.new()
 	_thread.start(TextureGen.make_all_files.bind(GEN_DIR))
-	if FileAccess.file_exists(USER_DIR + "/.cdn_done"):
-		return
 	var url := ""
 	if FileAccess.file_exists("res://cdn.json"):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://cdn.json"))
@@ -83,6 +82,13 @@ static func boot(parent: Node) -> void:
 			url = str((parsed as Dictionary).get("base", ""))
 	if url == "":
 		return
+	_pack_url = url
+	# round 16: the marker stores WHICH pack is on disk. When cdn.json moves to a
+	# new release (textures-v2, ...), the stored address no longer matches and the
+	# new pack downloads itself — no manual cache clearing for the player.
+	if FileAccess.file_exists(USER_DIR + "/.cdn_done"):
+		if FileAccess.get_file_as_string(USER_DIR + "/.cdn_done").strip_edges() == url:
+			return
 	_http = HTTPRequest.new()
 	_http.download_file = "user://textures_pack.zip"
 	_http.timeout = 60.0
@@ -104,7 +110,7 @@ static func _on_downloaded(result: int, code: int, _headers: PackedStringArray, 
 			z.close()
 			var m := FileAccess.open(USER_DIR + "/.cdn_done", FileAccess.WRITE)
 			if m != null:
-				m.store_string("1")
+				m.store_string(_pack_url)
 			_cache.clear()  # the next level build picks the real pack up
 	if _http != null:
 		_http.queue_free()
