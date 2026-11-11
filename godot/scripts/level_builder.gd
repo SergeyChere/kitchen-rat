@@ -1072,6 +1072,13 @@ func _recolor(n: Node3D, col: Color) -> void:
 
 
 func _decor() -> void:
+	# round 12 (asked): the kitchen gets a houseplant too — the dressed rooms have
+	# theirs from RoomFurniture.dress(). SW floor corner, clear of the west counter
+	# leg and the mouse hole; it sways like the rest (Game.plants).
+	var kp := spawn("furniture/plant", W(52, 548), randf() * 360.0, decor)
+	collide(kp)
+	if kp:
+		g.plants.append([kp, kp.rotation, randf() * TAU])
 	for p in night.get("props", []):
 		match str(p.t):
 			"foil":
@@ -1280,6 +1287,11 @@ func _food() -> void:
 	var fd: Dictionary = night.get("food", {})
 	for s in fd.get("spots", []):
 		var at := W(float(s.x), float(s.y)) if bool(s.get("floor", false)) else on_top(float(s.x), float(s.y))
+		if bool(s.get("plate", false)):
+			# round 12 (asked): some food is SERVED — a plate under it, and the food
+			# sits in the plate rather than on the bare surface beneath
+			spawn("food/plate", at, randf() * 360.0, decor)
+			at += Vector3.UP * 0.02
 		var f := g.spawn_food(str(s.type), at, str(s.get("tag", "")), false)
 		if f:
 			f.hidden = bool(s.get("hidden", false))

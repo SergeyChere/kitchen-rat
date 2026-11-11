@@ -77,7 +77,7 @@
  "food": {
   "spots": [
    {
-    "type": "cheese",
+    "type": "cake",
     "x": 600,
     "y": 36,
     "tag": "h1",
@@ -93,7 +93,7 @@
     "floor": true
    },
    {
-    "type": "cheese",
+    "type": "cookie",
     "x": 760,
     "y": 470,
     "tag": "h3",
@@ -109,7 +109,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "wedge",
     "x": 300,
     "y": 200,
     "tag": "",
@@ -125,12 +125,12 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "chunk",
     "x": 680,
     "y": 560,
     "tag": "",
     "hidden": false,
-    "floor": false
+    "floor": true
    },
    {
     "type": "crumb",

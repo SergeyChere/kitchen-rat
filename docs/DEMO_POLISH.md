@@ -557,3 +557,45 @@ caught and fixed before this push). Night 1 CI set all pass; night 7
 pass (the auto-walker still routes over furniture); night 8 boots
 clean; hides night 4 pass.
 
+## Round 12 — dragging down, houseplants, real cheese, varied food (2026-11-10)
+
+Playtest reports, three of them:
+
+1. **"The chicken leg hung under the table while she tried to drag
+   it off."** Hauling big food DOWN off a surface was the broken
+   part of dragging: the climb-down refused outright while dragging,
+   and the jump scanner only ever looked where she FACES — but a
+   dragging rat walks backwards, so the drop she was backing toward
+   was never scanned and never offered; she could only back blindly
+   off the edge and fall with the leg. Now: descending an edge works
+   while dragging (walk backwards off a table and she climbs down
+   with the leg in her teeth), and while dragging the drop scan also
+   covers the direction she is actually moving, so Space hops her
+   down off the edge she is backing toward. Up-offers are suppressed
+   while hauling (the dispatch barred them anyway; one could hide
+   the drop behind her).
+2. **More houseplants, swaying.** Dressed rooms now place TWO
+   plants (plus the floor lamp) instead of one; the kitchen — which
+   the dressing pass skips — gets its own in the SW corner; and
+   every plant (data-placed ones too) registers into `Game.plants`
+   and breathes in `_tick_props`: a slow two-axis tilt of a couple
+   of degrees around its base rotation, each on its own phase, the
+   way the curtains already sway.
+3. **Cheese with a texture; food with variety.** The cheese model
+   wore a flat plastic yellow; TextureGen now paints a "cheese"
+   (warm marbled rind, eleven seeded holes, dark and shadowed at
+   their hearts) plus a matching "cheese_normal" whose dips are the
+   same holes, and `spawn_model_food` dresses every cheese-model
+   food in it. The placed food on nights 1–5 was nearly all cheese
+   and crumbs; the spots now mix cake, salami, pizza, potato, lard,
+   sausage, cookie, biscuit and explicit pieces across the same
+   positions and tags (night totals stay in their old range), a
+   `plate: true` spot flag serves the food on a plate (builder
+   spawns it, the food sits in it), a few pieces lie on the floor —
+   one under the kitchen table — and random finds roll cookies and
+   cake slices too, not just cheese.
+
+**Testing.** Import clean; night 1 CI set all pass; walk night 1
+pass; nights 2, 3, 4, 8 boot clean; hides nights 2 and 4, cat and
+physics night 5 pass.
+

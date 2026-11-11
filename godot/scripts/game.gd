@@ -32,6 +32,7 @@ var cracks: Array[Vector3] = []
 var door_pivot: Node3D  # the door leaf, re-hung on a hinge by the builder (round 5)
 var clock_hands: Array = []  # [hour pivot, minute pivot] of the working wall clock
 var curtains: Array = []  # the window's curtain nodes — they sway
+var plants: Array = []  # round 12: houseplants — [node, base rotation, phase]; they sway too, gently
 var kettle_pos: Variant = null  # the kettle's spot; world_fx steams here
 var garland: Array = []  # [bulb material, phase] — the living-room garland (round 5)
 var _door_a := 0.0
@@ -1342,6 +1343,14 @@ func _tick_props(dt: float) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
+	for pl in plants:
+		# round 12: a houseplant breathes — a slow two-axis tilt around its base
+		# rotation, a couple of degrees at most, each on its own phase
+		var pn := pl[0] as Node3D
+		var base := pl[1] as Vector3
+		var ph := float(pl[2])
+		pn.rotation.x = base.x + sin(t * 0.8 + ph) * 0.03
+		pn.rotation.z = base.z + cos(t * 0.61 + ph * 1.7) * 0.03
 	for gb in garland:
 		# round 7: a real chase — four groups switching in turn, bulbs mostly OFF
 		# between their beats, so the switching is SEEN (round 6's gentle all-lit
@@ -1455,6 +1464,18 @@ func spawn_model_food(model: String, at: Vector3) -> Food:
 	if m:
 		m.position = Vector3.ZERO
 		m.rotation = Vector3.ZERO
+	if model == "food/cheese":
+		# round 12 (asked): the cheese model's flat yellow read as plastic — it
+		# wears the painted cheese now, holes and their dips included (TextureGen)
+		var cm := StandardMaterial3D.new()
+		cm.albedo_texture = TextureLib.get_texture("cheese")
+		var cn := TextureLib.get_texture("cheese_normal")
+		if cn:
+			cm.normal_texture = cn
+			cm.normal_scale = 0.6
+		cm.roughness = 0.55
+		for mi in f.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).set_surface_override_material(0, cm)
 	foods.append(f)
 	return f
 
@@ -1475,7 +1496,9 @@ func spawn_food(type: String, at: Vector3, tag: String, poison: bool) -> Food:
 
 func spawn_random(type: String) -> bool:
 	if type == "":
-		type = "cheese" if randf() < 0.3 else "crumb"
+		# round 12: random finds are not all cheese either
+		var r := randf()
+		type = "cheese" if r < 0.22 else ("cookie" if r < 0.32 else ("cake" if r < 0.38 else "crumb"))
 	var cheese := type == "cheese"
 	var open := bool(night.get("openFood", false))
 	var high := not high_surfaces.is_empty() and randf() < ((0.45 if open else 0.8) if cheese else 0.25)

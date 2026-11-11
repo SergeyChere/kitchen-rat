@@ -300,7 +300,11 @@ func build(list: Array) -> void:
 					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 0.7, 3.0, "steady")
 				else:
 					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
-			"plant": b.collide(b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn))
+			"plant":
+				var pn := b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn)
+				b.collide(pn)
+				if pn:
+					g.plants.append([pn, pn.rotation, randf() * TAU])  # round 12: it sways
 			"washer":
 				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
 				if not _lamp_done:
@@ -493,7 +497,7 @@ func dress(kind: String) -> void:
 				break
 			if _art_at(wall, float(along), arts[ai % arts.size()]):
 				ai += 1
-	var extras := ["furniture/plant", "furniture/floor_lamp"]
+	var extras := ["furniture/plant", "furniture/plant", "furniture/floor_lamp"]  # round 12 (asked): more houseplants — two per dressed room, not one
 	var ei := 0
 	for c in [[60, 60], [900, 60], [60, 540], [900, 540], [480, 560], [60, 300]]:
 		if ei >= extras.size():
@@ -626,4 +630,6 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 	var n := b.spawn(model, p, randf() * 360.0, b.furn)
 	if n:
 		b.collide(n)
+		if model == "furniture/plant":
+			g.plants.append([n, n.rotation, randf() * TAU])  # round 12: it sways
 	return n != null

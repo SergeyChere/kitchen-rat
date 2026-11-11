@@ -70,15 +70,16 @@
  "food": {
   "spots": [
    {
-    "type": "cheese",
+    "type": "cake",
     "x": 440,
     "y": 246,
     "tag": "plate",
     "hidden": false,
-    "floor": false
+    "floor": false,
+    "plate": true
    },
    {
-    "type": "crumb",
+    "type": "slice",
     "x": 472,
     "y": 228,
     "tag": "",
@@ -86,7 +87,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "wedge",
     "x": 506,
     "y": 262,
     "tag": "",
@@ -94,7 +95,7 @@
     "floor": false
    },
    {
-    "type": "cheese",
+    "type": "salami",
     "x": 688,
     "y": 476,
     "tag": "",
@@ -142,7 +143,7 @@
     "floor": false
    },
    {
-    "type": "crumb",
+    "type": "cookie",
     "x": 262,
     "y": 548,
     "tag": "bed",

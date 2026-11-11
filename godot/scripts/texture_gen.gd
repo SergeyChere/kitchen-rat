@@ -12,7 +12,7 @@ const S := 256
 
 ## All paintable material names (the shaft gradient is separate: make("shaft")).
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
-	"metal_matte", "cardboard", "plastic", "counter_stone"]
+	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese"]
 
 
 static func make(tex_name: String) -> Texture2D:
@@ -36,6 +36,8 @@ static func make_image(tex_name: String) -> Image:
 		"cardboard": img = _cardboard()
 		"plastic": img = _plastic()
 		"counter_stone": img = _stone()
+		"cheese": img = _cheese()
+		"cheese_normal": img = _cheese_normal()
 		"shaft": img = _shaft()
 		_: return null
 	if img == null:
@@ -301,4 +303,69 @@ static func _shaft() -> Image:
 			var u := float(x) / S
 			var edge := 0.25 + 0.75 * pow(sin(PI * u), 1.2)
 			_put(data, x, y, Color(0.78, 0.84, 1.0, a * edge))
+	return _img(data)
+
+
+## Round 12 (asked): the cheese. The GLB's flat yellow read as plastic; this is a
+## painted cheese — a warm marbled rind and real HOLES, darker and shadowed at
+## their hearts. The hole list is shared with the normal map, so the dips the
+## light catches are the same holes the eye sees. Wrap-aware: it tiles.
+static func _cheese_holes() -> Array:
+	var holes: Array = []
+	for i in 11:
+		var r := 0.045 + 0.05 * _h2(i, 11, 139)
+		holes.append([_h2(i, 3, 131), _h2(i, 7, 137), r, r * (0.68 + 0.3 * _h2(i, 13, 149))])
+	return holes
+
+
+## How deep the surface dips at (u, v): 0 on the rind, 1 at a hole's heart.
+static func _cheese_dip(u: float, v: float, holes: Array) -> float:
+	var dip := 0.0
+	for h in holes:
+		var dx := absf(u - float(h[0]))
+		dx = minf(dx, 1.0 - dx)
+		var dy := absf(v - float(h[1]))
+		dy = minf(dy, 1.0 - dy)
+		var rx := float(h[2])
+		var ry := float(h[3])
+		var d := sqrt(dx * dx / (rx * rx) + dy * dy / (ry * ry))
+		if d < 1.0:
+			var s := 1.0 - d
+			dip = maxf(dip, s * s * (3.0 - 2.0 * s))
+	return dip
+
+
+static func _cheese() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var holes := _cheese_holes()
+	var f := _field(6, 151)
+	var base := Color(0.97, 0.74, 0.27)
+	var deep := Color(0.70, 0.42, 0.09)
+	for y in S:
+		for x in S:
+			var c := base * (0.93 + 0.13 * f[y * S + x])
+			var dip := _cheese_dip(float(x) / S, float(y) / S, holes)
+			if dip > 0.0:
+				c = c.lerp(deep, dip * 0.85)
+				c *= 1.0 - 0.25 * dip  # a hole's heart sits in its own shadow
+			_put(data, x, y, c)
+	return _img(data)
+
+
+static func _cheese_normal() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var holes := _cheese_holes()
+	var e := 1.5 / S
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			# the surface height is the NEGATIVE dip, so the normal tilts along
+			# the dip's own gradient, into the hole
+			var gx := _cheese_dip(u + e, v, holes) - _cheese_dip(u - e, v, holes)
+			var gy := _cheese_dip(u, v + e, holes) - _cheese_dip(u, v - e, holes)
+			var n := Vector3(gx * 1.6, gy * 1.6, 1.0).normalized()
+			_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
 	return _img(data)

@@ -776,7 +776,7 @@ func _find_jump_target() -> void:
 		var p0 := global_position
 		var f := global_transform.basis.z.normalized()
 		var dd := 0.14
-		while dd <= max_jump_reach and not _has_target:
+		while dd <= max_jump_reach and not _has_target and not dragging():  # round 12: no up-offers while hauling — the dispatch bars them anyway, and one would hide the drop behind her
 			var o := p0 + f * dd + Vector3.UP * (max_jump_up + 0.2)
 			o.y = minf(o.y, CEILING - 0.03)  # start under the ceiling, not on top of it
 			var hit := _ray(o, Vector3(o.x, p0.y - 0.5, o.z))
@@ -789,18 +789,25 @@ func _find_jump_target() -> void:
 					_has_target = true
 			dd += 0.04
 		if not _has_target and surface_id != "floor":
-			dd = 0.12
-			while dd <= 0.6:
-				var o := p0 + f * dd + Vector3.UP * 0.1
-				var hit := _ray(o, o + Vector3.DOWN * 4.0)
-				dd += 0.04
-				if hit.is_empty() or p0.y - hit.position.y <= 0.12:
-					continue
-				if hit.normal.y > 0.75 and _clear(hit.position):
-					_target = hit.position
-					_target_up = false
-					_has_target = true
-				break
+			# round 12: while dragging she walks BACKWARDS, facing away from where
+			# she's going — so the drop she is backing toward is behind her facing.
+			# Scan the way she faces first, then the way she is actually moving.
+			var dirs := [f, -f] if dragging() else [f]
+			for df in dirs:
+				if _has_target:
+					break
+				dd = 0.12
+				while dd <= 0.6:
+					var o: Vector3 = p0 + df * dd + Vector3.UP * 0.1
+					var hit := _ray(o, o + Vector3.DOWN * 4.0)
+					dd += 0.04
+					if hit.is_empty() or p0.y - hit.position.y <= 0.12:
+						continue
+					if hit.normal.y > 0.75 and _clear(hit.position):
+						_target = hit.position
+						_target_up = false
+						_has_target = true
+					break
 	_show_marker(_has_target)
 
 
@@ -1020,7 +1027,10 @@ func _try_ledge_grab() -> void:
 
 ## Walking (not running) off a raised surface: she climbs down the side instead of dropping.
 func _try_descend(d: Vector3) -> bool:
-	if running or dragging() or surface_id == "floor" or d.length() < 0.2:
+	# round 12 (playtest): dragging is NO bar here any more — hauling a chicken leg
+	# DOWN off a table is the whole point of dragging, and with this refused she
+	# could only back blindly off the edge and fall with it
+	if running or surface_id == "floor" or d.length() < 0.2:
 		return false
 	var f := d.normalized()
 	var p0 := global_position

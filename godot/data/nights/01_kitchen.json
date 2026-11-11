@@ -74,6 +74,14 @@
  "food": {
   "spots": [
    {
+    "type": "chunk",
+    "x": 745,
+    "y": 470,
+    "tag": "",
+    "hidden": false,
+    "floor": true
+   },
+   {
     "type": "crumb",
     "x": 585,
     "y": 548,
@@ -87,10 +95,11 @@
     "y": 432,
     "tag": "plate",
     "hidden": false,
-    "floor": false
+    "floor": false,
+    "plate": true
    },
    {
-    "type": "cheese",
+    "type": "cookie",
     "x": 116,
     "y": 30,
     "tag": "bread",
@@ -98,7 +107,7 @@
     "floor": false
    },
    {
-    "type": "cheese",
+    "type": "cake",
     "x": 232,
     "y": 470,
     "tag": "",
