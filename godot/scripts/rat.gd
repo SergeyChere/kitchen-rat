@@ -21,6 +21,10 @@ const WALK_CLIP := 0.09
 const RUN_CLIP := 0.63
 const SNEAK_CLIP := 0.055
 const CARRY_CLIP := 0.08
+# Round 9 (asked): at slow gaits the true stride rate made her legs look SHORT —
+# a blur of tiny steps. The slow gaits run at 80% of the stride rate (slightly
+# fewer steps; a whisper of slide returns, worth it). The run was approved
+# exactly as measured — it is NOT softened.
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
 var max_jump_up := 0.62
@@ -873,8 +877,8 @@ func _tick_jump(dt: float) -> void:
 	if _root_bone >= 0 and model != null:
 		model.position = _model_home - _skel.get_bone_pose_position(_root_bone)
 	if model != null and (_kind == "up" or _kind == "grab") and dy >= 0.45:
-		# round 8: squash & stretch sells the fold — compressed flat while she folds
-		# against the face, stretched long on the unfold, settling over the edge
+		# round 9: squash & stretch per hop — stretched in each arc, compressed
+		# while clinging at the grab (loading hop 2), settling over the edge
 		var sc := Vector3.ONE
 		if t < 0.26:
 			sc = Vector3.ONE
@@ -882,13 +886,13 @@ func _tick_jump(dt: float) -> void:
 			sc = Vector3(1.08, 0.88, 1.05)
 		else:
 			var uu := (t - 0.40) / 0.60
-			if uu < 0.30:
-				sc = Vector3(1.02, 0.97, 1.01)
-			elif uu < 0.46:
-				sc = Vector3(1.16, 0.78, 1.09)  # folded in half
-			elif uu < 0.62:
-				sc = Vector3(0.92, 1.13, 0.95)  # the unfold
-			elif uu < 0.85:
+			if uu < 0.36:
+				sc = Vector3(0.95, 1.07, 0.97)  # hop 1, airborne
+			elif uu < 0.55:
+				sc = Vector3(1.12, 0.82, 1.07)  # the grab: loaded
+			elif uu < 0.78:
+				sc = Vector3(0.94, 1.10, 0.96)  # hop 2, airborne
+			elif uu < 0.92:
 				sc = Vector3(1.03, 0.97, 1.02)
 		model.scale = model.scale.lerp(sc, clampf(dt * 16.0, 0.0, 1.0))
 	if model:
@@ -976,15 +980,31 @@ func _climb_pos(t: float) -> Vector3:
 		var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
 		q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
 		return q
-	# Round 8 (asked): no more STEPS up the wall. She springs, grabs, and FOLDS IN
-	# HALF against the face — hindquarters swing up under her, the body compresses
-	# and dips (the deep 0.52 → 0.40) — and the fold IS the spring: one explosive
-	# unfold (0.40 → 0.90 in a fifth of the climb) carries her over the edge.
-	var rise := _keys(u, [[0.0, 0.0], [0.30, 0.52], [0.46, 0.40], [0.60, 0.90], [0.82, 0.98], [1.0, 1.0]])
-	var press := sin(clampf((u - 0.24) / 0.24, 0.0, 1.0) * PI) * 0.02  # folded INTO the face
-	var kick := sin(clampf((u - 0.52) / 0.20, 0.0, 1.0) * PI) * 0.026  # the unfold shoves her off it
-	q += dirv * (press - kick)
-	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.75, 1.0, u))
+	# Round 9 (asked, supersedes the round-8 fold): literally TWO of the approved
+	# low jumps chained. Hop 1 lands her at a grab point midway up the face, she
+	# CLINGS there a beat (the plateau — she loads, it is not a hover: the body is
+	# pressed to the face and settles a touch), then hop 2 pushes off the face and
+	# over the edge. Two arcs and a stick — never a run up the wall.
+	q = base.lerp(_to, smoothstep(0.68, 1.0, u))
+	var grab := 0.57
+	var rise: float
+	if u < 0.36:
+		var s := u / 0.36
+		rise = grab * (1.0 - (1.0 - s) * (1.0 - s))  # hop 1: ease-out, fast off the floor
+	elif u < 0.55:
+		rise = grab - 0.03 * sin((u - 0.36) / 0.19 * PI)  # the grab settles as she loads
+	else:
+		var s2 := (u - 0.55) / 0.45
+		rise = grab + (1.0 - grab) * (s2 * s2 * (3.0 - 2.0 * s2))  # hop 2: the push-off
+	var press := 0.0
+	if u < 0.30:
+		press = 0.014 * (u / 0.30)  # hop 1 closes onto the face
+	elif u < 0.58:
+		press = 0.014  # clinging: body weight on the face
+	else:
+		press = 0.014 - 0.040 * sin(clampf((u - 0.58) / 0.28, 0.0, 1.0) * PI)  # hop 2 kicks off it
+	q += dirv * press
+	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.8, 1.0, u))
 	return q
 
 
@@ -1126,10 +1146,9 @@ func _climb_tilt(t: float) -> float:
 	var u := (t - 0.40) / 0.60
 	if _to.y - _from.y < 0.45:
 		return _keys(u, [[0.0, 36.0], [0.45, 20.0], [0.85, -12.0], [1.0, 0.0]])
-	# round 8: the fold reads in the pitch — nose-up on the spring, then the body
-	# jackknifes (nose swings DOWN as the hindquarters come up under her), and the
-	# unfold whips it back over the edge
-	return _keys(u, [[0.0, 38.0], [0.30, 33.0], [0.46, -26.0], [0.60, 20.0], [0.82, -13.0], [1.0, 0.0]])
+	# round 9: each hop leans like the approved low jump's hop; between them she
+	# hangs most upright, pressed to the face at the grab
+	return _keys(u, [[0.0, 34.0], [0.36, 26.0], [0.46, 36.0], [0.55, 33.0], [0.75, 18.0], [0.88, -12.0], [1.0, 0.0]])
 
 
 # ---------- animation ----------
@@ -1168,8 +1187,8 @@ func _play_anim() -> void:
 		var spd := clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8)
 		if (_kind == "up" or _kind == "grab") and _to.y - _from.y >= 0.45 and _t > 0.40:
 			var uu := clampf((_t - 0.40) / 0.60, 0.0, 1.0)
-			if uu > 0.22 and uu < 0.50:
-				spd = 0.05  # round 8: while she folds she HOLDS — no leg steps on the wall
+			if uu > 0.34 and uu < 0.58:
+				spd = 0.05  # round 9: at the mid-face grab she CLINGS — the clip holds still
 		anim.set_speed(spd)
 	elif jumping:
 		anim.set_speed(1.7)  # the pole scramble
@@ -1185,6 +1204,6 @@ func _play_anim() -> void:
 			"carry_walk": cbase = CARRY_CLIP
 		var hspd := Vector3(velocity.x, 0.0, velocity.z).length()
 		if cbase > 0.0 and is_on_floor() and hspd > 0.05:
-			anim.set_speed(clampf(hspd / cbase, 0.3, 14.0))
+			anim.set_speed(clampf(hspd / cbase * (1.0 if clip == "run" else 0.8), 0.3, 14.0))
 		else:
 			anim.set_speed(0.15 if clip == "sneak" else 1.0)

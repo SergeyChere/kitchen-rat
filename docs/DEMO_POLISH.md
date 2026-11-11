@@ -454,3 +454,29 @@ night 1.
 (living room: dimmed lamp, fireplace), physics night 5, walk night 1,
 cat night 5 — all pass.
 
+## Round 9 — the user's two remaining complaints (2026-11-10)
+
+Verdict on round 8: the run is GOOD ("running is fine now"), the
+garland, lamp, fire, grading and the owner's entry were accepted; two
+things still bothered him.
+
+1. **Slow walking: "her legs look short — slightly fewer steps."**
+   The true stride rate (round 8) reads as a blur of tiny steps at slow
+   gaits. The slow gaits (walk, sneak, carry) now run at 80% of the
+   stride rate — slightly fewer steps, a whisper of slide traded back.
+   The run keeps the exact measured rate, untouched.
+2. **The high climb: TWO JUMPS, not a fold, not a run up the wall.**
+   His recipe: take the approved low jump and chain two of them. For
+   climbs ≥ 0.45 m she now hops to a grab point at 57% of the face,
+   clings there a beat (body pressed to the face, settling 3% as she
+   loads, the clip frozen — she holds), then pushes off the face and
+   hops over the edge. The rise is two arcs with a plateau; squash &
+   stretch follow the hops (stretch in each arc, compressed at the
+   grab). The round-8 fold is gone. Low hop-ups unchanged.
+
+**Testing.** Import clean; night 1 CI set all pass; walk night 1,
+physics night 5, cat night 5 — pass.
+
+The user is merging this branch into main himself and setting up the
+CDN release (textures-v1); the branch is ready for that.
+
