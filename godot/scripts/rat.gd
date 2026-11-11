@@ -27,7 +27,9 @@ const CARRY_CLIP := 0.08
 # exactly as measured — it is NOT softened.
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
-var max_jump_up := 0.62
+var max_jump_up := 0.54  # round 11: the tall wall climb is DELETED (the user's call) — one spring
+# is all she has; anything higher is reached over other furniture (chair 0.41 → counter
+# 0.92 is a 0.51 step; the pantry crates climb in 0.40 steps; a 0.52 stool tops the bench)
 var max_jump_reach := 0.9
 var capacity := 3
 
@@ -89,7 +91,7 @@ var _target_up := false
 var _target := Vector3.ZERO
 var _edge := Vector3.ZERO  # where the surface she climbs onto begins
 var _climb_edge := Vector3.ZERO
-var _kind := ""  # up (climb an edge), grab (caught an edge in the air), down (jump down), descend (climb down), pole (up a leg)
+var _kind := ""  # up (one spring onto an edge), grab (caught an edge in the air), down (jump down), descend (climb down)
 var _grabbed := false  # one ledge grab per hop
 var _hopping := false  # in the air after her own hop (only then she reaches for an edge)
 
@@ -733,8 +735,6 @@ func _physics_process(dt: float) -> void:
 			# round 5: dragging a sausage she may still jump DOWN (pulling it off a table was
 			# impossible before — she wedged at the edge for good); climbing UP with it stays barred
 			_start_jump(_target, _target_up)
-		elif _try_pole():
-			pass
 		elif grounded and not dragging():
 			# a hop forward: front paws first, like a real rat (not straight up like a ball)
 			_coyote = 0.0
@@ -856,7 +856,6 @@ func _tick_jump(dt: float) -> void:
 	match _kind:
 		"up", "grab": p = _climb_pos(t)
 		"descend": p = _descend_pos(t)
-		"pole": p = _pole_pos(t)
 		_: p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
 	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops
 	if _kind == "down":
@@ -876,30 +875,11 @@ func _tick_jump(dt: float) -> void:
 	# the clip only poses her
 	if _root_bone >= 0 and model != null:
 		model.position = _model_home - _skel.get_bone_pose_position(_root_bone)
-	if model != null and (_kind == "up" or _kind == "grab") and dy >= 0.45:
-		# round 9: squash & stretch per hop — stretched in each arc, compressed
-		# while clinging at the grab (loading hop 2), settling over the edge
-		var sc := Vector3.ONE
-		if t < 0.26:
-			sc = Vector3.ONE
-		elif t < 0.40:
-			sc = Vector3(1.08, 0.88, 1.05)
-		else:
-			var uu := (t - 0.40) / 0.60
-			if uu < 0.36:
-				sc = Vector3(0.95, 1.07, 0.97)  # hop 1, airborne
-			elif uu < 0.55:
-				sc = Vector3(1.12, 0.82, 1.07)  # the grab: loaded
-			elif uu < 0.78:
-				sc = Vector3(0.94, 1.10, 0.96)  # hop 2, airborne
-			elif uu < 0.92:
-				sc = Vector3(1.03, 0.97, 1.02)
-		model.scale = model.scale.lerp(sc, clampf(dt * 16.0, 0.0, 1.0))
+
 	if model:
 		var tilt := 0.0
 		match _kind:
 			"up", "grab": tilt = _climb_tilt(t)
-			"pole": tilt = 85.0 * (1.0 - smoothstep(0.75, 1.0, t)) * smoothstep(0.0, 0.15, t)
 			"descend": tilt = -60.0 * smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(0.85, 1.0, t))
 		model.rotation.x = -deg_to_rad(tilt)
 	if t < 1.0:
@@ -973,38 +953,13 @@ func _climb_pos(t: float) -> Vector3:
 		return q
 	var u := (t - 0.40) / 0.60
 	var low := reach * 0.35 - 0.026
+	# Round 11: EVERY climb is the one approved spring now. The tall wall climb —
+	# and its fold and two-jump successors — is deleted on the user's call, and
+	# the scanner's cap (max_jump_up) means a face this code sees is never more
+	# than one spring tall. High places are reached over other furniture.
 	var q := base.lerp(_to, smoothstep(0.55, 1.0, u))
-	if dy < 0.45:
-		# a low hop-up (a chair seat, a box): one spring is enough — no wall work,
-		# and the short jump was already approved as-is
-		var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
-		q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
-		return q
-	# Round 9 (asked, supersedes the round-8 fold): literally TWO of the approved
-	# low jumps chained. Hop 1 lands her at a grab point midway up the face, she
-	# CLINGS there a beat (the plateau — she loads, it is not a hover: the body is
-	# pressed to the face and settles a touch), then hop 2 pushes off the face and
-	# over the edge. Two arcs and a stick — never a run up the wall.
-	q = base.lerp(_to, smoothstep(0.68, 1.0, u))
-	var grab := 0.57
-	var rise: float
-	if u < 0.36:
-		var s := u / 0.36
-		rise = grab * (1.0 - (1.0 - s) * (1.0 - s))  # hop 1: ease-out, fast off the floor
-	elif u < 0.55:
-		rise = grab - 0.03 * sin((u - 0.36) / 0.19 * PI)  # the grab settles as she loads
-	else:
-		var s2 := (u - 0.55) / 0.45
-		rise = grab + (1.0 - grab) * (s2 * s2 * (3.0 - 2.0 * s2))  # hop 2: the push-off
-	var press := 0.0
-	if u < 0.30:
-		press = 0.014 * (u / 0.30)  # hop 1 closes onto the face
-	elif u < 0.58:
-		press = 0.014  # clinging: body weight on the face
-	else:
-		press = 0.014 - 0.040 * sin(clampf((u - 0.58) / 0.28, 0.0, 1.0) * PI)  # hop 2 kicks off it
-	q += dirv * press
-	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.8, 1.0, u))
+	var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
+	q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
 	return q
 
 
@@ -1021,26 +976,7 @@ func _descend_pos(t: float) -> Vector3:
 
 
 ## Up a chair or table leg: straight up its side, then over onto the top.
-func _pole_pos(t: float) -> Vector3:
-	var base := _climb_edge  # at the leg, on the floor
-	if t < 0.12:
-		return _from.lerp(base, t / 0.12)
-	if t < 0.78:
-		var kk := (t - 0.12) / 0.66
-		var q := base
-		# little grip pulses on the way up: she climbs the leg in pushes, not on a lift
-		var push := smoothstep(0.0, 1.0, kk) + sin(kk * PI * 3.0) * 0.012 * sin(kk * PI)
-		q.y = lerpf(_from.y, _to.y - 0.04, clampf(push, 0.0, 1.0))
-		return q
-	var k := (t - 0.78) / 0.22
-	var q := Vector3(base.x, _to.y - 0.04, base.z).lerp(_to, smoothstep(0.0, 1.0, k))
-	q.y = lerpf(_to.y - 0.04, _to.y, k)
-	return q
-
-
 func _start_kind(kind: String, to: Vector3, edge: Vector3, dur: float) -> void:
-	if kind == "up" or kind == "grab":
-		dur *= 1.3  # round 6: the staged scramble (crouch, spring, wall kick) needs time to read
 	_climb_rig()
 	jumping = true
 	_jump_up = kind != "descend"
@@ -1109,32 +1045,6 @@ func _try_descend(d: Vector3) -> bool:
 	return true
 
 
-## Space right at a chair / table / stool that's too high to jump onto: climb up its side or leg to the top
-## (up to 1.2 m).
-func _try_pole() -> bool:
-	if dragging() or not is_on_floor():
-		return false
-	var p0 := global_position
-	var f := global_transform.basis.z.normalized()
-	var dd := 0.06
-	while dd <= 0.3:
-		var o := p0 + f * dd + Vector3.UP * 1.3
-		o.y = minf(o.y, CEILING - 0.03)
-		var hit := _ray(o, Vector3(o.x, p0.y + 0.25, o.z))
-		dd += 0.03
-		if hit.is_empty():
-			continue
-		var dy: float = hit.position.y - p0.y
-		var what := Game.surface_of(hit.collider)
-		if dy > 0.28 and dy <= 1.2 and hit.normal.y > 0.75 and what != "fridge" and hit.position.y < CEILING - 0.25 \
-				and _clear(hit.position) and _ray(p0 + Vector3.UP * 0.1, Vector3(p0.x, hit.position.y + 0.12, p0.z)).is_empty():
-			var at := p0 + f * maxf(0.0, dd - 0.03 - 0.09)  # snout at the side
-			_start_kind("pole", _inward(hit.position, f), at, 0.55 + dy * 1.1)
-			return true
-		break
-	return false
-
-
 func _climb_tilt(t: float) -> float:
 	# round 7: the warped clip poses the body now — round 6's 76-80 degrees ON TOP
 	# of the clip's own pitch doubled the rotation into a backflip. This is only a
@@ -1144,11 +1054,7 @@ func _climb_tilt(t: float) -> float:
 	if t < 0.40:  # crouching: leans in a touch further as she loads the spring
 		return 30.0 + 8.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
 	var u := (t - 0.40) / 0.60
-	if _to.y - _from.y < 0.45:
-		return _keys(u, [[0.0, 36.0], [0.45, 20.0], [0.85, -12.0], [1.0, 0.0]])
-	# round 9: each hop leans like the approved low jump's hop; between them she
-	# hangs most upright, pressed to the face at the grab
-	return _keys(u, [[0.0, 34.0], [0.36, 26.0], [0.46, 36.0], [0.55, 33.0], [0.75, 18.0], [0.88, -12.0], [1.0, 0.0]])
+	return _keys(u, [[0.0, 36.0], [0.45, 20.0], [0.85, -12.0], [1.0, 0.0]])  # round 11: the one spring's lean, for every climb
 
 
 # ---------- animation ----------
@@ -1161,7 +1067,7 @@ func _play_anim() -> void:
 		return
 	var clip := "idle"
 	if jumping:
-		clip = "run" if _kind == "pole" else ("jump_up" if _jump_up else "jump_down")  # round 7: legs scramble up a pole
+		clip = "jump_up" if _jump_up else "jump_down"
 	elif not is_on_floor() and carrier == null:
 		clip = "jump_up" if velocity.y > 0.0 else "jump_down"
 	elif _land_t > 0.0:
@@ -1180,18 +1086,11 @@ func _play_anim() -> void:
 		_fast = false
 	var gait := ["walk", "run", "carry_walk", "sneak", "drag"]
 	anim.play(clip, 0.3 if gait.has(clip) and gait.has(anim.current) else 0.15)  # long cross-fade between gaits
-	if jumping and _kind != "pole":
-		# round 7: warp the one-shot onto the climb's length — its crouch, launch
+	if jumping:
+		# round 7: warp the one-shot onto the jump's length — its crouch, launch
 		# and pull-over land with the path's stages instead of ending at 0.42 s
 		# and freezing for the rest of the way up
-		var spd := clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8)
-		if (_kind == "up" or _kind == "grab") and _to.y - _from.y >= 0.45 and _t > 0.40:
-			var uu := clampf((_t - 0.40) / 0.60, 0.0, 1.0)
-			if uu > 0.34 and uu < 0.58:
-				spd = 0.05  # round 9: at the mid-face grab she CLINGS — the clip holds still
-		anim.set_speed(spd)
-	elif jumping:
-		anim.set_speed(1.7)  # the pole scramble
+		anim.set_speed(clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8))
 	else:
 		# round 8: feet must match the GROUND, not the intent — the clip is sped
 		# from her ACTUAL velocity against the clips' own measured foot speeds

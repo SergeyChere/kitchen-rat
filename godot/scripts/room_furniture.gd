@@ -229,6 +229,19 @@ func build(list: Array) -> void:
 					var cloth := n.find_child("tablecloth*", true, false) as Node3D if n else null
 					if cloth and int(f.get("cloth", 0)) == 0:
 						cloth.queue_free()
+					elif cloth and bool(f.get("dining", false)):
+						# round 11 (asked, night 8): the model's pale cloth threw the
+						# ceiling light back like a mirror. A deep wine cloth, fully
+						# matte — the glare is gone and the dining room gains a colour.
+						var clothmat := StandardMaterial3D.new()
+						clothmat.albedo_color = Color(0.4, 0.12, 0.15)
+						clothmat.albedo_texture = TextureLib.get_texture("fabric")
+						if clothmat.albedo_texture:
+							clothmat.uv1_scale = Vector3(4, 4, 4)
+						clothmat.roughness = 0.96
+						clothmat.metallic_specular = 0.08
+						for mi in cloth.find_children("*", "MeshInstance3D", true, false):
+							(mi as MeshInstance3D).material_override = clothmat
 					if bool(f.get("dining", false)):
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)

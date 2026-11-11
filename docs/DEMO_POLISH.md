@@ -528,3 +528,32 @@ PRACTICALS as accents, darkness preserved between pools.
 caught and fixed before this push). Night 1 CI set all pass; night 7
 (the flashlight night) boots and runs; hides night 2 pass.
 
+## Round 11 — the tall climb is deleted; the night-8 cloth (2026-11-10)
+
+1. **"You can't make the high jump work — delete it."** Done, all of
+   it: the staged wall climb (and its fold / two-jump successors), the
+   leg climb (`_try_pole`/`_pole_pos`, which climbed table legs up to
+   1.2 m), the per-hop squash windows and the clip-freeze that served
+   them. What remains is the ONE approved spring, and the scanner's
+   reach cap is now `max_jump_up = 0.54` — a taller face is simply
+   never offered. High places are reached over other furniture, which
+   the levels already teach (measured with a raycast probe, night 1:
+   chair seat 0.41 → counter 0.92 is a 0.51 step, chair → table 0.38;
+   night 4: crates 0.40 → 0.80 → 1.20 in 0.40 steps, box 0.50, tall
+   box +0.42, basket 0.43 → washer 0.86, stool 0.52 → bench 0.80).
+   Kept, deliberately: climbing DOWN an edge, catching an edge
+   mid-fall, and climbing out of the sink — none of them is a way UP
+   a tall face. One route is tight and worth a playtest look: the
+   island (0.92) is reached from the kitchen-table chair nearest it
+   (a 0.51 step across a ~0.6 m gap); if that feels finicky, the fix
+   is a stool by the island — a level-design call for the user.
+2. **Night 8's tablecloth** threw the ceiling light back like a
+   mirror (the model's pale cloth). Dining tables now get a deep
+   wine cloth (0.4, 0.12, 0.15) with the woven fabric texture,
+   roughness 0.96 and specular nearly off — matte, and the dining
+   room gains a colour.
+
+**Testing.** Import clean; night 1 CI set all pass; walk night 1
+pass (the auto-walker still routes over furniture); night 8 boots
+clean; hides night 4 pass.
+
