@@ -21,6 +21,7 @@ var _plan_started := false
 var _chased := false
 var _known := false
 var _visit := 0
+var _calm_until := 0.0  # round 14: post-visit refractory (see _end_visit)
 var _wp := 0
 var _t := 0.0
 var _t2 := 0.0
@@ -96,6 +97,7 @@ func _start_visit() -> void:
 func _end_visit() -> void:
 	mode = Mode.LEAVING
 	path_to(door)
+	_calm_until = G.night_time + 50.0  # round 14 (asked: he comes back far too often)
 
 
 func _process(dt: float) -> void:
@@ -109,7 +111,10 @@ func _process(dt: float) -> void:
 	if _has_plan() and mode == Mode.AWAY and _visit < at.size() and G.night_time >= float(at[_visit]):
 		_start_visit()
 	if mode == Mode.AWAY:
-		if G.stars >= _star():
+		# round 14: after a visit he settles — for 50 s only a REAL racket
+		# (two stars above the usual threshold) brings him back; the plan
+		# visits above are untouched.
+		if G.stars >= _star() + (2 if G.night_time < _calm_until else 0):
 			mode = Mode.COMING; _t = 0.9  # round 8: the door opens and he steps straight in — no waiting in the hall
 			G.bubble_at("Stomp… stomp… stomp…", door + Vector3.UP * 1.2, 2.2)
 		return

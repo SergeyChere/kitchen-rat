@@ -163,6 +163,63 @@ func _fire(at: Vector3, w_cm: float) -> void:
 	b.furn.add_child(e)
 	e.global_position = at
 	e.scale = Vector3(maxf(w_cm, 60.0) / 90.0, 0.55, 0.75)
+	# round 14 (asked, night 2: "still no fire"): particles alone do not read
+	# on every driver, so the fire ALSO gets plain meshes — an ember bed and
+	# three crossed flame planes. Meshes cannot not render; game.gd flickers
+	# their scale in _tick_props via g.flames.
+	var emb := MeshInstance3D.new()
+	emb.name = "Ember bed"
+	var eb := BoxMesh.new()
+	eb.size = Vector3(maxf(w_cm, 60.0) / 100.0 * 0.55, 0.03, 0.16)
+	emb.mesh = eb
+	var emat := StandardMaterial3D.new()
+	emat.albedo_color = Color(0.30, 0.07, 0.01)
+	emat.emission_enabled = true
+	emat.emission = Color(1.0, 0.30, 0.04)
+	emat.emission_energy_multiplier = 1.5
+	emb.material_override = emat
+	emb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.furn.add_child(emb)
+	emb.global_position = at + Vector3(0, 0.015, 0)
+	for k in 3:
+		var fl := MeshInstance3D.new()
+		fl.name = "Fire flame"
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.38, 0.46)
+		fl.mesh = qm
+		var fmat2 := StandardMaterial3D.new()
+		fmat2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		fmat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		fmat2.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		fmat2.cull_mode = BaseMaterial3D.CULL_DISABLED
+		fmat2.albedo_texture = _flame_tex()
+		fl.material_override = fmat2
+		fl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.furn.add_child(fl)
+		fl.global_position = at + Vector3(0, 0.24, 0)
+		fl.rotation.y = k * PI / 3.0
+		g.flames.append([fl, randf() * TAU, fl.scale])
+
+
+var _flame_t: Texture2D = null
+
+
+## A teardrop flame: wide and white-hot at the base, narrowing to the tip.
+func _flame_tex() -> Texture2D:
+	if _flame_t:
+		return _flame_t
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var nx := (float(x) / 63.0 - 0.5) * 2.0
+			var h := 1.0 - float(y) / 63.0  # 0 at the base (image bottom), 1 at the tip
+			var halfw := 0.85 * pow(1.0 - h, 0.7) * (0.8 + 0.2 * sin(h * 10.0 + float(x) * 0.15))
+			var dd := absf(nx) / maxf(halfw, 0.05)
+			var a := pow(clampf(1.0 - dd, 0.0, 1.0), 1.4) * (1.0 - h * 0.45)
+			var col := Color(1.0, 0.55, 0.10).lerp(Color(1.0, 0.92, 0.60), a)
+			img.set_pixel(x, y, Color(col.r, col.g, col.b, a))
+	_flame_t = ImageTexture.create_from_image(img)
+	return _flame_t
 
 
 func _soft_disc() -> Texture2D:
@@ -247,6 +304,21 @@ func build(list: Array) -> void:
 						clothmat.metallic_specular = 0.08
 						for mi in cloth.find_children("*", "MeshInstance3D", true, false):
 							(mi as MeshInstance3D).material_override = clothmat
+					if n:
+						# round 14 (asked: a prettier table — and night 8's still
+						# mirrored the light): real wood on the frame, and no
+						# surface of the table, cloth aside, glossier than 0.85.
+						b.apply_texture(n, "wood_dark")
+						for mi2 in n.find_children("*", "MeshInstance3D", true, false):
+							var mm := mi2 as MeshInstance3D
+							if "tablecloth" in mm.name.to_lower():
+								continue
+							for si in mm.mesh.get_surface_count():
+								var am := mm.get_active_material(si) as StandardMaterial3D
+								if am:
+									var dm := am.duplicate() as StandardMaterial3D
+									dm.roughness = maxf(dm.roughness, 0.85)
+									mm.set_surface_override_material(si, dm)
 					if bool(f.get("dining", false)):
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)
@@ -260,7 +332,7 @@ func build(list: Array) -> void:
 				place("furniture/workbench", f, "table", 0.0, 0.0, "wood_dark")
 				hide("table", f)
 			"chair":
-				var cf := {"x": x, "y": y, "w": 32, "h": 32}
+				var cf := {"x": x, "y": y, "w": 44, "h": 44}  # round 14: the zone covers the whole chair, not its middle
 				var back := str(f.get("back", "n"))
 				var r := 0.0
 				match back:
@@ -269,7 +341,7 @@ func build(list: Array) -> void:
 					"e": r = -90.0
 				var n := b.spawn("furniture/chair", W(x + 16, y + 16), r, b.furn)
 				b.collide(n, "chair")
-				hide("chair", cf, 2.0)
+				hide("chair", cf, 0.0)
 			"stool":
 				b.collide(b.spawn("furniture/stool", W(x + 18, y + 18), 0.0, b.furn), "stool")
 				hide("stool", {"x": x, "y": y, "w": 36, "h": 36}, 3.0)
@@ -295,15 +367,38 @@ func build(list: Array) -> void:
 					# dark, glossy, faintly lit from inside when the TV is on.
 					var scr := stand.find_child("screen", true, false) as MeshInstance3D
 					if scr:
-						var sm := StandardMaterial3D.new()
-						sm.albedo_color = Color(0.05, 0.07, 0.10)
-						sm.roughness = 0.22
-						sm.metallic = 0.3
-						if not bool(g.night.get("tvOff", false)):
-							sm.emission_enabled = true
-							sm.emission = Color(0.35, 0.5, 0.75)
-							sm.emission_energy_multiplier = 0.35
-						scr.set_surface_override_material(0, sm)
+						if bool(g.night.get("tvOff", false)):
+							var sm := StandardMaterial3D.new()
+							sm.albedo_color = Color(0.05, 0.07, 0.10)
+							sm.roughness = 0.22
+							sm.metallic = 0.3
+							scr.set_surface_override_material(0, sm)
+						else:
+							# round 14 (asked: the TV must SHOW something): an
+							# animated broadcast — a drifting picture under real
+							# static, scanlines and a rolling band.
+							var sh := Shader.new()
+							sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment() {
+	vec2 uv = UV;
+	float t = TIME;
+	vec3 pic = mix(vec3(0.10, 0.16, 0.30), vec3(0.45, 0.55, 0.70), sin(uv.x * 4.0 + t * 0.35) * 0.5 + 0.5);
+	pic = mix(pic, vec3(0.75, 0.62, 0.45), smoothstep(0.35, 0.75, sin(uv.y * 3.0 - t * 0.22) * 0.5 + 0.5) * 0.5);
+	float n = hash(floor(uv * vec2(160.0, 120.0)) + floor(t * 24.0));
+	vec3 col = pic * 0.72 + vec3(n) * 0.38;
+	col *= 0.92 + 0.08 * sin(uv.y * 400.0);
+	float roll = smoothstep(0.10, 0.0, abs(fract(uv.y + t * 0.07) - 0.5) - 0.40);
+	col += vec3(0.05, 0.07, 0.10) * roll;
+	col *= 1.0 - distance(uv, vec2(0.5)) * 0.55;
+	ALBEDO = col * 0.85;
+}
+"""
+							var shm := ShaderMaterial.new()
+							shm.shader = sh
+							scr.set_surface_override_material(0, shm)
 				var tv := light(W(cx, y + d + 70, 90), Color(0.56, 0.7, 1.0), 1.6, 4.6, "tv")
 				g.tv_light = tv
 				tv.visible = not bool(g.night.get("tvOff", false))
@@ -315,7 +410,9 @@ func build(list: Array) -> void:
 				_fire(W(cx, cy, 16), w)
 			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
-				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
+				var ln := b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn)
+				b.collide(ln)
+				b.shade_lamp(ln)  # round 14: a shade and a glowing bulb
 				# round 8 (asked): in the living room the floor lamp sits by the garland
 				# and out-shouts it — dimmed there, untouched elsewhere
 				if str(g.night.get("decor", "")) == "living":
@@ -328,7 +425,30 @@ func build(list: Array) -> void:
 				if pn:
 					g.plants.append([pn, pn.rotation, randf() * TAU])  # round 12: it sways
 			"washer":
-				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				var wn := place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				if wn:
+					# round 14 (asked: hiding behind the washing machines, like
+					# behind the TV): when the unit stands a rat-width off its
+					# wall, the slot behind it is a hide of hers alone.
+					# the gap is measured to the NEAREST wall, whichever it is
+					var sd := "n"
+					var gap := y
+					for k in ["s", "w", "e"]:
+						var gv := {"s": 600.0 - (y + d), "w": x, "e": 960.0 - (x + w)}[k] as float
+						if gv < gap:
+							gap = gv
+							sd = k
+					var hc := Vector2(cx, cy)
+					var along_x := true
+					match sd:
+						"n": hc = Vector2(cx, y / 2.0)
+						"s": hc = Vector2(cx, y + d + gap / 2.0)
+						"w": hc = Vector2(x / 2.0, cy); along_x = false
+						"e": hc = Vector2(x + w + gap / 2.0, cy); along_x = false
+					if gap >= 16.0 and gap <= 42.0:
+						# a HideSpot is a no-go on the hunters' path grid —
+						# they can wait at the slot's mouth but never path in.
+						b._hide("washerGap", hc.x, hc.y, w if along_x else gap, d if along_x else gap)
 				if not _lamp_done:
 					_lamp_done = true
 					_washer_wall_lamp(x - 160.0)

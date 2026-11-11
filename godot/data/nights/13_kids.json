@@ -66,8 +66,8 @@
   "floor": "wood",
   "floorA": "#5a4a3a",
   "wall": "stripes",
-  "wallA": "#4a5a8a",
-  "wallB": "#5a6a9a",
+  "wallA": "#7a6a8a",
+  "wallB": "#8a7a96",
   "trim": 3812928,
   "ceil": 2368570
  },
@@ -444,7 +444,20 @@
  ],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 1,
+   "b": 2
+  },
+  {
+   "a": 2,
+   "b": 0
+  }
+ ],
  "music": {
   "root": 60,
   "minor": false,

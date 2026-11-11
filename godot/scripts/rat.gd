@@ -94,11 +94,12 @@ var _climb_edge := Vector3.ZERO
 var _kind := ""  # up (one spring onto an edge), grab (caught an edge in the air), down (jump down), descend (climb down)
 var _grabbed := false  # one ledge grab per hop
 var _hopping := false  # in the air after her own hop (only then she reaches for an edge)
+var _embed_t := 0.0  # round 14: stuck-in-geometry rescue timer
 
 
 func _ready() -> void:
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 1 | 4  # round 14: layer 4 = rat-only solids (the cat's bed)
 	floor_max_angle = deg_to_rad(50.0)
 	floor_snap_length = 0.12  # demo polish: was 0.05, she un-stuck and micro-fell stepping off shelves
 	_make_dust()
@@ -561,8 +562,24 @@ func _physics_process(dt: float) -> void:
 		model.scale = model.scale.lerp(_breath(dt), clampf(dt * 10.0, 0.0, 1.0))
 	_tick_look(dt)
 	if _dust_trail:
-		_dust_trail.emitting = running and is_on_floor() and move_speed > walk_speed and not jumping and not hidden()
+		# round 14 (asked: dust where she walks, not only when she runs): the
+		# trail puffs at a walk too, thinner; a run kicks up the full cloud.
+		_dust_trail.emitting = is_on_floor() and move_speed > walk_speed * 0.5 and not jumping and not hidden()
+		var want_amt := 14 if move_speed > walk_speed else 6
+		if _dust_trail.amount != want_amt:
+			_dust_trail.amount = want_amt
 	noise_level = move_toward(noise_level, 0.0, dt * 1.5)
+	# round 14 (playtest: she ends up inside walls and furniture): if her core
+	# is embedded in something solid, step out to the nearest free offset.
+	_embed_t -= dt
+	if _embed_t <= 0.0 and not jumping:
+		_embed_t = 0.3
+		if not Game.I.sphere_free(global_position + Vector3.UP * 0.08, 0.04):
+			for off in [Vector3(0.15, 0, 0), Vector3(-0.15, 0, 0), Vector3(0, 0, 0.15), Vector3(0, 0, -0.15), Vector3(0.11, 0, 0.11), Vector3(-0.11, 0, 0.11), Vector3(0.11, 0, -0.11), Vector3(-0.11, 0, -0.11)]:
+				if Game.I.sphere_free(global_position + off + Vector3.UP * 0.08, 0.04):
+					global_position += off
+					velocity = Vector3.ZERO
+					break
 	if scripted:
 		_show_marker(false)
 		return
@@ -775,8 +792,11 @@ func _find_jump_target() -> void:
 	if not sniffing and is_on_floor():
 		var p0 := global_position
 		var f := global_transform.basis.z.normalized()
+		# round 14 (asked: with a run-up she should clear a gap between pieces of
+		# furniture — a little further, not far): momentum buys +0.38 m of scan.
+		var fast := Vector2(velocity.x, velocity.z).length() > 1.55
 		var dd := 0.14
-		while dd <= max_jump_reach and not _has_target and not dragging():  # round 12: no up-offers while hauling — the dispatch bars them anyway, and one would hide the drop behind her
+		while dd <= max_jump_reach + (0.38 if fast else 0.0) and not _has_target and not dragging():  # round 12: no up-offers while hauling — the dispatch bars them anyway, and one would hide the drop behind her
 			var o := p0 + f * dd + Vector3.UP * (max_jump_up + 0.2)
 			o.y = minf(o.y, CEILING - 0.03)  # start under the ceiling, not on top of it
 			var hit := _ray(o, Vector3(o.x, p0.y - 0.5, o.z))
@@ -797,11 +817,21 @@ func _find_jump_target() -> void:
 				if _has_target:
 					break
 				dd = 0.12
-				while dd <= 0.6:
+				var saw_gap := false
+				while dd <= (0.98 if fast else 0.6):
 					var o: Vector3 = p0 + df * dd + Vector3.UP * 0.1
 					var hit := _ray(o, o + Vector3.DOWN * 4.0)
 					dd += 0.04
-					if hit.is_empty() or p0.y - hit.position.y <= 0.12:
+					if hit.is_empty():
+						saw_gap = true
+						continue
+					var drop := p0.y - (hit.position as Vector3).y
+					if drop > 0.35:
+						saw_gap = true
+					# round 14: at a run, a LEVEL landing across a real gap (she
+					# saw void or floor between) is a target too — counter to
+					# island, chair to chair. Without the run it stays a drop.
+					if drop <= 0.12 and not (fast and saw_gap and drop >= -0.02):
 						continue
 					if hit.normal.y > 0.75 and _clear(hit.position):
 						_target = hit.position

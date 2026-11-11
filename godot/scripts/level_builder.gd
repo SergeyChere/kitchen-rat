@@ -372,6 +372,70 @@ static func _takes_texture(tex_name: String, src: BaseMaterial3D) -> bool:
 ## not colour: among the thin slabs in the model's upper band, the one whose
 ## top is highest. Fruit bowls, soap bottles and cabinet fronts sit elsewhere
 ## (or are thicker than a slab) and keep the materials they were made with.
+## Round 14 (asked: "a stick with a bulb"): a floor lamp gets its shade, and
+## the bulb inside actually glows.
+func shade_lamp(n: Node3D) -> void:
+	if n == null:
+		return
+	var bulb: MeshInstance3D = null
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		if "bulb" in (c as MeshInstance3D).name.to_lower():
+			bulb = c as MeshInstance3D
+	if bulb == null:
+		return
+	for i in bulb.mesh.get_surface_count():
+		var d := StandardMaterial3D.new()
+		d.albedo_color = Color(1.0, 0.85, 0.55)
+		d.emission_enabled = true
+		d.emission = Color(1.0, 0.72, 0.35)
+		d.emission_energy_multiplier = 1.4
+		bulb.set_surface_override_material(i, d)
+	var bc := world_aabb(bulb).get_center()
+	var shade := spawn("rooms/lamp_shade", bc, 0.0, n.get_parent())
+	if shade:
+		var sb := world_aabb(shade)
+		shade.global_position += bc + Vector3(0, 0.04, 0) - sb.get_center()
+
+
+## Round 14 (asked: the foil reads as plain white scraps): crinkle facets,
+## real metal — foil must flash under the moon patch, not sit there as paper.
+func dress_foil(n: Node3D) -> void:
+	if n == null:
+		return
+	var tex := TextureLib.get_texture("crinkle")
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var s := m.get_active_material(i) as BaseMaterial3D
+			if s == null:
+				continue
+			var d := s.duplicate() as StandardMaterial3D
+			d.metallic = 0.85
+			d.roughness = 0.42
+			if tex != null:
+				d.albedo_texture = tex
+				d.albedo_color = Color(0.92, 0.95, 1.02)
+				_add_normal(d, "crinkle")
+			m.set_surface_override_material(i, d)
+
+
+## Round 14 (asked: the plate is just a white circle): porcelain — warm white,
+## glossy enough to catch a rim of light.
+func dress_plate(n: Node3D) -> void:
+	if n == null:
+		return
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var s := m.get_active_material(i) as BaseMaterial3D
+			if s == null:
+				continue
+			var d := s.duplicate() as StandardMaterial3D
+			d.albedo_color = Color(0.93, 0.90, 0.84)
+			d.roughness = 0.16
+			m.set_surface_override_material(i, d)
+
+
 func apply_countertop(n: Node3D) -> void:
 	var tex := TextureLib.get_texture("counter_stone")
 	if n == null or tex == null:
@@ -388,26 +452,53 @@ func apply_countertop(n: Node3D) -> void:
 		first = false
 	if first:
 		return
-	var cands: Array = []  # [mesh, surface, box]
+	var cands: Array = []  # [mesh, surface, box, uv_span]
 	var top_end := -1.0e9
 	for mi in mis:
 		var to_local := inv * mi.global_transform
 		for i in mi.mesh.get_surface_count():
-			var verts: PackedVector3Array = mi.mesh.surface_get_arrays(i)[Mesh.ARRAY_VERTEX]
+			var arrays := mi.mesh.surface_get_arrays(i)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			if verts.is_empty():
 				continue
 			var sb := AABB(verts[0], Vector3.ZERO)
 			for v in verts:
 				sb = sb.expand(v)
 			sb = to_local * sb
-			if sb.size.y <= 0.08 and sb.position.y >= all.position.y + all.size.y * 0.78:
-				cands.append([mi, i, sb])
+			if sb.size.y <= 0.08 and sb.position.y >= all.position.y + all.size.y * 0.75:
+				var span := Vector2(1, 1)
+				var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+				if not uvs.is_empty():
+					var mn := Vector2(1.0e9, 1.0e9)
+					var mx := Vector2(-1.0e9, -1.0e9)
+					for t2 in uvs:
+						mn = mn.min(t2)
+						mx = mx.max(t2)
+					span = Vector2(maxf(mx.x - mn.x, 0.05), maxf(mx.y - mn.y, 0.05))
+				cands.append([mi, i, sb, span])
 				top_end = maxf(top_end, sb.end.y)
 	if cands.is_empty():
 		return
+	# round 14 (asked: the stone read as a ROAD — one giant slab per counter):
+	# repeat the sheet ~3.2 times across the slab's own UV span, so the slate
+	# pieces land at ~20 cm whatever the model's UVs do. One material per piece.
+	# The reference slab is the WIDEST thin candidate — the island's fruit bowl
+	# also sits up there in thin slices and must never be mistaken for the top.
+	var ref := 0
+	var ref_area := -1.0
+	for ci in cands.size():
+		var cb2 := cands[ci][2] as AABB
+		var ar := cb2.size.x * cb2.size.z
+		if ar > ref_area:
+			ref_area = ar
+			ref = ci
+	top_end = (cands[ref][2] as AABB).end.y
+	var span0: Vector2 = cands[ref][3]
 	var stone := mat_named("counter_stone", Color(0.92, 0.92, 0.94))
+	stone.uv1_scale = Vector3(clampf(3.2 / span0.x, 1.5, 6.0), clampf(3.2 / span0.y, 1.5, 6.0), 1)
 	for cd in cands:
-		if (cd[2] as AABB).end.y >= top_end - 0.015:
+		var cb3 := cd[2] as AABB
+		if cb3.end.y >= top_end - 0.03 and cb3.size.x * cb3.size.z >= ref_area * 0.4:
 			(cd[0] as MeshInstance3D).set_surface_override_material(int(cd[1]), stone)
 
 
@@ -415,11 +506,15 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 	var tex := TextureLib.get_texture(tex_name) if n != null else null
 	if tex == null:
 		return
-	var c := Color(clampf(tint.r / 0.45, 0.0, 1.0), clampf(tint.g / 0.45, 0.0, 1.0), clampf(tint.b / 0.45, 0.0, 1.0))
+	# round 14: with no explicit tint, the SURFACE's own colour is the tint
+	# (divided by the texture's mean brightness) — a purple sofa stays purple
+	# WITH its weave, instead of every piece washing out to the raw texture.
+	var mean: float = float({"wood": 0.50, "wood_dark": 0.45, "fabric": 0.75, "leather": 0.55, "metal_matte": 0.60, "cardboard": 0.65, "plastic": 0.65}.get(tex_name, 0.45))
+	var c := Color(clampf(tint.r / mean, 0.0, 1.0), clampf(tint.g / mean, 0.0, 1.0), clampf(tint.b / mean, 0.0, 1.0))
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if "screen" in m.name.to_lower():
-			continue  # round 12b: a screen is glass, not furniture — never texture one
+		if "screen" in m.name.to_lower() or "tablecloth" in m.name.to_lower():
+			continue  # round 12b/14: a screen is glass and a cloth is cloth — never texture either
 		for i in m.mesh.get_surface_count():
 			var src := m.get_active_material(i) as BaseMaterial3D
 			if src == null:
@@ -428,7 +523,7 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 				continue  # round 12c: baked-in props keep their own materials
 			var t := src.duplicate() as BaseMaterial3D
 			t.albedo_texture = tex
-			t.albedo_color = c
+			t.albedo_color = c if tint != Color.WHITE else Color(clampf(src.albedo_color.r / mean, 0.0, 1.0), clampf(src.albedo_color.g / mean, 0.0, 1.0), clampf(src.albedo_color.b / mean, 0.0, 1.0))
 			t.uv1_scale = Vector3(2.0, 2.0, 1.0)
 			var p := surface_props(tex_name)
 			t.roughness = float(p[0])
@@ -533,11 +628,11 @@ func _lighting() -> void:
 			atint = Color(1.06, 0.97, 0.86)
 			ascale = 0.78  # warm-keyed rooms: the fill drops so the fire/lamps own them
 		"pantry":
-			atint = Color(0.9, 0.99, 1.07)
+			atint = Color(0.98, 0.98, 1.01)
 		"kids":
 			atint = Color(1.03, 0.98, 1.02)
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.38 * ascale * float(pal.get("hemi", 0.8)) / 0.8  # round 4/10: the FILL of the cinematic scheme — low and cool against the keys; the motivated sources carry the room
+	env.ambient_light_color = Color(0.60, 0.56, 0.50) * atint * 0.38  # round 14: the palette is set at 70/30 — warm sources carry the room, cool is moonlight and this fill only, warmed and lowered so rooms stop reading blue * ascale * float(pal.get("hemi", 0.8)) / 0.8  # round 4/10: the FILL of the cinematic scheme — low and cool against the keys; the motivated sources carry the room
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
@@ -593,7 +688,7 @@ func _lighting() -> void:
 	var fill := DirectionalLight3D.new()
 	fill.name = "Moon fill"
 	fill.light_color = Color(0.6, 0.7, 1.0)
-	fill.light_energy = 0.22
+	fill.light_energy = 0.15  # round 14: 70/30 — the fill is a whisper now
 	fill.shadow_enabled = false
 	root.add_child(fill)
 	fill.rotation = Vector3(deg_to_rad(-50.0), deg_to_rad(-15.0), 0)
@@ -638,6 +733,35 @@ func _lighting() -> void:
 		# slim stand carries it down to the floor, so the light visibly stands on something
 		var lh := float(l.get("h", 60))
 		if lh > 12.0:
+			# round 14 (asked: "a stick with a bulb on it"): the stand carries a
+			# little lantern now — a glass sleeve around the flame and a dark cap,
+			# so the light reads as a lamp standing in the corner.
+			var glass := MeshInstance3D.new()
+			glass.name = "Lantern glass"
+			var glm := CylinderMesh.new()
+			glm.top_radius = 0.042
+			glm.bottom_radius = 0.042
+			glm.height = 0.115
+			glass.mesh = glm
+			var glmat := StandardMaterial3D.new()
+			glmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			glmat.albedo_color = Color(1.0, 0.78, 0.45, 0.30)
+			glmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			glass.material_override = glmat
+			glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(glass)
+			glass.global_position = W(float(l.x), float(l.y), lh - 2.0)
+			var cap := MeshInstance3D.new()
+			cap.name = "Lantern cap"
+			var cm2 := CylinderMesh.new()
+			cm2.top_radius = 0.012
+			cm2.bottom_radius = 0.058
+			cm2.height = 0.045
+			cap.mesh = cm2
+			cap.material_override = mat(hex(0x2a2320))
+			cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(cap)
+			cap.global_position = W(float(l.x), float(l.y), lh + 5.5)
 			var pole := MeshInstance3D.new()
 			pole.name = "Candle stand"
 			var pm := CylinderMesh.new()
@@ -670,6 +794,12 @@ func _lighting() -> void:
 	root.add_child(room)
 	room.global_position = W(480, 300, 200)
 	g.room_light = room
+	# round 14 (asked: light with no lamp): the ceiling light hangs in a
+	# chandelier, so its source is in the room even when it is off.
+	var ch := spawn("rooms/chandelier", W(480, 300, 250), 0.0, root)
+	if ch:
+		var cbb := world_aabb(ch)
+		ch.global_position.y -= cbb.end.y - 2.52
 
 
 static func _section(p: float) -> int:
@@ -857,13 +987,20 @@ func _room() -> void:
 		# (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before.
 		var ct := TextureLib.get_texture("ceramic_tile", false)
 		if ct != null:
-			floor_mat = mat(Color(0.30, 0.32, 0.45))
+			floor_mat = mat(Color(0.46, 0.44, 0.41))  # round 14: warm-neutral — the old tint was blue, and it blued every tile floor
 			floor_mat.albedo_texture = ct
 			floor_mat.uv1_scale = Vector3(6, 3.75, 1)
 			floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 			floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
 			_add_normal(floor_mat, "ceramic_tile")
 	var wall_mat := mat(Color.WHITE, wall_tex)
+	# round 14 (asked: walls the same blue everywhere): a painted wallpaper
+	# (TextureGen) tinted by THIS night's wallA replaces the bundled pattern,
+	# so each room's walls carry its own colour. Falls back to the old pattern
+	# until the painter has produced the wallpaper once.
+	var wp_name := "wallpaper_" + str(pal.get("wall", "stripes"))
+	if TextureLib.get_texture(wp_name, false) != null:
+		wall_mat = mat_named(wp_name, Color.html(str(pal.get("wallA", "#8a8378"))))
 	var trim := mat(hex(0x7a4a2a))
 
 	# floor (a thin solid slab) and ceiling (no collision, casts no shadow)
@@ -871,6 +1008,35 @@ func _room() -> void:
 	var fm := (fl as MeshInstance3D).mesh as BoxMesh
 	fm.size = Vector3(9.6, 0.1, 6.0)
 	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), mat(hex(pal.get("ceil", 0x22263a))), root, false)
+	# round 14 (asked: dust and air, everywhere): motes drift through the whole
+	# room, catching the moon patch as they cross it — the air itself is alive.
+	var motes := CPUParticles3D.new()
+	motes.name = "Dust motes"
+	motes.amount = 64
+	motes.lifetime = 9.0
+	motes.preprocess = 9.0
+	motes.local_coords = false
+	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	motes.emission_box_extents = Vector3(4.6, 1.1, 2.8)
+	motes.direction = Vector3(0, -1, 0)
+	motes.spread = 180.0
+	motes.initial_velocity_min = 0.008
+	motes.initial_velocity_max = 0.03
+	motes.gravity = Vector3(0, -0.004, 0)
+	var msm := SphereMesh.new()
+	msm.radius = 0.006
+	msm.height = 0.012
+	msm.radial_segments = 6
+	msm.rings = 3
+	var mmat := StandardMaterial3D.new()
+	mmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mmat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mmat.albedo_color = Color(1, 1, 1, 0.30)
+	msm.material = mmat
+	motes.mesh = msm
+	root.add_child(motes)
+	motes.global_position = W(480, 300, 120)
 	var cb := StaticBody3D.new()  # the rat and the camera bump into the ceiling (up on the cabinets)
 	cb.collision_layer = 1 | 4
 	cb.collision_mask = 0
@@ -1026,18 +1192,24 @@ func _furniture() -> void:
 	# the table with chairs, a low shelf and a stool. Fronts face into the room.
 	furn_piece("furniture/counter_corner", 36, 36, 0.0, "counter", 72, 72)
 	var n := 12
-	var w := (830.0 - 72.0) / n
+	var w := (800.0 - 72.0) / n  # round 14: the run ends at 800 — a slot is left by the fridge (below)
 	for i in n:
 		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
 		if i == 6 and piece:
 			_sink_water(piece)
 	for j in 4:
 		furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72)
-	furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
+	furn_piece("furniture/fridge", 895, 84, 0.0, "fridge", 130, 110)
+	# round 14 (asked: hiding behind the fridge, like behind the TV): the
+	# fridge stands 29 cm off the north wall and the counter run ends early —
+	# the strip behind it is hers alone (hunter guards seal the way in).
+	_hide("fridgeGap", 895, 15, 120, 26)  # a HideSpot is a hunter no-go on their grid (NavGrid) — the slot is hers
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
 	furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90)
 	furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44)
 	var table := furn_piece("furniture/table_kitchen", 720, 445, 0.0, "table", 200, 130)
+	if table:
+		apply_texture(table, "wood_dark")  # round 14 (asked): the kitchen table gets its wood too
 	if table:
 		var cloth := table.find_child("tablecloth*", true, false) as Node3D
 		var spec := {}
@@ -1045,14 +1217,14 @@ func _furniture() -> void:
 			if str(f.t) == "table": spec = f
 		if cloth and int(spec.get("cloth", 0)) == 0:
 			cloth.queue_free()
-	_hide("table", 720, 445, 184, 114)
+	_hide("table", 720, 445, 196, 126)
 	# round 5: hiding under a bare table read as ridiculous — there are THINGS under it now:
 	# a storage box and the kid's backpack, and she ducks in among them
 	collide(spawn("props/small_box", W(655, 485), 18.0, decor))
 	spawn("props/backpack", W(778, 402), -35.0, decor)
 	for c in [[596, 420, 90], [596, 472, 90], [846, 446, -90]]:
 		furn_piece("furniture/chair", c[0], c[1], c[2], "chair")
-		_hide("chair", c[0], c[1], 28, 28)
+		_hide("chair", c[0], c[1], 42, 42)  # round 14: the whole chair is her cover — and a hunter no-go
 	furn_piece("furniture/low_shelf", 231, 325, 0.0, "lowShelf", 62, 50)
 	_hide("shelf", 231, 325, 54, 42)
 	furn_piece("furniture/stool", 100, 252, 0.0, "stool")
@@ -1131,18 +1303,19 @@ func _bowl_leftovers(bowl: Node3D) -> void:
 	var bb := world_aabb(bowl)
 	var c := bb.get_center()
 	var r := minf(bb.size.x, bb.size.z) * 0.28
-	var kib := mat(hex(0x8a5a2e))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	for i in 22:
+	for i in 26:
 		var a := rng.randf() * TAU
 		var d := sqrt(rng.randf()) * r
 		var k := MeshInstance3D.new()
 		var sm := SphereMesh.new()
-		sm.radius = 0.009
-		sm.height = 0.012
+		sm.radius = rng.randf_range(0.008, 0.013)  # round 14: kibble you can READ —
+		sm.height = sm.radius * 1.35  # varied bits in varied browns, mounded, not one flat disc
 		k.mesh = sm
-		k.material_override = kib
+		var km := mat(Color(0.54, 0.35, 0.18).lerp(Color(0.30, 0.18, 0.08), rng.randf()))
+		km.roughness = 0.75
+		k.material_override = km
 		decor.add_child(k)
 		k.global_position = Vector3(c.x + cos(a) * d, bb.position.y + bb.size.y * 0.6 + rng.randf() * 0.008, c.z + sin(a) * d)
 
@@ -1177,7 +1350,9 @@ func _decor() -> void:
 		match str(p.t):
 			"foil":
 				var c := W(float(p.x) + float(p.w) / 2.0, float(p.y) + float(p.h) / 2.0)
-				fit(spawn("props/foil", c, 0.0, decor), float(p.w), float(p.h))
+				var fn := spawn("props/foil", c, 0.0, decor)
+				fit(fn, float(p.w), float(p.h))
+				dress_foil(fn)
 				(add_zone(NoisyZone, "Foil", c, Vector3(float(p.w) / 100.0, 0.2, float(p.h) / 100.0)) as NoisyZone).configure("foil")
 			"breadbox":
 				collide(spawn("props/bread_box", on_top(float(p.x) + float(p.w) / 2.0, float(p.y) + float(p.h) / 2.0), 0.0, decor))
@@ -1192,11 +1367,27 @@ func _decor() -> void:
 				_sticky(p, str(p.t))
 	for f in night.get("furn", []):
 		if bool(f.get("plate", false)):
-			collide(spawn("food/plate", on_top(680, 432), 0.0, decor))
+			var pl1 := spawn("food/plate", on_top(680, 432), 0.0, decor)
+			collide(pl1)
+			dress_plate(pl1)
 	var ex: Array = night.get("exit", [])
 	if ex.size() >= 2:
 		_exit(Nights.pos(ex))
-	spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # no collision: the cat lies in it
+	var cat_bed := spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # the cat lies in it…
+	if cat_bed:
+		# round 14 (asked: she walks through the cat's bed): a rat-only collider
+		# (layer 4 is in HER mask, not the hunters') — the bed is solid to her,
+		# the cat still settles in as before.
+		var bb := StaticBody3D.new()
+		bb.collision_layer = 4
+		bb.collision_mask = 0
+		var bcs := CollisionShape3D.new()
+		var bbs := BoxShape3D.new()
+		bbs.size = Vector3(0.58, 0.13, 0.58)
+		bcs.shape = bbs
+		bcs.position.y = 0.065
+		bb.add_child(bcs)
+		cat_bed.add_child(bb)
 	if (night.get("bowl", []) as Array).size() >= 2:
 		var bowl := spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor)
 		collide(bowl)
@@ -1384,7 +1575,7 @@ func _food() -> void:
 		if bool(s.get("plate", false)):
 			# round 12 (asked): some food is SERVED — a plate under it, and the food
 			# sits in the plate rather than on the bare surface beneath
-			spawn("food/plate", at, randf() * 360.0, decor)
+			dress_plate(spawn("food/plate", at, randf() * 360.0, decor))
 			at += Vector3.UP * 0.02
 		var f := g.spawn_food(str(s.type), at, str(s.get("tag", "")), false)
 		if f:
@@ -1441,8 +1632,9 @@ func _nest() -> void:
 	var light := OmniLight3D.new()
 	light.light_color = Color8(0xff, 0xd0, 0xa0)
 	light.light_energy = 0.95
-	light.omni_range = 2.8
+	light.omni_range = 2.2
 	light.omni_attenuation = 1.2  # round 10: the nest stays a pocket of warm dark
+	light.shadow_enabled = true  # round 14: the wall must OCCLUDE it — the room's corner glowed with no source
 	nest.add_child(light)
 	light.global_position = W(180, 622, 42)
 	for mnd in [[95, 705, 0.55, 0.42], [168, 712, 0.48, 0.38], [128, 660, 0.42, 0.34], [205, 668, 0.36, 0.3]]:

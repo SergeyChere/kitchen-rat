@@ -26,6 +26,7 @@ var run := {"catWoke": false, "chased": false, "seenOwner": false, "poisonDelive
 var env: Environment
 var moon: DirectionalLight3D
 var flickers: Array = []  # [light, base energy, "fire" | "tv" | "steady"]
+var flames: Array = []  # round 14: [flame plane, phase, base scale] — fireplace flames flickered in _tick_props
 var tv_light: OmniLight3D
 var tv_on := false
 var cracks: Array[Vector3] = []
@@ -1344,6 +1345,12 @@ func _tick_props(dt: float) -> void:
 		(clock_hands[0] as Node3D).rotation.z = -fmod(th, 12.0) / 12.0 * TAU
 		(clock_hands[1] as Node3D).rotation.z = -fmod(th * 60.0, 60.0) / 60.0 * TAU
 	var t := Time.get_ticks_msec() / 1000.0
+	for fl in flames:
+		var fp := fl[0] as Node3D
+		if is_instance_valid(fp):
+			var fs := 0.92 + 0.10 * sin(t * 11.0 + float(fl[1])) + 0.04 * sin(t * 27.0 + float(fl[1]) * 1.7)
+			var bs := fl[2] as Vector3
+			fp.scale = Vector3(bs.x, bs.y * fs, bs.z)
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
 	for pl in plants:

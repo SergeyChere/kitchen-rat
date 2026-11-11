@@ -12,7 +12,8 @@ const S := 256
 
 ## All paintable material names (the shaft gradient is separate: make("shaft")).
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
-	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese", "fur_rat", "fur_cat"]
+	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese", "fur_rat", "fur_cat",
+	"wallpaper_stripes", "wallpaper_damask", "wallpaper_panel", "wallpaper_brick", "crinkle"]
 
 
 static func make(tex_name: String) -> Texture2D:
@@ -41,6 +42,12 @@ static func make_image(tex_name: String) -> Image:
 		"fur_rat": img = _fur(211, false)
 		"fur_cat": img = _fur(223, true)
 		"fur_rat_normal": img = _fur_normal(211, false)
+		"wallpaper_stripes": img = _wallpaper("stripes")
+		"wallpaper_damask": img = _wallpaper("damask")
+		"wallpaper_panel": img = _wallpaper("panel")
+		"wallpaper_brick": img = _wallpaper("brick")
+		"crinkle": img = _crinkle(false)
+		"crinkle_normal": img = _crinkle(true)
 		"fur_cat_normal": img = _fur_normal(223, true)
 		"shaft": img = _shaft()
 		_: return null
@@ -428,4 +435,61 @@ static func _fur_normal(seed: int, tabby: bool) -> Image:
 			var gy := _fur_height(u, v + e, seed, tabby) - _fur_height(u, v - e, seed, tabby)
 			var n := Vector3(-gx * 1.1, -gy * 1.1, 1.0).normalized()
 			_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	return _img(data)
+
+
+## Round 14: wallpapers — luminance patterns painted near-white; the night's
+## own wallA tints them (mat_named), so each room's walls carry its colour
+## instead of one blue pattern everywhere. And crinkle for the foil sheets:
+## sharp little facets that catch the light like real foil.
+static func _wallpaper(kind: String) -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var f1 := _field(6, 71, 2)
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			var lum := 0.94
+			match kind:
+				"stripes":
+					lum = 0.90 + 0.10 * (0.5 + 0.5 * sin(u * TAU * 7.0))
+				"damask":
+					var dx := absf(fposmod(u * 4.0, 1.0) - 0.5) + absf(fposmod(v * 4.0, 1.0) - 0.5)
+					lum = 0.90 + 0.09 * smoothstep(0.25, 0.75, dx)
+				"panel":
+					var px := fposmod(u * 3.0, 1.0)
+					var py := fposmod(v * 2.0, 1.0)
+					var edge := minf(minf(px, 1.0 - px) * 3.0, minf(py, 1.0 - py) * 2.0)
+					lum = 0.89 + 0.10 * smoothstep(0.04, 0.16, edge)
+				"brick":
+					var row := int(v * 8.0)
+					var bx := fposmod(u * 4.0 + (0.5 if row % 2 == 1 else 0.0), 1.0)
+					var by := fposmod(v * 8.0, 1.0)
+					var m := minf(minf(bx, 1.0 - bx) * 4.0, minf(by, 1.0 - by) * 8.0)
+					lum = 0.86 + 0.13 * smoothstep(0.02, 0.10, m)
+			lum *= 0.96 + 0.07 * f1[y * S + x]
+			_put(data, x, y, Color(lum, lum, lum))
+	return _img(data)
+
+
+static func _crinkle_height(u: float, v: float) -> float:
+	return absf(_vn2(u, v, 24, 24, 331) - _vn2(u, v, 24, 24, 337)) * 1.5 + _vn2(u, v, 48, 48, 341) * 0.35
+
+
+static func _crinkle(normal: bool) -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var e := 1.5 / S
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			if normal:
+				var gx := _crinkle_height(u + e, v) - _crinkle_height(u - e, v)
+				var gy := _crinkle_height(u, v + e) - _crinkle_height(u, v - e)
+				var n := Vector3(-gx * 1.6, -gy * 1.6, 1.0).normalized()
+				_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+			else:
+				_put(data, x, y, Color(0.92, 0.94, 0.97) * (0.72 + 0.5 * _crinkle_height(u, v)))
 	return _img(data)

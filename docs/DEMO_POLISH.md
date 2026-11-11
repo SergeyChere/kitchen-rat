@@ -694,3 +694,76 @@ clips live in these rigs.
 **Testing.** Import clean; night 1 CI set and walk pass; stride
 nights 2 and 7, cat night 5 pass.
 
+## Round 14 — the big playtest list (2026-11-10, 23 points)
+
+**Palette, decided and applied everywhere (points 4, 10, 21).**
+The house now grades at 70/30: warm motivated sources (lamps,
+fire, TV, candles) carry ~70% of the light; cool is moonlight
+only. The ambient fill is warmed (0.60, 0.56, 0.50) and the blue
+"Moon fill" drops 0.22 → 0.15; the tile-floor tint is warm-neutral
+instead of blue. Walls stop being one blue pattern: TextureGen
+paints luminance wallpapers (stripes / damask / panel / brick),
+and each night's walls are tinted by its own wallA — the
+blue-greys were re-hued warm (kitchen sage, kitchen-again taupe,
+laundry warm grey-green, kids dusty plum, party mauve); the
+already-warm rooms (living teal-green, pantry brick, dining
+plum) keep their identities.
+
+**Bugs and regressions.** The cat's bed is solid to the rat now
+(a layer-4 collider in her mask only; the cat still settles in).
+A stuck-in-geometry rescue checks every 0.3 s whether her core
+is embedded and steps her out to the nearest free offset. The
+tossed-food scatter (night 8's vanishing chicken) tries seven
+directions and accepts only a real top face at or below the
+food's height, else drops at her feet. The sofa/armchair "lost
+their texture": the texture pass now tints by each surface's OWN
+colour divided by the texture's mean, so pieces keep their
+authored colours WITH the weave/grain instead of washing out.
+The fireplace (night 2, "still no fire") gains an ember bed and
+three crossed flame planes — plain meshes, flickered in
+_tick_props — the particles stay as a bonus. The nest omni gets
+shadows and a shorter range: the room corner by the hole no
+longer glows from nowhere. The ceiling light hangs in a
+chandelier. The candle stand is a lantern (glass sleeve + cap),
+and floor lamps get shades and glowing bulbs (night 2's "light
+with no lamp", night 1's "stick with a bulb"). The TV, when on,
+shows an animated broadcast (drifting picture, static,
+scanlines, roll bar) via a small shader. Dining tables: wood on
+the frame and no surface glossier than 0.85 (night 8's mirror).
+Kitchen table gets its wood; plates are porcelain (warm white,
+roughness 0.16) instead of flat white circles. The foil sheets
+are crinkled metal now (TextureGen "crinkle" + normal, metallic
+0.85), not white paper. The cat's bowl holds 26 varied kibble
+bits in varied browns instead of one flat disc (night 6).
+
+**Countertops (2, 6).** A probe on night 1 confirms the stone
+lands on every counter segment, the sink, the corner and the
+island. The "roadway" scale is fixed by normalising the repeat
+to each slab's own UV span (~3.2 sheets across, ~20 cm pieces),
+and the reference slab is chosen by footprint AREA — after the
+thickness widening briefly dressed the island's fruit in stone.
+
+**Gameplay (8, 19b, 20, 22, 23).** A running rat (speed > 1.55)
+scans +0.38 m further and, after seeing a real gap, may take a
+LEVEL target across it — counter to island, chair to chair;
+without the run-up nothing changes. The owner gets a 50-second
+post-visit refractory: only stars two above the threshold bring
+him back early (plan visits untouched). Hunters path on the
+NavGrid, not physics — hide zones are their no-go — so the
+chair/table zones were widened to the furniture's real footprint
+(the cat slipped through the margins). Tunnels: twelve nights
+had cracks but an EMPTY tunnel list; all now ring-link their
+cracks (enter one hole, out another). Hiding behind appliances:
+the kitchen fridge stands 29 cm off the wall with the counter
+run ending at 800 — the strip behind it is a hide; pantry and
+laundry washers stand 30 cm off the wall (data), and RoomFurniture
+registers the slot behind any 16–42 cm-gapped washer as a hide.
+
+**Air (1).** The noise rings stay; her dust trail now puffs at a
+walk too (6 motes) and at a run in full (14), and every room
+drifts 64 slow dust motes through the moon patch.
+
+**Testing.** Import clean; night 1 CI set and walk pass; stride
+nights 2, 3, 4, 6, 8, 9, 10 and hides night 4 pass. Countertop
+probe verified on night 1 (see above).
+

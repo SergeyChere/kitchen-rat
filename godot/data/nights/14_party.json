@@ -67,8 +67,8 @@
   "floorA": "#3e3c62",
   "floorB": "#4c4a7a",
   "wall": "stripes",
-  "wallA": "#524a76",
-  "wallB": "#5c5482",
+  "wallA": "#6e5a68",
+  "wallB": "#7d6a74",
   "trim": 3812928,
   "ceil": 2236474
  },
@@ -466,7 +466,24 @@
  ],
  "dog": [],
  "zones": [],
- "tunnels": [],
+ "tunnels": [
+  {
+   "a": 0,
+   "b": 1
+  },
+  {
+   "a": 1,
+   "b": 2
+  },
+  {
+   "a": 2,
+   "b": 3
+  },
+  {
+   "a": 3,
+   "b": 0
+  }
+ ],
  "music": {
   "root": 58,
   "minor": false,

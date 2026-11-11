@@ -66,8 +66,8 @@
   "floorA": "#3b4058",
   "floorB": "#4a5070",
   "wall": "stripes",
-  "wallA": "#4b5272",
-  "wallB": "#545c80",
+  "wallA": "#5f6a58",
+  "wallB": "#6b7563",
   "trim": 3812912,
   "ceil": 2238010
  },

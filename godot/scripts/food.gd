@@ -54,15 +54,20 @@ func make_poison() -> void:
 ## side, so a dropped sausage never wedges at a table's base (round 5, playtest: it stuck there).
 func toss_scatter() -> void:
 	var from := global_position
-	var side := Vector3(randf_range(-1.0, 1.0), 0, randf_range(-1.0, 1.0)).normalized()
-	if side.length() < 0.1:
-		side = Vector3.RIGHT
-	var at := from + side * randf_range(0.35, 0.55)
 	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 3.0)
-	var hit := space.intersect_ray(q)
-	if not hit.is_empty():
-		at = hit.position
+	# round 14 (playtest, night 8: a tossed chicken leg VANISHED): the old code
+	# took the first sideways point blind — if it lay inside a wall or a solid
+	# counter, the down-ray found nothing there and the food froze mid-geometry.
+	# Now: try several directions, accept only a hit on a real top face at or
+	# below where the food was; last resort, drop it straight down at her feet.
+	var at := from
+	for k in 7:
+		var cand := from if k == 6 else from + Vector3(cos(randf() * TAU), 0, sin(randf() * TAU)) * randf_range(0.35, 0.55)
+		var q := PhysicsRayQueryParameters3D.create(cand + Vector3.UP * 0.5, cand + Vector3.DOWN * 3.0)
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and (hit.normal as Vector3).y > 0.65 and (hit.position as Vector3).y <= from.y + 0.05:
+			at = hit.position
+			break
 	set_meta("dropped_at", at)
 	var tw := create_tween()
 	tw.tween_method(func(t: float): global_position = from.lerp(at, t) + Vector3.UP * sin(t * PI) * 0.16, 0.0, 1.0, 0.38)
