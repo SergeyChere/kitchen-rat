@@ -852,3 +852,28 @@ floors it was meant for:
   re-downloads by itself. cdn.json points at textures-v2.
 - **Anisotropic filtering 8×** in project settings — floors and
   countertops stop swimming at grazing camera angles.
+
+## Round 17 — the details pass (2026-11-11)
+
+Sergii's brief: "scatter details everywhere, at your discretion — I'll
+keep the good ones and veto the rest." So every placed piece of
+furniture now gets set dressing derived from its measured world AABB
+(works whatever wall it stands against), all non-solid decor:
+
+- sofas/armchairs: cushions in a warm muted palette + a fabric throw;
+- bookcases: three rows of individual books (varied height, width,
+  colour, lean); shelf units and crates: rows of lidded jars;
+- washers/dryers: a detergent bottle and a stack of folded towels;
+- TV stands: a remote and two game cases; sideboards: a vase with
+  greens and a book stack; coffee tables: books and a mug;
+- fridges: a note and five magnets on the door;
+- dining tables: four placemats, a centrepiece and two candles;
+- every dressed room: wall outlets, a light switch; living rooms add
+  a radiator and a slow ceiling fan (spinners ticked in _tick_props).
+- The fixed kitchen (night 1): four hanging pans that sway with the
+  houseplants, a dish rack with plates by the sink, spice jars, a
+  paper-towel roll, a floor bin, a fruit bowl on the table, and a
+  gingham towel on the oven handle.
+
+Also here: `docs/TEXTURES_V2.md` — the shopping list for the v2 pack,
+moved into the project at Sergii's request.

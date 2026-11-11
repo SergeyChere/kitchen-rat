@@ -1478,6 +1478,75 @@ func _furniture() -> void:
 	furn_piece("furniture/stool", 100, 252, 0.0, "stool")
 	if bool(night.get("kitchenUpper", false)):
 		_kitchen_upper()
+	_kitchen_details()
+
+
+func _kcyl(center: Vector3, r: float, h: float, m: Material, r_top := -1.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = "Detail cyl"
+	var cm := CylinderMesh.new()
+	cm.top_radius = r if r_top < 0.0 else r_top
+	cm.bottom_radius = r
+	cm.height = h
+	mi.mesh = cm
+	mi.material_override = m
+	decor.add_child(mi)
+	mi.global_position = center
+	return mi
+
+
+## Round 17 (details pass, Muse's discretion): the fixed-layout kitchen gets
+## its set dressing — hanging pans that sway with the plants, a dish rack by
+## the sink, spice jars, a paper-towel roll, a bin, fruit on the table and a
+## towel on the oven handle.
+func _kitchen_details() -> void:
+	var iron := mat(Color(0.16, 0.16, 0.17))
+	iron.metallic = 0.7
+	iron.roughness = 0.42
+	for px in [150.0, 205.0, 560.0, 620.0]:
+		var grp := Node3D.new()
+		grp.name = "Hanging pan"
+		decor.add_child(grp)
+		grp.global_position = W(px, 8, 134)
+		var pan := MeshInstance3D.new()
+		var pm := CylinderMesh.new()
+		pm.top_radius = 0.095; pm.bottom_radius = 0.082; pm.height = 0.028
+		pan.mesh = pm
+		pan.material_override = iron
+		pan.rotation.x = PI / 2.0
+		pan.position = Vector3(0, -0.15, 0.03)
+		grp.add_child(pan)
+		var hd := _mesh_box(Vector3(0.03, 0.15, 0.012), iron)
+		hd.position = Vector3(0, -0.03, 0.03)
+		grp.add_child(hd)
+		g.plants.append([grp, grp.rotation, randf() * TAU])
+	var ceramic := mat(Color(0.92, 0.90, 0.85))
+	ceramic.roughness = 0.25
+	box("Dish rack", W(520, 40, 93), Vector3(0.36, 0.025, 0.26), mat(Color(0.88, 0.87, 0.84)), decor, false)
+	for i in 3:
+		var pl := _kcyl(W(505.0 + float(i) * 11.0, 40, 99), 0.085, 0.008, ceramic)
+		pl.rotation.z = 1.35
+	var spice_cols := [Color(0.62, 0.25, 0.12), Color(0.80, 0.58, 0.15), Color(0.35, 0.45, 0.20), Color(0.90, 0.88, 0.82)]
+	for i in 4:
+		var sx := 100.0 + float(i) * 16.0
+		_kcyl(W(sx, 12, 96.5), 0.026, 0.085, mat(spice_cols[i]))
+		_kcyl(W(sx, 12, 101.3), 0.028, 0.014, mat(Color(0.20, 0.18, 0.16)))
+	_kcyl(W(700, 32, 92.6), 0.07, 0.012, iron)
+	_kcyl(W(700, 32, 104), 0.052, 0.23, mat(Color(0.94, 0.93, 0.90)))
+	_kcyl(W(565, 395, 18), 0.13, 0.36, iron)
+	_kcyl(W(708, 438, 81.5), 0.07, 0.05, ceramic, 0.11)
+	var fruit_cols := [Color(0.62, 0.16, 0.12), Color(0.85, 0.45, 0.12), Color(0.85, 0.70, 0.20)]
+	var fruit_pos := [[700.0, 432.0, 85.0], [716.0, 440.0, 85.5], [708.0, 445.0, 86.5]]
+	for i in 3:
+		var fr := MeshInstance3D.new()
+		fr.name = "Fruit"
+		var sm := SphereMesh.new()
+		sm.radius = 0.034; sm.height = 0.068
+		fr.mesh = sm
+		fr.material_override = mat(fruit_cols[i])
+		decor.add_child(fr)
+		fr.global_position = W(fruit_pos[i][0], fruit_pos[i][1], fruit_pos[i][2])
+	box("Oven towel", W(285, 74, 66), Vector3(0.17, 0.24, 0.014), mat_named("tablecloth", Color(0.85, 0.50, 0.42)), decor, false)
 
 
 ## The kitchen's second level (night 1): wall cabinets over the counter left and right of the window, a shelf over

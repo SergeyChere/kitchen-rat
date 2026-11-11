@@ -36,6 +36,7 @@ var curtains: Array = []  # the window's curtain nodes — they sway
 var plants: Array = []  # round 12: houseplants — [node, base rotation, phase]; they sway too, gently
 var kettle_pos: Variant = null  # the kettle's spot; world_fx steams here
 var garland: Array = []  # [bulb material, phase] — the living-room garland (round 5)
+var spinners: Array = []  # round 17: ceiling fans — [node, rad/s], turned in _tick_props
 var _door_a := 0.0
 var noisy: Array = []
 var gnaws: Array = []
@@ -1425,6 +1426,8 @@ func _tick_props(dt: float) -> void:
 				fp.rotation.y = float(fl[3]) + sin(t * 2.7 + float(fl[1])) * 0.07  # round 15: the tongues sway, not just pulse
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
+	for sp in spinners:
+		(sp[0] as Node3D).rotation.y += dt * float(sp[1])
 	for pl in plants:
 		# round 12: a houseplant breathes — a slow two-axis tilt around its base
 		# rotation, a couple of degrees at most, each on its own phase
