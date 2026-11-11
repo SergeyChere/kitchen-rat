@@ -408,3 +408,49 @@ hides night 2, walk night 1, cat night 5 — pass. The bugs suite fails
 round-6 build: that suite is kitchen-specific and CI only runs it on
 night 1.
 
+## Round 8 — the user's seven points (2026-11-10)
+
+1. **The climb: "too many steps on the wall".** Round 7 still read as
+   running up the wall. The user's biomechanics: she should FOLD IN
+   HALF midway, and the fold should be the impulse for the extra jump.
+   Now, for climbs ≥ 0.45 m: spring → grab → the rise DIPS deep
+   (0.52 → 0.40) while her pitch jackknifes to −26° (hindquarters swing
+   up under her), the clip nearly freezes (she holds, no leg steps),
+   the body squashes flat (scale y 0.78) — then ONE unfold: rise
+   0.40 → 0.90 in a fifth of the climb, pitch whips back, body stretches
+   (scale y 1.13). Low hop-ups (< 0.45 m) keep the simple spring — the
+   short jump was approved as-is.
+2. **The floor lamp by the garland, dimmed** — in living rooms only:
+   energy 1.3 → 0.7, range 3.8 → 3.0. Other rooms untouched.
+3. **A moving fire in the fireplace** — it was a flickering light
+   behind a static model. Now 26 CPU flame particles rise over the
+   logs, shrink and die, orange → ember-red, additively blended; the
+   warm flicker light stays as their glow.
+4. **Question answered (no code): the CDN does NOT need a merge.**
+   Releases are independent of branches; the game reads the release
+   URL from `godot/cdn.json`, which is already in this branch. Steps
+   for the user are in the round-8 report. Loader now also accepts
+   .jpg files in the pack (what the texture libraries actually ship).
+5. **Grading for the whole game (asked).** On top of round 7's ACES +
+   glow: every room KIND now grades differently — ambient tint and
+   adjustment presets per kind (living/dining warm and softer, pantry
+   cold and flat, kids sweeter, kitchens crisp) — plus a film overlay
+   on the whole frame: soft vignette + a whisper of animated grain
+   (skipped on the low quality setting).
+6. **"She swims when just walking" — measured, and it's bad.** The
+   stride tester (extended to the rat) says the rig's clips were
+   authored ambling: walk feet travel 0.09 m/s at playback 1.0, sneak
+   0.055, carry 0.08, run 0.63 — against body speeds of 0.9/0.68/1.9,
+   the feet were moving at a TENTH of the ground speed. She wasn't
+   walking, she was ice-skating. Gaits are now sped from her ACTUAL
+   velocity against the measured clip speeds (WALK_CLIP & co in
+   rat.gd), so stance feet travel with the ground. Footstep sounds are
+   distance-based and unaffected.
+7. **The owner enters at once.** COMING was a 2.4 s wait in the hall
+   with the door opening at the end. Now 0.9 s, and the door starts
+   swinging the moment he arrives — he steps straight in behind it.
+
+**Testing.** Import clean. Night 1 CI set all pass; hides night 2
+(living room: dimmed lamp, fireplace), physics night 5, walk night 1,
+cat night 5 — all pass.
+

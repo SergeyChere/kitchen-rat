@@ -1298,8 +1298,8 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 func _tick_props(dt: float) -> void:
 	if door_pivot:
 		var want := 0.0
-		if owner_ai.mode == OwnerAI.Mode.COMING and owner_ai._t < 0.9:
-			want = -1.85  # he's at the door: it opens before he steps in
+		if owner_ai.mode == OwnerAI.Mode.COMING:
+			want = -1.85  # round 8: the door opens as he arrives and he steps straight in
 		elif owner_ai.in_room() and owner_ai.global_position.distance_to(owner_ai.door) < 1.3:
 			want = -1.85
 		_door_a = lerpf(_door_a, want, clampf(dt * 5.0, 0.0, 1.0))

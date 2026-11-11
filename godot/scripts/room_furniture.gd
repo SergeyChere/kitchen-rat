@@ -122,6 +122,58 @@ func _washer_wall_lamp(lx: float) -> void:
 	light(W(lx, 16, 148), Color8(0xff, 0xc2, 0x7a), 0.95, 3.4, "steady")
 
 
+## Round 8 (asked): a MOVING fire in the fireplace — the flickering light alone
+## read as a lamp behind glass. CPU flame particles: they rise, shrink and die,
+## orange to ember-red, additively blended over the logs.
+func _fire(at: Vector3, w_cm: float) -> void:
+	var e := CPUParticles3D.new()
+	e.name = "Fireplace fire"
+	e.amount = 26
+	e.lifetime = 0.75
+	e.local_coords = false
+	e.direction = Vector3.UP
+	e.spread = 13.0
+	e.gravity = Vector3(0, 0.32, 0)
+	e.initial_velocity_min = 0.22
+	e.initial_velocity_max = 0.42
+	e.damping_min = 0.3
+	e.damping_max = 0.6
+	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	e.emission_sphere_radius = 0.15
+	e.scale_amount_min = 0.7
+	e.scale_amount_max = 1.25
+	var sc := Curve.new()
+	sc.add_point(Vector2(0, 0.35)); sc.add_point(Vector2(0.3, 1.0)); sc.add_point(Vector2(1, 0.1))
+	e.scale_amount_curve = sc
+	var gr := Gradient.new()
+	gr.set_color(0, Color(1.0, 0.6, 0.14, 0.8))
+	gr.set_color(1, Color(0.9, 0.2, 0.03, 0.0))
+	e.color_ramp = gr
+	var q := QuadMesh.new()
+	q.size = Vector2(0.11, 0.11)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = _soft_disc()
+	q.material = m
+	e.mesh = q
+	b.furn.add_child(e)
+	e.global_position = at
+	e.scale = Vector3(maxf(w_cm, 60.0) / 90.0, 0.55, 0.75)
+
+
+func _soft_disc() -> Texture2D:
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			var r := Vector2(x - 15.5, y - 15.5).length() / 15.5
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - r, 0.0, 1.0) ** 1.5))
+	return ImageTexture.create_from_image(img)
+
+
 func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire") -> OmniLight3D:
 	var l := OmniLight3D.new()
 	l.light_color = color
@@ -222,10 +274,16 @@ func build(list: Array) -> void:
 				place("furniture/fireplace", f, "fireplace")
 				var out := W(x + w + 30, cy, 40) if side(x, y, w, d) == "w" else W(cx, cy, 40)
 				light(out, Color8(0xff, 0x8a, 0x3a), 2.2, 4.2)
+				_fire(W(cx, cy, 16), w)
 			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
 				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
-				light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
+				# round 8 (asked): in the living room the floor lamp sits by the garland
+				# and out-shouts it — dimmed there, untouched elsewhere
+				if str(g.night.get("decor", "")) == "living":
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 0.7, 3.0, "steady")
+				else:
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
 			"plant": b.collide(b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn))
 			"washer":
 				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")

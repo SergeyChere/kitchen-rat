@@ -29,6 +29,22 @@ void fragment() {
 }
 """
 
+## Round 8: the film grade overlay — a soft vignette and a whisper of animated
+## grain over the whole frame. Part of grading the game like a film (the user's
+## It Takes Two ask); kept very subtle so the HUD stays crisp.
+const GRADE := """
+shader_type canvas_item;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment() {
+	vec2 uv = UV - 0.5;
+	float d = length(uv * vec2(1.4, 1.0));
+	float vig = smoothstep(0.52, 1.05, d);
+	float gr = hash(UV * vec2(1831.0, 1013.0) + vec2(fract(TIME * 13.7), fract(TIME * 7.3)) * 91.7) - 0.5;
+	vec3 col = mix(vec3(0.5 + gr * 0.9), vec3(0.0), vig);
+	COLOR = vec4(col, max(0.045, vig * 0.13));
+}
+"""
+
 
 func _init(game: Game) -> void:
 	g = game
@@ -37,6 +53,16 @@ func _init(game: Game) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if Settings.quality != "low":
+		var grade := ColorRect.new()
+		grade.set_anchors_preset(Control.PRESET_FULL_RECT)
+		grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var gsh := Shader.new()
+		gsh.code = GRADE
+		var gmat := ShaderMaterial.new()
+		gmat.shader = gsh
+		grade.material = gmat
+		g.hud.add_child(grade)
 	_vignette = ColorRect.new()
 	_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE

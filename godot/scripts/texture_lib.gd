@@ -25,9 +25,14 @@ static func get_texture(tex_name: String, generate := true) -> Texture2D:
 	if _cache.has(tex_name):
 		return _cache[tex_name]
 	var t: Texture2D = null
-	var up := USER_DIR + "/" + tex_name + ".png"
-	if FileAccess.file_exists(up):
-		t = _load_file(up)
+	# the CDN pack may carry .jpg files (that's what the texture libraries ship) —
+	# the names are what matter, not the container
+	for ext in [".png", ".jpg"]:
+		var up: String = USER_DIR + "/" + tex_name + ext
+		if FileAccess.file_exists(up):
+			t = _load_file(up)
+			if t != null:
+				break
 	if t == null and ResourceLoader.exists("res://assets/textures/" + tex_name + ".png"):
 		t = load("res://assets/textures/" + tex_name + ".png") as Texture2D
 	if t == null:
@@ -92,7 +97,7 @@ static func _on_downloaded(result: int, code: int, _headers: PackedStringArray, 
 		if z.open("user://textures_pack.zip") == OK:
 			DirAccess.make_dir_recursive_absolute(USER_DIR)
 			for f in z.get_files():
-				if f.ends_with(".png"):
+				if f.ends_with(".png") or f.ends_with(".jpg"):
 					var fa := FileAccess.open(USER_DIR + "/" + f.get_file(), FileAccess.WRITE)
 					if fa != null:
 						fa.store_buffer(z.read_file(f))

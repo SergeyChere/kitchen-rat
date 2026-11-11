@@ -12,6 +12,15 @@ const CEILING := 2.5
 var walk_speed := 0.9
 var run_speed := 1.9
 var sneak_speed := 0.68  # round 5: 0.4 was so slow nobody sneaked — a real tradeoff needs a usable speed
+# The clips' OWN foot speeds at playback 1.0 (m/s), measured from the paws on the
+# floor with the stride tester (round 8). They are TINY — the rig was authored
+# ambling (walk feet: 0.09 m/s against her 0.9 m/s body speed, a 10x mismatch) —
+# which is exactly why she ice-skated ("swam") when just walking. The gaits are
+# now sped from these numbers, so the feet travel at the body's speed.
+const WALK_CLIP := 0.09
+const RUN_CLIP := 0.63
+const SNEAK_CLIP := 0.055
+const CARRY_CLIP := 0.08
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
 var max_jump_up := 0.62
@@ -863,6 +872,25 @@ func _tick_jump(dt: float) -> void:
 	# the clip only poses her
 	if _root_bone >= 0 and model != null:
 		model.position = _model_home - _skel.get_bone_pose_position(_root_bone)
+	if model != null and (_kind == "up" or _kind == "grab") and dy >= 0.45:
+		# round 8: squash & stretch sells the fold — compressed flat while she folds
+		# against the face, stretched long on the unfold, settling over the edge
+		var sc := Vector3.ONE
+		if t < 0.26:
+			sc = Vector3.ONE
+		elif t < 0.40:
+			sc = Vector3(1.08, 0.88, 1.05)
+		else:
+			var uu := (t - 0.40) / 0.60
+			if uu < 0.30:
+				sc = Vector3(1.02, 0.97, 1.01)
+			elif uu < 0.46:
+				sc = Vector3(1.16, 0.78, 1.09)  # folded in half
+			elif uu < 0.62:
+				sc = Vector3(0.92, 1.13, 0.95)  # the unfold
+			elif uu < 0.85:
+				sc = Vector3(1.03, 0.97, 1.02)
+		model.scale = model.scale.lerp(sc, clampf(dt * 16.0, 0.0, 1.0))
 	if model:
 		var tilt := 0.0
 		match _kind:
@@ -939,16 +967,22 @@ func _climb_pos(t: float) -> Vector3:
 		var q := base
 		q.y = _from.y + reach * 0.35 - 0.026 * sin(k2 * PI * 0.5)
 		return q
-	# Rounds 6-7, stage by stage: spring up the face (front paws pull) — a SLIP
-	# back while she re-grips (motion, never a hover: round 6's level hitch hung
-	# her in the air) — the wall kick — front paws over the edge, pull through.
-	# The time-warped jump clip (see _play_anim) acts the same stages on top.
 	var u := (t - 0.40) / 0.60
 	var low := reach * 0.35 - 0.026
-	var rise := _keys(u, [[0.0, 0.0], [0.30, 0.50], [0.44, 0.46], [0.62, 0.85], [0.82, 0.97], [1.0, 1.0]])
 	var q := base.lerp(_to, smoothstep(0.55, 1.0, u))
-	var press := sin(clampf((u - 0.26) / 0.22, 0.0, 1.0) * PI) * 0.018  # pressed INTO the face while she re-grips
-	var kick := sin(clampf((u - 0.48) / 0.24, 0.0, 1.0) * PI) * 0.030  # the hind-leg kick shoves her off it
+	if dy < 0.45:
+		# a low hop-up (a chair seat, a box): one spring is enough — no wall work,
+		# and the short jump was already approved as-is
+		var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
+		q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
+		return q
+	# Round 8 (asked): no more STEPS up the wall. She springs, grabs, and FOLDS IN
+	# HALF against the face — hindquarters swing up under her, the body compresses
+	# and dips (the deep 0.52 → 0.40) — and the fold IS the spring: one explosive
+	# unfold (0.40 → 0.90 in a fifth of the climb) carries her over the edge.
+	var rise := _keys(u, [[0.0, 0.0], [0.30, 0.52], [0.46, 0.40], [0.60, 0.90], [0.82, 0.98], [1.0, 1.0]])
+	var press := sin(clampf((u - 0.24) / 0.24, 0.0, 1.0) * PI) * 0.02  # folded INTO the face
+	var kick := sin(clampf((u - 0.52) / 0.20, 0.0, 1.0) * PI) * 0.026  # the unfold shoves her off it
 	q += dirv * (press - kick)
 	q.y = _from.y + low + (dy - low) * rise + 0.02 * rise * (1.0 - smoothstep(0.75, 1.0, u))
 	return q
@@ -1089,7 +1123,13 @@ func _climb_tilt(t: float) -> float:
 		return 30.0 * smoothstep(0.35, 1.0, t / 0.26)
 	if t < 0.40:  # crouching: leans in a touch further as she loads the spring
 		return 30.0 + 8.0 * smoothstep(0.0, 1.0, (t - 0.26) / 0.14)
-	return _keys((t - 0.40) / 0.60, [[0.0, 38.0], [0.30, 34.0], [0.44, 30.0], [0.62, 16.0], [0.82, -14.0], [1.0, 0.0]])
+	var u := (t - 0.40) / 0.60
+	if _to.y - _from.y < 0.45:
+		return _keys(u, [[0.0, 36.0], [0.45, 20.0], [0.85, -12.0], [1.0, 0.0]])
+	# round 8: the fold reads in the pitch — nose-up on the spring, then the body
+	# jackknifes (nose swings DOWN as the hindquarters come up under her), and the
+	# unfold whips it back over the edge
+	return _keys(u, [[0.0, 38.0], [0.30, 33.0], [0.46, -26.0], [0.60, 20.0], [0.82, -13.0], [1.0, 0.0]])
 
 
 # ---------- animation ----------
@@ -1125,9 +1165,26 @@ func _play_anim() -> void:
 		# round 7: warp the one-shot onto the climb's length — its crouch, launch
 		# and pull-over land with the path's stages instead of ending at 0.42 s
 		# and freezing for the rest of the way up
-		anim.set_speed(clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8))
+		var spd := clampf((0.42 if _jump_up else 0.25) / maxf(_dur * 0.85, 0.05), 0.5, 1.8)
+		if (_kind == "up" or _kind == "grab") and _to.y - _from.y >= 0.45 and _t > 0.40:
+			var uu := clampf((_t - 0.40) / 0.60, 0.0, 1.0)
+			if uu > 0.22 and uu < 0.50:
+				spd = 0.05  # round 8: while she folds she HOLDS — no leg steps on the wall
+		anim.set_speed(spd)
 	elif jumping:
 		anim.set_speed(1.7)  # the pole scramble
 	else:
-		var base := run_speed if clip == "run" else (sneak_speed if sneaking else walk_speed)
-		anim.set_speed(clampf(move_speed / base, 0.5, 1.5) if moving() else (0.15 if clip == "sneak" else 1.0))
+		# round 8: feet must match the GROUND, not the intent — the clip is sped
+		# from her ACTUAL velocity against the clips' own measured foot speeds
+		# (WALK_CLIP & co, tester --test=stride); intent-speed was the ice-skating
+		var cbase := 0.0
+		match clip:
+			"walk": cbase = WALK_CLIP
+			"run": cbase = RUN_CLIP
+			"sneak": cbase = SNEAK_CLIP
+			"carry_walk": cbase = CARRY_CLIP
+		var hspd := Vector3(velocity.x, 0.0, velocity.z).length()
+		if cbase > 0.0 and is_on_floor() and hspd > 0.05:
+			anim.set_speed(clampf(hspd / cbase, 0.3, 14.0))
+		else:
+			anim.set_speed(0.15 if clip == "sneak" else 1.0)

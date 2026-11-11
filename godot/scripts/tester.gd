@@ -316,7 +316,7 @@ func _run(host: Node) -> void:
 		return
 	if name == "stride":
 		await _wait(host, 0.5)
-		for a in [g.cat, g.owner_ai, g.dog]:
+		for a in [g.rat, g.cat, g.owner_ai, g.dog]:
 			if a == null: continue
 			a.process_mode = Node.PROCESS_MODE_DISABLED
 			_stride(a)
@@ -873,7 +873,7 @@ func _stride(a: Node3D) -> void:
 				leaves.append([(sk.get_bone_global_rest(b)).origin.y, b])
 		leaves.sort()
 		for i in mini(4, leaves.size()): feet.append(leaves[i][1])
-	for clip in ["walk", "run"]:
+	for clip in ["walk", "run", "sneak", "carry_walk"]:
 		if not ap.has_animation(clip): continue
 		ap.play(clip)
 		var len := ap.get_animation(clip).length
@@ -898,7 +898,7 @@ func _stride(a: Node3D) -> void:
 					tot += absf(pos[i + 1][f].z - pos[i][f].z) / (len / n); cnt += 1
 			if cnt > 0: speeds.append(tot / cnt)
 		speeds.sort()
-		print("STRIDE %s %s feet %d  ground speed %s  set %.2f" % [a.name, clip, feet.size(), str(speeds), a.walk_clip_speed if clip == "walk" else a.run_clip_speed])
+		print("STRIDE %s %s feet %d  ground speed %s  set %s" % [a.name, clip, feet.size(), str(speeds), str(a.get("walk_clip_speed") if clip == "walk" else a.get("run_clip_speed"))])
 
 
 ## Game feel: forgiving jumps, quick stop, footsteps by surface, camera, danger, head turning, muffled hiding.

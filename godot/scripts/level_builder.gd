@@ -436,8 +436,18 @@ func _lighting() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = hex(pal.get("fog", 0x0e1220))
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	# round 8: per-room grading (the user asked for the whole game graded, not one
+	# global curve) — each room kind gets its own ambient tint and adjustments:
+	# kitchens crisp, living rooms warm and soft, the pantry cold and flat, kids'
+	# rooms a touch sweeter. It Takes Two grades every room like a film set.
+	var kind := str(night.get("decor", "kitchen"))
+	var atint := Color(1, 1, 1)
+	match kind:
+		"living", "dining": atint = Color(1.06, 0.97, 0.86)
+		"pantry": atint = Color(0.9, 0.99, 1.07)
+		"kids": atint = Color(1.03, 0.98, 1.02)
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.5, 0.56, 0.8) * 0.42 * float(pal.get("hemi", 0.8)) / 0.8  # round 4: far less sourceless fill — the motivated sources (moon, strips, lamps) carry the room; this is only their bounce
+	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.42 * float(pal.get("hemi", 0.8)) / 0.8  # round 4: far less sourceless fill — the motivated sources (moon, strips, lamps) carry the room; this is only their bounce
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
@@ -455,6 +465,18 @@ func _lighting() -> void:
 	env.adjustment_brightness = 1.2  # a touch more than the linear era: ACES darkens the mids
 	env.adjustment_contrast = 1.06
 	env.adjustment_saturation = 1.12
+	match kind:  # round 8: the per-room grade (see the ambient tint above)
+		"living", "dining":
+			env.adjustment_brightness = 1.17
+			env.adjustment_contrast = 1.08
+			env.adjustment_saturation = 1.17
+		"pantry":
+			env.adjustment_brightness = 1.23
+			env.adjustment_contrast = 1.04
+			env.adjustment_saturation = 0.97
+		"kids":
+			env.adjustment_brightness = 1.21
+			env.adjustment_saturation = 1.19
 	var we := WorldEnvironment.new()
 	we.environment = env
 	g.env = env
