@@ -330,6 +330,40 @@ static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
 ## toon materials, tinted by `tint` (the furniture's own colour from the night data, white = as authored).
 ## The tint is divided by the textures' average brightness (~0.45), so the result lands near the
 ## requested colour instead of going twice as dark. No texture file -> no change at all.
+## Round 12c (asked: "check ALL the other items"): should this surface take the
+## furniture texture? The models bake their props into the same mesh — the
+## bookcase's books, the shelf unit's jars, the workbench's steel tools — and
+## the blanket pass turned them ALL into the furniture's material (the wooden
+## TV screen was just the loudest casualty). Rules, by texture:
+## - wood lands only on wood-toned surfaces: orange-brown hue, clearly
+##   saturated, neither near-black trim nor pale pages/paper;
+## - plastic and metal skip near-black surfaces (a washer's glass door);
+## - everything else (fabric, cardboard) takes the blanket as before.
+static func _takes_texture(tex_name: String, src: BaseMaterial3D) -> bool:
+	var c := src.albedo_color
+	var mx := maxf(c.r, maxf(c.g, c.b))
+	var mn := minf(c.r, minf(c.g, c.b))
+	if tex_name == "plastic" or tex_name == "metal_matte":
+		return mx > 0.08
+	if tex_name != "wood" and tex_name != "wood_dark":
+		return true
+	if mx < 0.05 or mx > 0.8 or mx - mn < 0.001:
+		return false
+	if (mx - mn) / mx < 0.3:
+		return false  # greys and pales: steel, stone, paper
+	var hue := 0.0
+	if mx == c.r:
+		hue = fmod((c.g - c.b) / (mx - mn), 6.0)
+	elif mx == c.g:
+		hue = (c.b - c.r) / (mx - mn) + 2.0
+	else:
+		hue = (c.r - c.g) / (mx - mn) + 4.0
+	hue *= 60.0
+	if hue < 0.0:
+		hue += 360.0
+	return hue >= 10.0 and hue <= 52.0
+
+
 func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 	var tex := TextureLib.get_texture(tex_name) if n != null else null
 	if tex == null:
@@ -343,6 +377,8 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 			var src := m.get_active_material(i) as BaseMaterial3D
 			if src == null:
 				continue
+			if not _takes_texture(tex_name, src):
+				continue  # round 12c: baked-in props keep their own materials
 			var t := src.duplicate() as BaseMaterial3D
 			t.albedo_texture = tex
 			t.albedo_color = c

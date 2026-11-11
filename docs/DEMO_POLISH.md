@@ -615,3 +615,27 @@ it. The stand keeps its dark wood.
 **Testing.** Import clean; night 1 CI set all pass; bugs night 2
 and boots nights 2–3 clean.
 
+## Round 12c — the full audit: no more wooden books either (2026-11-10)
+
+Asked to check ALL the other items, and the TV was not alone.
+The furniture models bake their props into the same mesh as the
+carcass — the bookcase's books, the coffee table's books, the
+sideboard's clutter, the shelf unit's jars and steel frame, the
+workbench's tools — and the blanket texture pass was re-skinning
+every one of those surfaces in the furniture's material. With the
+real pack that meant wooden books, wooden jars and wooden tools;
+even the washer's black glass door was getting the plastic.
+
+`apply_texture` now asks `_takes_texture` per surface: a wood
+texture lands only on wood-toned surfaces (orange-brown hue,
+clearly saturated, neither near-black nor pale — pages, steel and
+coloured book spines keep the materials they were modelled with);
+plastic and metal skip near-black surfaces (glass stays glass).
+Fabric and cardboard keep the blanket — a sofa is a sofa. Audited
+clean: fridge, crate, boxes, laundry basket, ottoman, and every
+untextured model (tables, desk, fireplace, island, bar cart —
+their stock materials were never touched).
+
+**Testing.** Import clean; night 1 CI set all pass; boots nights
+2, 3, 4, 8 clean; bugs night 2, hides night 4 pass.
+
