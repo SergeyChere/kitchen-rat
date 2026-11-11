@@ -480,3 +480,51 @@ physics night 5, cat night 5 — pass.
 The user is merging this branch into main himself and setting up the
 CDN release (textures-v1); the branch is ready for that.
 
+## Round 10 — the lighting pass (2026-11-10)
+
+The user asked for ALL of the light found, audited and re-set on
+cinematic schemes. Full audit first (it is short — the game has fewer
+sources than it feels like):
+
+- **Moon** (directional, from the north window, shadows on) — the KEY.
+- **Environment ambient** — the FILL, flat and cool.
+- **Kitchen**: one candle practical in the SE corner (omni, shadows
+  on) + two warm under-cabinet spots over the counter run + the
+  moon shaft sheets + the ceiling light (off until the owner comes).
+- **Rooms**: fireplace omni, floor/table lamps, the TV's cool flicker
+  omni, the garland's warm omni, dining candles, the pantry wall lamp.
+- **The owner's flashlight** (spot, shadows on, swept by his patrol).
+- **The nest**: one warm omni through the mouse hole. Plus emissives
+  with no light of their own (garland bulbs, candle cores, TV screen)
+  and one gameplay light (the green exit ring — left alone on purpose).
+
+The scheme applied — classic three-point, translated to a night
+interior: a cool KEY (the moon), a low complementary FILL, warm
+PRACTICALS as accents, darkness preserved between pools.
+
+1. **The fill is now SHAPED.** A second directional ("Moon fill",
+   0.22, deep blue, no shadows) comes from over the camera's shoulder
+   (south-east, high): south faces get gentle blue modelling, so the
+   rat's silhouette separates from dark furniture instead of melting
+   into it. Flat ambient drops a little (0.42 → 0.38) and drops more
+   in warm-keyed rooms (living/dining ×0.78) so their fires own them.
+2. **Every practical is now a POOL.** Omni attenuation was the
+   default 1.0 everywhere — washes, not pools. Now: data practicals
+   1.45, furniture practicals by kind (fire 1.35, steady 1.3, garland
+   1.25, TV 1.15), the ceiling light 1.3, the nest 1.2. Light falls
+   off; the dark between sources is back.
+3. **The moon deepened**: colour (0.72, 0.8, 1.0), shadow opacity
+   0.55 → 0.62. Orange-teal, the night-film standard: blue keys and
+   fills against warm practicals.
+4. **Cabinet spots**: warmer (1.0, 0.72, 0.42), cone 58° → 46°,
+   energy 1.5 → 1.35, attenuation 1.15 — a defined pool on the
+   counter where the food is.
+5. **The flashlight has a BEAM now.** An additive cone hangs in the
+   air under his spot (bright at the lamp, fresnel-edged, fading down
+   its length), a child of the light so it sweeps and switches with
+   it. Patrols read across the room before the pool lands anywhere.
+
+**Testing.** Import clean (one naming slip in the beam code was
+caught and fixed before this push). Night 1 CI set all pass; night 7
+(the flashlight night) boots and runs; hides night 2 pass.
+

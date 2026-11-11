@@ -179,6 +179,9 @@ func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire")
 	l.light_color = color
 	l.light_energy = energy
 	l.omni_range = rng
+	# round 10 (the lighting pass): every practical falls off into a pool — the
+	# fire tightest, the TV softest — so rooms read as islands of motivated light
+	l.omni_attenuation = {"fire": 1.35, "tv": 1.15, "garland": 1.25}.get(kind, 1.3)
 	l.shadow_enabled = kind != "tv"
 	b.root.add_child(l)
 	l.global_position = at

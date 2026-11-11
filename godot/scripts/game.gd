@@ -321,12 +321,43 @@ func _make_agents() -> void:
 	var fl := SpotLight3D.new()
 	fl.spot_angle = 22.0
 	fl.spot_range = 6.0
+	fl.spot_attenuation = 1.1  # round 10: the beam's pool tightens at its edge
 	fl.light_energy = 4.0
 	fl.light_color = Color(1, 0.95, 0.8)
 	fl.shadow_enabled = true
 	fl.visible = false
 	owner_ai.add_child(fl)
 	fl.position = Vector3(0.15, 1.3, 0.2)
+	# Round 10: a visible beam. A patrol you can only see by its floor pool reads
+	# flat; films show the cone in the air. Additive cone, brightest at the lamp,
+	# fresnel-edged so it glows when it crosses your view, gone when he turns it
+	# off (it is a child of the light: its visibility follows).
+	var beam := MeshInstance3D.new()
+	beam.name = "Flashlight beam"
+	var bmesh := CylinderMesh.new()
+	bmesh.top_radius = 0.035
+	bmesh.bottom_radius = 0.8
+	bmesh.height = 3.4
+	bmesh.radial_segments = 20
+	beam.mesh = bmesh
+	var bsh := Shader.new()
+	bsh.code = """
+shader_type spatial;
+render_mode blend_add, cull_disabled, unshaded;
+varying float axial;
+void vertex() { axial = clamp(VERTEX.y / 3.4 + 0.5, 0.0, 1.0); }
+void fragment() {
+	float f = abs(dot(NORMAL, VIEW));
+	ALBEDO = vec3(1.0, 0.93, 0.78) * pow(axial, 1.8) * pow(f, 1.6) * 0.5;
+}
+"""
+	var bmat := ShaderMaterial.new()
+	bmat.shader = bsh
+	beam.material_override = bmat
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fl.add_child(beam)
+	beam.rotation_degrees = Vector3(90, 0, 0)  # the cylinder's small end at the lamp, opening down the beam
+	beam.position = Vector3(0, 0, -1.7)
 	owner_ai.flashlight = fl
 	owner_ai.room_light = room_light
 

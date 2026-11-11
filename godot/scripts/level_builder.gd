@@ -442,12 +442,17 @@ func _lighting() -> void:
 	# rooms a touch sweeter. It Takes Two grades every room like a film set.
 	var kind := str(night.get("decor", "kitchen"))
 	var atint := Color(1, 1, 1)
+	var ascale := 1.0  # round 10: the fill level per room (the lighting pass)
 	match kind:
-		"living", "dining": atint = Color(1.06, 0.97, 0.86)
-		"pantry": atint = Color(0.9, 0.99, 1.07)
-		"kids": atint = Color(1.03, 0.98, 1.02)
+		"living", "dining":
+			atint = Color(1.06, 0.97, 0.86)
+			ascale = 0.78  # warm-keyed rooms: the fill drops so the fire/lamps own them
+		"pantry":
+			atint = Color(0.9, 0.99, 1.07)
+		"kids":
+			atint = Color(1.03, 0.98, 1.02)
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.42 * float(pal.get("hemi", 0.8)) / 0.8  # round 4: far less sourceless fill — the motivated sources (moon, strips, lamps) carry the room; this is only their bounce
+	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.38 * ascale * float(pal.get("hemi", 0.8)) / 0.8  # round 4/10: the FILL of the cinematic scheme — low and cool against the keys; the motivated sources carry the room
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
@@ -484,10 +489,10 @@ func _lighting() -> void:
 
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moonlight"
-	moon.light_color = Color(0.78, 0.82, 1.0)
+	moon.light_color = Color(0.72, 0.8, 1.0)  # round 10: a deeper blue — the cool KEY of the night scheme
 	moon.light_energy = 1.25 * float(pal.get("moon", 0.9)) / 0.9
 	moon.shadow_enabled = true
-	moon.shadow_opacity = 0.55  # soft shadows: you can still see into them
+	moon.shadow_opacity = 0.62  # round 10: deeper night shadows (ACES still rolls them off)
 	moon.shadow_blur = 1.2  # fairly crisp, but no stair-steps on the small rat
 	moon.shadow_bias = 0.08  # no striped shadow acne on flat tops
 	moon.shadow_normal_bias = 2.5
@@ -495,11 +500,25 @@ func _lighting() -> void:
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
 
+	# Round 10, the cinematic scheme's shaped FILL: a faint cool directional from
+	# over the camera's shoulder (south-east, high). Flat ambient alone modelled
+	# nothing — this gives south faces a gentle blue modelling so the rat's
+	# silhouette separates from dark furniture instead of melting into it. No
+	# shadows, low energy: it is bounce, not a second moon.
+	var fill := DirectionalLight3D.new()
+	fill.name = "Moon fill"
+	fill.light_color = Color(0.6, 0.7, 1.0)
+	fill.light_energy = 0.22
+	fill.shadow_enabled = false
+	root.add_child(fill)
+	fill.rotation = Vector3(deg_to_rad(-50.0), deg_to_rad(-15.0), 0)
+
 	for l in night.get("lights", []):
 		var pl := OmniLight3D.new()
 		pl.light_color = hex(l.get("c", 0xffa860))
 		pl.light_energy = float(l.get("i", 1.0)) * 1.6
 		pl.omni_range = float(l.get("r", 500)) / 100.0
+		pl.omni_attenuation = 1.45  # round 10: a defined pool with real darkness past it, not an even wash
 		pl.shadow_enabled = true
 		pl.shadow_bias = 0.15
 		pl.shadow_normal_bias = 2.0
@@ -560,6 +579,7 @@ func _lighting() -> void:
 	room.light_color = Color(1.0, 0.93, 0.8)
 	room.light_energy = 2.0
 	room.omni_range = 9.0
+	room.omni_attenuation = 1.3  # round 10: pooled under the ceiling — the room's edges fall dark when he flips it on
 	room.shadow_enabled = true
 	room.visible = false
 	root.add_child(room)
@@ -979,10 +999,11 @@ func _kitchen_upper() -> void:
 		strip.global_position = W(bcx, 30, 143)
 		var spot := SpotLight3D.new()
 		spot.name = "Cabinet spot"
-		spot.light_color = Color(1.0, 0.76, 0.47)
-		spot.light_energy = 1.5
+		spot.light_color = Color(1.0, 0.72, 0.42)  # round 10: warmer, and a tighter cone — a defined pool on the counter, not a wash
+		spot.light_energy = 1.35
 		spot.spot_range = 1.7
-		spot.spot_angle = 58.0
+		spot.spot_angle = 46.0
+		spot.spot_attenuation = 1.15
 		spot.rotation_degrees = Vector3(-90, 0, 0)
 		furn.add_child(spot)
 		spot.global_position = W(bcx, 30, 141)
@@ -1315,6 +1336,7 @@ func _nest() -> void:
 	light.light_color = Color8(0xff, 0xd0, 0xa0)
 	light.light_energy = 0.95
 	light.omni_range = 2.8
+	light.omni_attenuation = 1.2  # round 10: the nest stays a pocket of warm dark
 	nest.add_child(light)
 	light.global_position = W(180, 622, 42)
 	for mnd in [[95, 705, 0.55, 0.42], [168, 712, 0.48, 0.38], [128, 660, 0.42, 0.34], [205, 668, 0.36, 0.3]]:
