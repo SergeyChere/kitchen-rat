@@ -102,62 +102,12 @@ func _ready() -> void:
 	collision_mask = 1 | 4  # round 14: layer 4 = rat-only solids (the cat's bed)
 	floor_max_angle = deg_to_rad(50.0)
 	floor_snap_length = 0.12  # demo polish: was 0.05, she un-stuck and micro-fell stepping off shelves
-	_make_dust()
 
 
-# ---------- squash & stretch, dust (from Kenney's Starter Kit 3D Platformer, MIT) ----------
-
-var _dust_trail: CPUParticles3D
+# ---------- squash & stretch (from Kenney's Starter Kit 3D Platformer, MIT) ----------
 
 
-func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
-	var e := CPUParticles3D.new()
-	e.amount = amount
-	e.lifetime = 0.55 if burst else 0.45
-	e.one_shot = burst
-	e.explosiveness = 0.95 if burst else 0.0
-	e.emitting = false
-	e.local_coords = false
-	e.direction = Vector3.UP
-	e.spread = 80.0 if burst else 40.0
-	e.initial_velocity_min = 0.08 if burst else 0.02
-	e.initial_velocity_max = 0.22 if burst else 0.06
-	e.gravity = Vector3(0, -0.05, 0)
-	e.damping_min = 0.4
-	e.damping_max = 0.8
-	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	e.emission_sphere_radius = 0.03 if burst else 0.015
-	e.scale_amount_min = 0.6
-	e.scale_amount_max = 1.2
-	var c := Curve.new()
-	c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.3))
-	e.scale_amount_curve = c
-	var g := Gradient.new()
-	g.set_color(0, Color(0.78, 0.74, 0.68, 0.45 if burst else 0.25))
-	g.set_color(1, Color(0.78, 0.74, 0.68, 0.0))
-	e.color_ramp = g
-	var q := QuadMesh.new()
-	q.size = Vector2(0.035, 0.035)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.vertex_color_use_as_albedo = true
-	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	for y in 32:
-		for x in 32:
-			var r := Vector2(x - 15.5, y - 15.5).length() / 15.5
-			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - r, 0.0, 1.0) ** 1.5))
-	m.albedo_texture = ImageTexture.create_from_image(img)
-	q.material = m
-	e.mesh = q
-	add_child(e)
-	e.position = Vector3(0, 0.01, 0)
-	return e
 
-
-func _make_dust() -> void:
-	_dust_trail = _dust_emitter(14, false)
 
 
 ## Stretch tall on take-off, squash flat on landing; the model eases back to its shape.
@@ -561,13 +511,9 @@ func _physics_process(dt: float) -> void:
 	if model:
 		model.scale = model.scale.lerp(_breath(dt), clampf(dt * 10.0, 0.0, 1.0))
 	_tick_look(dt)
-	if _dust_trail:
-		# round 14 (asked: dust where she walks, not only when she runs): the
-		# trail puffs at a walk too, thinner; a run kicks up the full cloud.
-		_dust_trail.emitting = is_on_floor() and move_speed > walk_speed * 0.5 and not jumping and not hidden()
-		var want_amt := 14 if move_speed > walk_speed else 6
-		if _dust_trail.amount != want_amt:
-			_dust_trail.amount = want_amt
+	# round 15: her dust is Game's mesh puffs now (world_fx.puff, kicked up
+	# per stride in Game._footsteps) — the CPU particle trail never
+	# rendered on some drivers, so the rings outlived it.
 	noise_level = move_toward(noise_level, 0.0, dt * 1.5)
 	# round 14 (playtest: she ends up inside walls and furniture): if her core
 	# is embedded in something solid, step out to the nearest free offset.

@@ -787,3 +787,45 @@ names and dress her fur by her own palette.
 cat pass (the stock-cat path is byte-identical when no alt file
 exists).
 
+
+## Round 15 — the second playtest list (2026-11-10)
+
+**Kitchen (night 1).** The tall JSON light is a standing lamp now —
+weighted base, pole, fabric shade, the bulb glowing inside it (the
+candle-on-a-stick and the lantern-on-a-stick are gone). Stepping and
+running kick up mesh dust puffs, and noise no longer draws rings at
+all: a noise is a soft dust cloud hugging the floor (the CPU particle
+trail never rendered on the test machine — same lesson as the
+fireplace). The countertop hunt ended: the corner and sink slabs were
+rejected by the old "upper band" test, which measured from each
+model's tallest prop (the corner's bottles reach 1.18 m, the sink's
+faucet 1.17 m) — thin slabs are now grouped by top height and the
+worktop group wins on area. A gas hob dresses counter segment 3 (the
+kettle's segment): black glass, four burners under iron grates, oven
+front and knobs. The fridge stands centred in its slot (counter ends
+800, east wall 960) with a rat-width hide on the left, right and
+behind. The kitchen tablecloth wears a woven gingham in the night's
+cloth colour. The green beacon column at the nest hole is deleted,
+and the mouse hole itself is dressed: a ragged dark blob with a
+chipped-plaster rim and plaster crumbs on the floor.
+
+**Living room (night 2).** The fireplace is a fire now: three charred
+logs, glowing coals, five outer flame tongues that sway as well as
+pulse, and a white-hot core. The floor lamp's pool is tighter (range
+2.4, attenuation 1.55) so it ends at the walls; unlit dresser lamps
+get a dim bulb and a shade. Sofas and armchairs: tint compensation
+now divides by the texture's MEASURED mean brightness (the table
+guessed 0.75; painted fabric is 0.40, the CDN sheet ~0.85 — that is
+why they read pale), and fabric lands 15% deeper than authored.
+
+**House rules.** The Wanted readout is off the HUD and the star
+glyphs are out of the banners; the stars still drive the house
+exactly as before (end-of-night stats keep their "Top wanted" line).
+
+**Cat bowl.** A heaped kibble mound with a painted kibble texture
+(34 rounded pieces + a normal map), loose bits on the heap and a
+spill beside the bowl — no more uniform brown beads.
+
+**Owner (night 7).** The flashlight hangs at his right hand (0.30,
+1.02) with a visible torch — body, head, lit lens — parented to the
+light, so the sweep carries the torch and the beam starts in the lens.

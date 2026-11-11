@@ -9,9 +9,9 @@ var g: Game
 var _steam_t := 0.0
 var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
-var _rings: Array = []  # [MeshInstance3D, t, life, max_r]
+var _rings: Array = []  # [MeshInstance3D, t, life, max_r, base_alpha]
+var _puffs: Array = []  # [MeshInstance3D, t, life, size, base_alpha, rise]
 var _glints: Array = []  # [Sprite3D, node it marks, phase]
-var _beacon: MeshInstance3D  # a green column of light over the nest hole while she carries food
 static var _tex: ImageTexture
 static var _star: ImageTexture
 static var _dot: ImageTexture
@@ -101,8 +101,11 @@ func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: 
 
 
 ## A puff of dust where she lands (bigger from higher up).
+## Round 15: landing dust is puffs too — same reason as ring().
 func dust(at: Vector3, big: bool) -> void:
-	_particles(at, 14 if big else 7, Color(0.75, 0.7, 0.62, 0.55), 0.05 if big else 0.035, 0.5 if big else 0.3, 0.02, 0.7, -0.4)
+	var n := 7 if big else 4
+	for i in n:
+		puff(at + Vector3(randf_range(-0.05, 0.05), 0.02 + 0.02 * i, randf_range(-0.05, 0.05)), (0.16 if big else 0.10) * randf_range(0.8, 1.3), Color(0.76, 0.71, 0.63, 0.4 if big else 0.28), randf_range(0.5, 0.85), 0.07)
 
 
 ## Sparkles when she picks something up.
@@ -168,41 +171,7 @@ func _make_glints() -> void:
 		_glints.append([s, n, randf() * TAU])
 
 
-func _make_beacon() -> void:
-	_beacon = MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.07
-	cyl.bottom_radius = 0.07
-	cyl.height = 2.4
-	cyl.cap_top = false
-	cyl.cap_bottom = false
-	_beacon.mesh = cyl
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.albedo_texture = _fade_tex()
-	m.albedo_color = Color(0.35, 1.0, 0.45, 0.55)
-	_beacon.material_override = m
-	_beacon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_beacon.visible = false
-	add_child(_beacon)
-	_beacon.global_position = g.hole + Vector3(0, 1.2, -0.05)
-
-
-## Bright at the bottom, fading out upward (the cylinder's V runs top to bottom).
-static func _fade_tex() -> ImageTexture:
-	var img := Image.create(4, 64, false, Image.FORMAT_RGBA8)
-	for y in 64:
-		var a := pow(y / 63.0, 1.6)
-		for x in 4:
-			img.set_pixel(x, y, Color(1, 1, 1, a))
-	return ImageTexture.create_from_image(img)
-
-
 func _ready() -> void:
-	_make_beacon()
 	_motes()
 	_make_glints()
 	for z in g.zones:
@@ -237,24 +206,51 @@ func _ready() -> void:
 	add_child(_cone)
 
 
-func ring(at: Vector3, radius: float, big: bool) -> void:
+## A soft billboard of dust. Mesh-based on purpose: the CPU particle
+## systems do not render on every driver (the fireplace taught us), and
+## these puffs are the game's footstep language now.
+func puff(at: Vector3, size: float, col: Color, life := 0.7, rise := 0.05) -> void:
 	var mi := MeshInstance3D.new()
-	var t := TorusMesh.new()
-	t.inner_radius = 0.93
-	t.outer_radius = 1.0
-	t.rings = 48
-	t.ring_segments = 3
-	mi.mesh = t
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	mi.mesh = q
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(0.95, 0.76, 0.3, 0.6) if big else Color(0.93, 0.9, 0.85, 0.45)
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_texture = _make_dot()
+	m.albedo_color = col
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
-	mi.global_position = Vector3(at.x, maxf(at.y, 0.0) + 0.01, at.z)
-	mi.scale = Vector3(0.05, 0.02, 0.05)
-	_rings.append([mi, 0.0, 1.0 if big else 0.6, clampf(radius, 0.5, 6.0)])
+	mi.global_position = at
+	mi.scale = Vector3.ONE * size * 0.45
+	_puffs.append([mi, 0.0, life, size, col.a, rise])
+
+
+## Round 15 (playtest: the circles are still there when she walks and
+## runs): no more rings at all. A noise is dust and displaced air — a
+## soft cloud hugging the floor that swells and thins out.
+func ring(at: Vector3, radius: float, big: bool) -> void:
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.orientation = PlaneMesh.FACE_Y
+	q.size = Vector2(1, 1)
+	mi.mesh = q
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_texture = _make_dot()
+	m.albedo_color = Color(0.82, 0.77, 0.68, 0.34 if big else 0.20)
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_position = Vector3(at.x, maxf(at.y, 0.0) + 0.015, at.z)
+	mi.scale = Vector3(0.1, 1, 0.1)
+	_rings.append([mi, 0.0, 0.9 if big else 0.55, clampf(radius, 0.4, 6.0), 0.34 if big else 0.20])
+	if big:
+		for k in 3:
+			puff(at + Vector3(randf_range(-0.15, 0.15), 0.03, randf_range(-0.15, 0.15)), 0.22, Color(0.8, 0.75, 0.66, 0.3), 0.8, 0.10)
 
 
 ## A small glowing mark over food she has sniffed out, for a few seconds.
@@ -293,10 +289,6 @@ func _process(dt: float) -> void:
 	if g.kettle_pos != null and _steam_t <= 0.0:
 		_steam_t = 0.33
 		_particles(g.kettle_pos, 2, Color(0.95, 0.97, 1.0, 0.3), 0.045, 0.03, 0.22, 1.3, -0.12)
-	if _beacon:
-		_beacon.visible = not g.rat.carried.is_empty() and not g.rat.in_nest
-		if _beacon.visible:
-			(_beacon.material_override as StandardMaterial3D).albedo_color.a = 0.45 + 0.15 * sin(Time.get_ticks_msec() / 250.0)
 	var rp := g.rat.global_position
 	var playing := g.state == "play" or g.state == "pause"
 	for e in _marks:
@@ -322,6 +314,19 @@ func _process(dt: float) -> void:
 		var tw := 0.5 + 0.5 * sin(t * 2.4 + float(e[2]))
 		s.modulate.a = near * (0.35 + 0.65 * tw)
 		s.scale = Vector3.ONE * (0.8 + 0.4 * tw)
+	for i in range(_puffs.size() - 1, -1, -1):
+		var pf: Array = _puffs[i]
+		pf[1] = float(pf[1]) + dt
+		var pk: float = float(pf[1]) / float(pf[2])
+		var pm := pf[0] as MeshInstance3D
+		if pk >= 1.0 or not is_instance_valid(pm):
+			if is_instance_valid(pm):
+				pm.queue_free()
+			_puffs.remove_at(i)
+			continue
+		pm.scale = Vector3.ONE * float(pf[3]) * (0.45 + 0.85 * pk)
+		pm.global_position.y += float(pf[5]) * dt
+		(pm.material_override as StandardMaterial3D).albedo_color.a = float(pf[4]) * pow(1.0 - pk, 1.4)
 	for i in range(_rings.size() - 1, -1, -1):
 		var r: Array = _rings[i]
 		r[1] += dt
@@ -331,9 +336,9 @@ func _process(dt: float) -> void:
 			mi.queue_free()
 			_rings.remove_at(i)
 			continue
-		var rad: float = lerpf(0.05, r[3], 1.0 - pow(1.0 - k, 2.0))
-		mi.scale = Vector3(rad, 0.02, rad)
-		(mi.material_override as StandardMaterial3D).albedo_color.a = (1.0 - k) * 0.55
+		var rad: float = lerpf(0.1, r[3], 1.0 - pow(1.0 - k, 2.0))
+		mi.scale = Vector3(rad, 1, rad)
+		(mi.material_override as StandardMaterial3D).albedo_color.a = (1.0 - k) * float(r[4])
 
 
 func _draw_cone() -> void:

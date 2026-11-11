@@ -355,7 +355,51 @@ func _make_agents() -> void:
 	fl.shadow_enabled = true
 	fl.visible = false
 	owner_ai.add_child(fl)
-	fl.position = Vector3(0.15, 1.3, 0.2)
+	fl.position = Vector3(0.30, 1.02, 0.10)
+	# round 15 (playtest, night 7: the flashlight levitates in front of
+	# him): it hangs at his right hand now, and there is a torch in it —
+	# body, head and a lit lens, all children of the light, so the sweep
+	# carries them together and the beam is born in the lens.
+	var tmat := StandardMaterial3D.new()
+	tmat.albedo_color = Color(0.10, 0.10, 0.11)
+	tmat.metallic = 0.6
+	tmat.roughness = 0.45
+	var tbody := MeshInstance3D.new()
+	var tbm := CylinderMesh.new()
+	tbm.top_radius = 0.016
+	tbm.bottom_radius = 0.018
+	tbm.height = 0.17
+	tbody.mesh = tbm
+	tbody.material_override = tmat
+	tbody.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fl.add_child(tbody)
+	tbody.rotation.x = -PI / 2.0
+	tbody.position = Vector3(0, 0, 0.03)
+	var thead := MeshInstance3D.new()
+	var thm := CylinderMesh.new()
+	thm.top_radius = 0.030
+	thm.bottom_radius = 0.020
+	thm.height = 0.055
+	thead.mesh = thm
+	thead.material_override = tmat
+	thead.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fl.add_child(thead)
+	thead.rotation.x = -PI / 2.0
+	thead.position = Vector3(0, 0, -0.085)
+	var tlens := MeshInstance3D.new()
+	var tlm := CylinderMesh.new()
+	tlm.top_radius = 0.024
+	tlm.bottom_radius = 0.024
+	tlm.height = 0.006
+	tlens.mesh = tlm
+	var tlmat := StandardMaterial3D.new()
+	tlmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tlmat.albedo_color = Color(1.0, 0.93, 0.75)
+	tlens.material_override = tlmat
+	tlens.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fl.add_child(tlens)
+	tlens.rotation.x = -PI / 2.0
+	tlens.position = Vector3(0, 0, -0.115)
 	# Round 10: a visible beam. A patrol you can only see by its floor pool reads
 	# flat; films show the cone in the air. Additive cone, brightest at the lamp,
 	# fresnel-edged so it glows when it crosses your view, gone when he turns it
@@ -851,6 +895,10 @@ func _footsteps(dt: float) -> void:
 		return
 	_stride = 0.0
 	Sfx.play(step_sound(rat.surface_id), rat.global_position, 0.0 if rat.running else -7.0, 1.0, 0.08)
+	if fx:
+		# round 15 (asked: dust where she walks): a small mesh puff per
+		# stride — meshes render on every driver, the particle trail didn't
+		fx.puff(rat.global_position + Vector3.UP * 0.025, 0.17 if rat.running else 0.11, Color(0.78, 0.73, 0.65, 0.30 if rat.running else 0.19), 0.55, 0.035)
 	if rat.running and rat.surface_id != "floor":
 		_jiggle(rat.global_position, 0.22, 0.45)
 
@@ -1091,7 +1139,7 @@ func _tick_wanted(dt: float) -> void:
 	if ns > stars:
 		_on_stars(ns, stars)
 	elif ns < stars and state == "play":
-		banner("★".repeat(ns) + ("" if ns > 0 else "☆") + " The house calms down", "Wanted level dropped" if ns > 0 else "Nobody is looking for you now", 2.5)
+		banner("The house calms down", "Things are quieter now" if ns > 0 else "Nobody is looking for you now", 2.5)
 	stars = ns
 	max_stars = maxi(max_stars, stars)
 
@@ -1103,21 +1151,20 @@ func _on_stars(ns: int, os: int) -> void:
 			continue
 		_stars_done[s] = true
 		Sfx.play("star_up", null, 0.0, 1.0 + s * 0.03)
-		var st := "★".repeat(s)
 		var t: String = threats[s - 1] if s - 1 < threats.size() else ""
 		if t != "":
 			_trigger_threat(t)
 			match t:
-				"cat": banner(st + " The cat woke up", "It can’t climb after you, but it will wait below. Hide to lose it.", 5.0)
-				"owner": banner(st + " The owner woke up", "He can spot you even on tables. Hide under furniture or in a crack.", 5.0)
-				"traps": banner(st + " Mousetraps!", "The owner set traps. They smell like cheese too, so sniff first (hold E).", 5.0)
-				"poison": banner(st + " Poisoned cheese", "Poisoned cheese smells green. Sniff before you grab.", 5.0)
-				_: banner(st + " " + t, "", 4.0)
+				"cat": banner("The cat woke up", "It can’t climb after you, but it will wait below. Hide to lose it.", 5.0)
+				"owner": banner("The owner woke up", "He can spot you even on tables. Hide under furniture or in a crack.", 5.0)
+				"traps": banner("Mousetraps!", "The owner set traps. They smell like cheese too, so sniff first (hold E).", 5.0)
+				"poison": banner("Poisoned cheese", "Poisoned cheese smells green. Sniff before you grab.", 5.0)
+				_: banner(t, "", 4.0)
 		elif threats.is_empty():
 			var tip := str(night.get("starTip", ""))
-			banner(st + " The house is restless", tip if tip != "" else "Everyone is faster and sharper now", 3.5)
+			banner("The house is restless", tip if tip != "" else "Everyone is faster and sharper now", 3.5)
 		else:
-			banner(st + " High alert", "Everyone in the house is faster and sharper now", 4.5)
+			banner("High alert", "Everyone in the house is faster and sharper now", 4.5)
 			if threats.has("traps") and s == 5:
 				place_traps(2)
 
@@ -1373,7 +1420,9 @@ func _tick_props(dt: float) -> void:
 		if is_instance_valid(fp):
 			var fs := 0.92 + 0.10 * sin(t * 11.0 + float(fl[1])) + 0.04 * sin(t * 27.0 + float(fl[1]) * 1.7)
 			var bs := fl[2] as Vector3
-			fp.scale = Vector3(bs.x, bs.y * fs, bs.z)
+			fp.scale = Vector3(bs.x * (1.0 + 0.05 * sin(t * 9.0 + float(fl[1]) * 1.3)), bs.y * fs, bs.z)
+			if fl.size() > 3:
+				fp.rotation.y = float(fl[3]) + sin(t * 2.7 + float(fl[1])) * 0.07  # round 15: the tongues sway, not just pulse
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
 	for pl in plants:

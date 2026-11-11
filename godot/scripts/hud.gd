@@ -217,14 +217,13 @@ func _draw_hud() -> void:
 			_canvas.draw_rect(Rect2(sp.x - 30, sp.y - 4, 60 * float(e[1]), 6), SLEEP)
 
 	# top-left: night, clock, lives, wanted level and what's going on in the house
-	var wanted := bool(n.get("wanted", false))
-	_canvas.draw_rect(Rect2(12, 12, 300, 104 if wanted else 80), PANEL)
+	# round 15 (asked): no Wanted readout — the stars still run the house
+	# exactly as before, they are simply never announced on the HUD.
+	_canvas.draw_rect(Rect2(12, 12, 300, 80), PANEL)
 	_text(Vector2(22, 34), "Night %d · %s" % [int(n.number), str(n.name)], 17)
 	_text(Vector2(22, 58), _clock(g) + "  ·  dawn at 06:00", 14, HINT)
 	var lives := "♥".repeat(maxi(0, g.lives)) + "♡".repeat(maxi(0, 3 - g.lives))
-	_text(Vector2(22, 82), "Lives " + lives + (("    Wanted " + ("★".repeat(g.stars) + "☆".repeat(5 - g.stars))) if wanted else ""), 15)
-	if wanted:
-		_text(Vector2(22, 104), _house_text(g), 13, HINT, 280)
+	_text(Vector2(22, 82), "Lives " + lives, 15)
 
 	# top-centre: nest progress
 	var bw := 320.0

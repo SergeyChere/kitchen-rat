@@ -397,6 +397,201 @@ func shade_lamp(n: Node3D) -> void:
 		shade.global_position += bc + Vector3(0, 0.04, 0) - sb.get_center()
 
 
+## A plain mesh box with no body — dressing that must never snag her feet.
+func _mesh_box(size: Vector3, material: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = material
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+## Round 15 (asked): a gas hob on the counter — black glass, four burners
+## under iron grates, and an oven front with knobs on the face below.
+## Mesh-only: her footing stays the counter's own, exactly as before.
+func _stove(piece: Node3D) -> void:
+	var bb := world_aabb(piece)
+	var top := bb.end.y
+	var cx := bb.get_center().x
+	var cz := bb.get_center().z
+	var glass := mat(Color(0.05, 0.05, 0.06))
+	glass.roughness = 0.25
+	glass.metallic = 0.2
+	var iron := mat(Color(0.08, 0.08, 0.09))
+	iron.roughness = 0.6
+	iron.metallic = 0.5
+	var plate := _mesh_box(Vector3(0.56, 0.008, 0.62), glass)
+	plate.name = "Cooktop"
+	decor.add_child(plate)
+	plate.global_position = Vector3(cx, top + 0.004, cz)
+	for off in [[-0.14, -0.16], [0.14, -0.16], [-0.14, 0.16], [0.14, 0.16]]:
+		var burn := MeshInstance3D.new()
+		burn.name = "Burner"
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.055
+		cm.bottom_radius = 0.065
+		cm.height = 0.010
+		burn.mesh = cm
+		burn.material_override = iron
+		burn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		decor.add_child(burn)
+		burn.global_position = Vector3(cx + float(off[0]), top + 0.012, cz + float(off[1]))
+		var g1 := _mesh_box(Vector3(0.20, 0.007, 0.028), iron)
+		g1.name = "Grate"
+		decor.add_child(g1)
+		g1.global_position = Vector3(cx + float(off[0]), top + 0.020, cz + float(off[1]))
+		var g2 := _mesh_box(Vector3(0.028, 0.007, 0.20), iron)
+		g2.name = "Grate"
+		decor.add_child(g2)
+		g2.global_position = Vector3(cx + float(off[0]), top + 0.020, cz + float(off[1]))
+	var front := bb.end.z
+	var door := _mesh_box(Vector3(0.52, 0.52, 0.012), glass)
+	door.name = "Oven door"
+	decor.add_child(door)
+	door.global_position = Vector3(cx, 0.50, front + 0.004)
+	var steel := mat(Color(0.55, 0.57, 0.60))
+	steel.metallic = 0.85
+	steel.roughness = 0.3
+	var handle := MeshInstance3D.new()
+	handle.name = "Oven handle"
+	var hm := CylinderMesh.new()
+	hm.top_radius = 0.011
+	hm.bottom_radius = 0.011
+	hm.height = 0.46
+	handle.mesh = hm
+	handle.material_override = steel
+	handle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	decor.add_child(handle)
+	handle.rotation.z = PI / 2.0
+	handle.global_position = Vector3(cx, 0.80, front + 0.028)
+	for k in 4:
+		var knob := MeshInstance3D.new()
+		knob.name = "Stove knob"
+		var km := CylinderMesh.new()
+		km.top_radius = 0.013
+		km.bottom_radius = 0.016
+		km.height = 0.022
+		knob.mesh = km
+		knob.material_override = iron
+		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		decor.add_child(knob)
+		knob.rotation.x = PI / 2.0
+		knob.global_position = Vector3(cx - 0.21 + k * 0.14, 0.845, front + 0.012)
+
+
+## Round 15: a standing lamp for a tall JSON light — a weighted base, a
+## real pole, and a fabric shade with the bulb glowing inside it. The
+## omni sits at the bulb, so the light and its source are one point.
+func _lamp_stand(x: float, y: float, h_cm: float, col: Color) -> void:
+	var dark := mat(hex(0x2a2320))
+	var base := MeshInstance3D.new()
+	base.name = "Lamp base"
+	var bm := CylinderMesh.new()
+	bm.top_radius = 0.10
+	bm.bottom_radius = 0.12
+	bm.height = 0.025
+	base.mesh = bm
+	base.material_override = dark
+	root.add_child(base)
+	base.global_position = W(x, y, 1.2)
+	var pole := MeshInstance3D.new()
+	pole.name = "Lamp pole"
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.013
+	pm.bottom_radius = 0.016
+	pm.height = (h_cm - 10.0) / 100.0
+	pole.mesh = pm
+	pole.material_override = dark
+	root.add_child(pole)
+	pole.global_position = W(x, y, (h_cm - 10.0) / 2.0 + 1.0)
+	var shade := MeshInstance3D.new()
+	shade.name = "Lamp shade"
+	var sm := CylinderMesh.new()
+	sm.top_radius = 0.075
+	sm.bottom_radius = 0.115
+	sm.height = 0.17
+	sm.cap_top = false
+	sm.cap_bottom = false
+	shade.mesh = sm
+	var shmat := StandardMaterial3D.new()
+	shmat.albedo_color = Color(0.93, 0.84, 0.64)
+	shmat.emission_enabled = true
+	shmat.emission = Color(1.0, 0.76, 0.44)
+	shmat.emission_energy_multiplier = 0.5
+	shmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shade.material_override = shmat
+	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(shade)
+	shade.global_position = W(x, y, h_cm - 2.0)
+	var bulb := MeshInstance3D.new()
+	bulb.name = "Lamp bulb"
+	var km := SphereMesh.new()
+	km.radius = 0.030
+	km.height = 0.06
+	bulb.mesh = km
+	var kmat := StandardMaterial3D.new()
+	kmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	kmat.albedo_color = col
+	bulb.material_override = kmat
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(bulb)
+	bulb.global_position = W(x, y, h_cm - 2.0)
+
+
+## Round 15 (asked: the nest entrance looks bad): over the model's flat
+## arch plate goes a real hole — a ragged dark opening with a rim of
+## chipped plaster, and crumbs of plaster on the floor beneath it.
+func _mouse_hole() -> void:
+	var grp := Node3D.new()
+	grp.name = "Mouse hole"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var radii: Array = []
+	for i in 10:
+		radii.append(0.15 * rng.randf_range(0.7, 1.14))
+	var rim := MeshInstance3D.new()
+	rim.mesh = _blob_mesh(radii, 1.22)
+	rim.material_override = mat(Color(0.72, 0.64, 0.52))
+	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rim.position.z = -0.004
+	grp.add_child(rim)
+	var dark := MeshInstance3D.new()
+	dark.mesh = _blob_mesh(radii, 1.0)
+	dark.material_override = mat(hex(0x050506))
+	dark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	grp.add_child(dark)
+	grp.scale = Vector3(1.12, 0.92, 1)
+	grp.rotation.y = PI
+	root.add_child(grp)
+	grp.global_position = W(180, 597, 13.5)
+	var plaster := mat(Color(0.72, 0.64, 0.52))
+	for c in [[168, 590], [186, 588], [176, 592], [193, 591]]:
+		var crumb := _mesh_box(Vector3(0.028, 0.014, 0.022), plaster)
+		root.add_child(crumb)
+		crumb.global_position = W(float(c[0]), float(c[1]), 0.7)
+		crumb.rotation.y = rng.randf() * TAU
+
+
+## Round 15: a tablecloth wears the woven gingham (TextureGen
+## "tablecloth"), tinted by the night's cloth colour — never a flat fill.
+func dress_tablecloth(n: Node3D, tint: Color) -> void:
+	var tex := TextureLib.get_texture("tablecloth")
+	if n == null or tex == null:
+		return
+	var cm := StandardMaterial3D.new()
+	cm.albedo_color = tint
+	cm.albedo_texture = tex
+	cm.uv1_scale = Vector3(2.5, 2.5, 1)
+	cm.roughness = 0.94
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if "tablecloth" in m.name.to_lower():
+			for i in m.mesh.get_surface_count():
+				m.set_surface_override_material(i, cm)
+
+
 ## Round 14 (asked: the foil reads as plain white scraps): crinkle facets,
 ## real metal — foil must flash under the moon patch, not sit there as paper.
 func dress_foil(n: Node3D) -> void:
@@ -465,7 +660,7 @@ func apply_countertop(n: Node3D) -> void:
 			for v in verts:
 				sb = sb.expand(v)
 			sb = to_local * sb
-			if sb.size.y <= 0.08 and sb.position.y >= all.position.y + all.size.y * 0.75:
+			if sb.size.y <= 0.08:  # round 15: any thin slab — the old upper-band test measured from the model's tallest prop (faucet, plant) and the corner and sink tops fell below it
 				var span := Vector2(1, 1)
 				var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 				if not uvs.is_empty():
@@ -479,27 +674,79 @@ func apply_countertop(n: Node3D) -> void:
 				top_end = maxf(top_end, sb.end.y)
 	if cands.is_empty():
 		return
+	# round 15 (playtest: the kitchen CORNER and the SINK stayed bare):
+	# group the thin surfaces by their top height and dress the group that
+	# reads as the worktop — the most area up there, ties toward the higher
+	# top. The floor plinth is thin too, and the bits standing ON the slab
+	# are thinner still; neither out-areas the slab itself.
+	var groups := {}
+	for cd0 in cands:
+		var cb0 := cd0[2] as AABB
+		var gk := int(round(cb0.end.y * 50.0))
+		if not groups.has(gk):
+			groups[gk] = [0.0, cb0.end.y]
+		groups[gk][0] = float(groups[gk][0]) + cb0.size.x * cb0.size.z
+	var best_key := -1
+	var best_score := -1.0
+	for gk2 in groups:
+		var gscore := float(groups[gk2][0]) * (0.45 + float(groups[gk2][1]))
+		if gscore > best_score:
+			best_score = gscore
+			best_key = gk2
+	if best_key < 0:
+		return
+	top_end = float(groups[best_key][1])
 	# round 14 (asked: the stone read as a ROAD — one giant slab per counter):
 	# repeat the sheet ~3.2 times across the slab's own UV span, so the slate
 	# pieces land at ~20 cm whatever the model's UVs do. One material per piece.
-	# The reference slab is the WIDEST thin candidate — the island's fruit bowl
-	# also sits up there in thin slices and must never be mistaken for the top.
-	var ref := 0
+	var ref := -1
 	var ref_area := -1.0
 	for ci in cands.size():
 		var cb2 := cands[ci][2] as AABB
+		if int(round(cb2.end.y * 50.0)) != best_key:
+			continue
 		var ar := cb2.size.x * cb2.size.z
 		if ar > ref_area:
 			ref_area = ar
 			ref = ci
-	top_end = (cands[ref][2] as AABB).end.y
+	if ref < 0:
+		return
 	var span0: Vector2 = cands[ref][3]
 	var stone := mat_named("counter_stone", Color(0.92, 0.92, 0.94))
 	stone.uv1_scale = Vector3(clampf(3.2 / span0.x, 1.5, 6.0), clampf(3.2 / span0.y, 1.5, 6.0), 1)
 	for cd in cands:
 		var cb3 := cd[2] as AABB
-		if cb3.end.y >= top_end - 0.03 and cb3.size.x * cb3.size.z >= ref_area * 0.4:
+		if int(round(cb3.end.y * 50.0)) == best_key and cb3.size.x * cb3.size.z >= ref_area * 0.35:
 			(cd[0] as MeshInstance3D).set_surface_override_material(int(cd[1]), stone)
+
+
+static var _mean_cache := {}
+
+
+## Round 15: a texture's TRUE average brightness, sampled once and cached.
+## The old table guessed 0.75 for fabric while the painted fabric averages
+## 0.40 and the downloaded sheet nearer 0.85 — so the same sofa landed
+## pale on one machine and dark on another. Measuring the sheet itself
+## ends that: authored colour in, authored colour out, on every machine.
+static func _tex_mean(tex: Texture2D, tex_name: String) -> float:
+	if _mean_cache.has(tex_name):
+		return float(_mean_cache[tex_name])
+	var fallback: float = float({"wood": 0.50, "wood_dark": 0.45, "fabric": 0.75, "leather": 0.55, "metal_matte": 0.60, "cardboard": 0.65, "plastic": 0.65}.get(tex_name, 0.45))
+	var mean := fallback
+	var img := tex.get_image() if tex != null else null
+	if img != null and not img.is_empty():
+		img = img.duplicate()
+		if img.is_compressed():
+			img.decompress()
+		img.resize(16, 16)
+		var sum := 0.0
+		for yy in 16:
+			for xx in 16:
+				var px := img.get_pixel(xx, yy)
+				sum += (px.r + px.g + px.b) / 3.0
+		mean = clampf(sum / 256.0, 0.15, 0.95)
+	_mean_cache[tex_name] = mean
+	return mean
 
 
 func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
@@ -509,8 +756,9 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 	# round 14: with no explicit tint, the SURFACE's own colour is the tint
 	# (divided by the texture's mean brightness) — a purple sofa stays purple
 	# WITH its weave, instead of every piece washing out to the raw texture.
-	var mean: float = float({"wood": 0.50, "wood_dark": 0.45, "fabric": 0.75, "leather": 0.55, "metal_matte": 0.60, "cardboard": 0.65, "plastic": 0.65}.get(tex_name, 0.45))
-	var c := Color(clampf(tint.r / mean, 0.0, 1.0), clampf(tint.g / mean, 0.0, 1.0), clampf(tint.b / mean, 0.0, 1.0))
+	var mean := _tex_mean(tex, tex_name)
+	var deepen := 0.85 if tex_name == "fabric" else 1.0  # round 15 (playtest): the sofa and armchair still read pale — fabric lands a touch deeper than authored
+	var c := Color(clampf(tint.r / mean, 0.0, 1.0), clampf(tint.g / mean, 0.0, 1.0), clampf(tint.b / mean, 0.0, 1.0)) * deepen
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		if "screen" in m.name.to_lower() or "tablecloth" in m.name.to_lower():
@@ -523,7 +771,7 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 				continue  # round 12c: baked-in props keep their own materials
 			var t := src.duplicate() as BaseMaterial3D
 			t.albedo_texture = tex
-			t.albedo_color = c if tint != Color.WHITE else Color(clampf(src.albedo_color.r / mean, 0.0, 1.0), clampf(src.albedo_color.g / mean, 0.0, 1.0), clampf(src.albedo_color.b / mean, 0.0, 1.0))
+			t.albedo_color = c if tint != Color.WHITE else Color(clampf(src.albedo_color.r / mean, 0.0, 1.0), clampf(src.albedo_color.g / mean, 0.0, 1.0), clampf(src.albedo_color.b / mean, 0.0, 1.0)) * deepen
 			t.uv1_scale = Vector3(2.0, 2.0, 1.0)
 			var p := surface_props(tex_name)
 			t.roughness = float(p[0])
@@ -707,81 +955,36 @@ func _lighting() -> void:
 		g.flickers.append([pl, pl.light_energy, "steady"])
 		# round 4: every light gets a visible source — a little candle lantern at the light's own
 		# spot (dark base, warm glowing core), so no light in the room comes from nowhere
-		var base := MeshInstance3D.new()
-		base.name = "Candle base"
-		var bm := CylinderMesh.new()
-		bm.top_radius = 0.035
-		bm.bottom_radius = 0.05
-		bm.height = 0.025
-		base.mesh = bm
-		base.material_override = mat(hex(0x2a2320))
-		root.add_child(base)
-		base.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 7.0)
-		var flame := MeshInstance3D.new()
-		flame.name = "Candle glow"
-		var fm := SphereMesh.new()
-		fm.radius = 0.028
-		fm.height = 0.056
-		flame.mesh = fm
-		var fmat := StandardMaterial3D.new()
-		fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		fmat.albedo_color = hex(l.get("c", 0xffa860))
-		flame.material_override = fmat
-		root.add_child(flame)
-		flame.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 2.0)
-		# round 6: the candle stood on AIR (a light at h=60 in an empty corner) — now a
-		# slim stand carries it down to the floor, so the light visibly stands on something
 		var lh := float(l.get("h", 60))
 		if lh > 12.0:
-			# round 14 (asked: "a stick with a bulb on it"): the stand carries a
-			# little lantern now — a glass sleeve around the flame and a dark cap,
-			# so the light reads as a lamp standing in the corner.
-			var glass := MeshInstance3D.new()
-			glass.name = "Lantern glass"
-			var glm := CylinderMesh.new()
-			glm.top_radius = 0.042
-			glm.bottom_radius = 0.042
-			glm.height = 0.115
-			glass.mesh = glm
-			var glmat := StandardMaterial3D.new()
-			glmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			glmat.albedo_color = Color(1.0, 0.78, 0.45, 0.30)
-			glmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			glass.material_override = glmat
-			glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			root.add_child(glass)
-			glass.global_position = W(float(l.x), float(l.y), lh - 2.0)
-			var cap := MeshInstance3D.new()
-			cap.name = "Lantern cap"
-			var cm2 := CylinderMesh.new()
-			cm2.top_radius = 0.012
-			cm2.bottom_radius = 0.058
-			cm2.height = 0.045
-			cap.mesh = cm2
-			cap.material_override = mat(hex(0x2a2320))
-			cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			root.add_child(cap)
-			cap.global_position = W(float(l.x), float(l.y), lh + 5.5)
-			var pole := MeshInstance3D.new()
-			pole.name = "Candle stand"
-			var pm := CylinderMesh.new()
-			pm.top_radius = 0.013
-			pm.bottom_radius = 0.013
-			pm.height = (lh - 8.0) / 100.0
-			pole.mesh = pm
-			pole.material_override = mat(hex(0x2a2320))
-			root.add_child(pole)
-			pole.global_position = W(float(l.x), float(l.y), (lh - 8.0) / 2.0)
-			var foot := MeshInstance3D.new()
-			foot.name = "Candle stand foot"
-			var dm := CylinderMesh.new()
-			dm.top_radius = 0.075
-			dm.bottom_radius = 0.085
-			dm.height = 0.012
-			foot.mesh = dm
-			foot.material_override = mat(hex(0x2a2320))
-			root.add_child(foot)
-			foot.global_position = W(float(l.x), float(l.y), 0.6)
+			# round 15 (playtest: the fixture still looks bad — first a candle
+			# on a stick, then a lantern on the same stick): a tall light
+			# stands as a proper shaded lamp now.
+			_lamp_stand(float(l.x), float(l.y), lh, hex(l.get("c", 0xffa860)))
+		else:
+			# a low light: a candle on its base at the light's own spot
+			var base := MeshInstance3D.new()
+			base.name = "Candle base"
+			var bm := CylinderMesh.new()
+			bm.top_radius = 0.035
+			bm.bottom_radius = 0.05
+			bm.height = 0.025
+			base.mesh = bm
+			base.material_override = mat(hex(0x2a2320))
+			root.add_child(base)
+			base.global_position = W(float(l.x), float(l.y), lh - 7.0)
+			var flame := MeshInstance3D.new()
+			flame.name = "Candle glow"
+			var fm := SphereMesh.new()
+			fm.radius = 0.028
+			fm.height = 0.056
+			flame.mesh = fm
+			var fmat := StandardMaterial3D.new()
+			fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			fmat.albedo_color = hex(l.get("c", 0xffa860))
+			flame.material_override = fmat
+			root.add_child(flame)
+			flame.global_position = W(float(l.x), float(l.y), lh - 2.0)
 
 	var room := OmniLight3D.new()  # the ceiling light: off at night, the owner switches it on
 	room.name = "Ceiling light"
@@ -1113,6 +1316,7 @@ func _room() -> void:
 				if curt:
 					g.curtains.append(curt)
 	for i in 8: _wall(south[i] if south[i] else "wall_section", 60 + 120 * i, 605, 180.0, walls, wall_mat)
+	_mouse_hole()  # round 15: a ragged plaster-rimmed entrance over the flat arch plate
 	for j in 5: _wall(west[j] if west[j] else "wall_section", -5, 60 + 120 * j, 90.0, walls, wall_mat)
 	for j in 5:
 		var esec := _wall(east[j] if east[j] else "wall_section", 965, 60 + 120 * j, -90.0, walls, wall_mat)
@@ -1197,14 +1401,20 @@ func _furniture() -> void:
 		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
 		if i == 6 and piece:
 			_sink_water(piece)
+		if i == 3 and piece:
+			_stove(piece)  # round 15 (asked): a gas hob for the kitchen — the kettle already steams over this segment
 	for j in 4:
 		furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72)
-	furn_piece("furniture/fridge", 895, 84, 0.0, "fridge", 130, 110)
-	# round 14 (asked: hiding behind the fridge, like behind the TV): the
-	# fridge stands 29 cm off the north wall and the counter run ends early —
-	# the strip behind it is hers alone (hunter guards seal the way in).
-	_hide("fridgeGap", 895, 15, 120, 26)  # a HideSpot is a hunter no-go on their grid (NavGrid) — the slot is hers
-	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
+	# round 15 (playtest: the fridge sat shoved against the wall, too
+	# obvious): it stands CENTRED in its slot now — the counter run ends
+	# at 800, the east wall is at 960 — with a rat-width slot on every
+	# side: left, right and behind. Each slot is a hide of hers alone
+	# (a HideSpot is a no-go on the hunters' grid).
+	furn_piece("furniture/fridge", 880, 70, 0.0, "fridge", 124, 106)
+	_hide("fridgeGap", 809, 61, 18, 122)
+	_hide("fridgeGap", 951, 61, 18, 122)
+	_hide("fridgeGap", 880, 8, 124, 17)
+	add_zone(HumZone, "Fridge hum", W(880, 128), Vector3(1.8, 1.2, 1.2))
 	furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90)
 	furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44)
 	var table := furn_piece("furniture/table_kitchen", 720, 445, 0.0, "table", 200, 130)
@@ -1215,8 +1425,13 @@ func _furniture() -> void:
 		var spec := {}
 		for f in night.get("furn", []):
 			if str(f.t) == "table": spec = f
-		if cloth and int(spec.get("cloth", 0)) == 0:
+		var clothv := int(spec.get("cloth", 0))
+		if cloth and clothv == 0:
 			cloth.queue_free()
+		elif cloth:
+			# round 15 (asked: the cloth is one flat colour): the woven
+			# check, in the night's own cloth colour
+			dress_tablecloth(table, hex(clothv) if clothv > 1 else Color(0.85, 0.38, 0.30))
 	_hide("table", 720, 445, 196, 126)
 	# round 5: hiding under a bare table read as ridiculous — there are THINGS under it now:
 	# a storage box and the kid's backpack, and she ducks in among them
@@ -1298,26 +1513,61 @@ func _kitchen_upper() -> void:
 	_wall_art("rooms/wall_art_portrait", 720, 598, 165, 180.0)
 
 
-## A few kibbles left in the cat's bowl.
+## Round 15 (playtest: the bowl still reads as "something unclear"): a
+## heaped mound wearing the kibble texture — pieces you can pick out,
+## lit piece by piece — a few loose bits on the heap and a spill beside
+## the bowl. No more uniform brown beads in a disc.
 func _bowl_leftovers(bowl: Node3D) -> void:
 	var bb := world_aabb(bowl)
 	var c := bb.get_center()
-	var r := minf(bb.size.x, bb.size.z) * 0.28
+	var r := minf(bb.size.x, bb.size.z) * 0.30
+	var top := bb.position.y + bb.size.y * 0.55
+	var dome := MeshInstance3D.new()
+	dome.name = "Kibble mound"
+	var sm := SphereMesh.new()
+	sm.radius = 1.0
+	sm.height = 2.0
+	dome.mesh = sm
+	dome.scale = Vector3(r, r * 0.42, r)
+	var dm := StandardMaterial3D.new()
+	dm.albedo_color = Color(1.02, 0.98, 0.92)
+	var ktex := TextureLib.get_texture("kibble")
+	if ktex != null:
+		dm.albedo_texture = ktex
+		dm.uv1_scale = Vector3(2.0, 2.0, 1.0)
+		_add_normal(dm, "kibble")
+	dm.roughness = 0.85
+	dome.material_override = dm
+	decor.add_child(dome)
+	dome.global_position = Vector3(c.x, top - r * 0.10, c.z)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	for i in 26:
+	for i in 12:
 		var a := rng.randf() * TAU
-		var d := sqrt(rng.randf()) * r
+		var d := sqrt(rng.randf()) * r * 0.8
 		var k := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = rng.randf_range(0.008, 0.013)  # round 14: kibble you can READ —
-		sm.height = sm.radius * 1.35  # varied bits in varied browns, mounded, not one flat disc
-		k.mesh = sm
-		var km := mat(Color(0.54, 0.35, 0.18).lerp(Color(0.30, 0.18, 0.08), rng.randf()))
-		km.roughness = 0.75
-		k.material_override = km
+		var km2 := SphereMesh.new()
+		km2.radius = rng.randf_range(0.007, 0.011)
+		km2.height = km2.radius * 1.5
+		k.mesh = km2
+		var mat2 := mat(Color(0.50, 0.32, 0.15).lerp(Color(0.28, 0.16, 0.07), rng.randf()))
+		mat2.roughness = 0.8
+		k.material_override = mat2
 		decor.add_child(k)
-		k.global_position = Vector3(c.x + cos(a) * d, bb.position.y + bb.size.y * 0.6 + rng.randf() * 0.008, c.z + sin(a) * d)
+		var lift := r * 0.42 * sqrt(maxf(0.0, 1.0 - (d / r) * (d / r)))
+		k.global_position = Vector3(c.x + cos(a) * d, top - r * 0.10 + lift + 0.004, c.z + sin(a) * d)
+	for i2 in 4:  # the spill beside the bowl
+		var a2 := rng.randf() * TAU
+		var k2 := MeshInstance3D.new()
+		var km3 := SphereMesh.new()
+		km3.radius = rng.randf_range(0.007, 0.010)
+		km3.height = km3.radius * 1.5
+		k2.mesh = km3
+		var mat3 := mat(Color(0.45, 0.28, 0.13).lerp(Color(0.30, 0.18, 0.08), rng.randf()))
+		mat3.roughness = 0.8
+		k2.material_override = mat3
+		decor.add_child(k2)
+		k2.global_position = Vector3(c.x + cos(a2) * (r + 0.06 + rng.randf() * 0.05), km3.radius * 0.7, c.z + sin(a2) * (r + 0.06 + rng.randf() * 0.05))
 
 
 ## A picture or clock on a wall, centred at (x, y) and h cm up, facing into the room.

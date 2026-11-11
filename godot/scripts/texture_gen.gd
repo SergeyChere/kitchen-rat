@@ -13,7 +13,8 @@ const S := 256
 ## All paintable material names (the shaft gradient is separate: make("shaft")).
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
 	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese", "fur_rat", "fur_cat",
-	"wallpaper_stripes", "wallpaper_damask", "wallpaper_panel", "wallpaper_brick", "crinkle"]
+	"wallpaper_stripes", "wallpaper_damask", "wallpaper_panel", "wallpaper_brick", "crinkle",
+	"tablecloth", "kibble"]
 
 
 static func make(tex_name: String) -> Texture2D:
@@ -47,6 +48,9 @@ static func make_image(tex_name: String) -> Image:
 		"wallpaper_panel": img = _wallpaper("panel")
 		"wallpaper_brick": img = _wallpaper("brick")
 		"crinkle": img = _crinkle(false)
+		"tablecloth": img = _tablecloth()
+		"kibble": img = _kibble()
+		"kibble_normal": img = _kibble_normal()
 		"crinkle_normal": img = _crinkle(true)
 		"fur_cat_normal": img = _fur_normal(223, true)
 		"shaft": img = _shaft()
@@ -218,6 +222,86 @@ static func _fabric() -> Image:
 			_put(data, x, y, c)
 	return _img(data)
 
+
+
+## Round 15 (asked: the tablecloth is one flat colour): a woven gingham —
+## stripes both ways make the checks; painted near-white so the night's
+## own cloth colour does the tinting.
+static func _tablecloth() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var f := _field(6, 71)
+	var cell := S / 8
+	for y in S:
+		var sy := (y / cell) % 2 == 0
+		var edge_y := y % cell == 0
+		for x in S:
+			var sx := (x / cell) % 2 == 0
+			var lum := 0.97
+			if sx != sy:
+				lum = 0.82
+			if edge_y or x % cell == 0:
+				lum *= 0.82
+			var c := Color(1.0, 0.985, 0.95) * lum * (0.95 + 0.09 * f[y * S + x])
+			_put(data, x, y, c)
+	return _img(data)
+
+
+## Round 15 (asked: "something unclear" in the cat's bowl): dry kibble —
+## a field of small rounded pieces in varied browns, with a height map,
+## so the heap in the bowl catches the light piece by piece.
+static func _kibble_blobs() -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 97
+	var blobs: Array = []
+	for i in 34:
+		blobs.append([rng.randf(), rng.randf(), rng.randf_range(0.055, 0.095), rng.randf()])
+	return blobs
+
+
+static func _kibble_height(u: float, v: float, blobs: Array) -> float:
+	var h := 0.0
+	for b in blobs:
+		var du := absf(u - float(b[0]))
+		var dv := absf(v - float(b[1]))
+		du = minf(du, 1.0 - du)
+		dv = minf(dv, 1.0 - dv)
+		var d := sqrt(du * du + dv * dv) / float(b[2])
+		if d < 1.0:
+			h = maxf(h, (0.55 + 0.45 * float(b[3])) * (1.0 - d * d))
+	return h
+
+
+static func _kibble() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var blobs := _kibble_blobs()
+	var dark := Color(0.16, 0.09, 0.04)
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			var h := _kibble_height(u, v, blobs)
+			var tone := 0.5 + 0.5 * _h2(int(u * 7.0), int(v * 7.0), 97)
+			var piece := Color(0.42, 0.26, 0.11).lerp(Color(0.62, 0.42, 0.19), tone)
+			_put(data, x, y, dark.lerp(piece, clampf(0.25 + h, 0.0, 1.0)) * (0.8 + 0.35 * h))
+	return _img(data)
+
+
+static func _kibble_normal() -> Image:
+	var data := PackedByteArray()
+	data.resize(S * S * 4)
+	var blobs := _kibble_blobs()
+	var e := 1.5 / S
+	for y in S:
+		for x in S:
+			var u := float(x) / S
+			var v := float(y) / S
+			var gx := _kibble_height(u + e, v, blobs) - _kibble_height(u - e, v, blobs)
+			var gy := _kibble_height(u, v + e, blobs) - _kibble_height(u, v - e, blobs)
+			var n := Vector3(-gx * 1.4, -gy * 1.4, 1.0).normalized()
+			_put(data, x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	return _img(data)
 
 static func _leather() -> Image:
 	var data := PackedByteArray()

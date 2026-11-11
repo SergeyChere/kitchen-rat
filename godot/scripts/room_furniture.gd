@@ -163,10 +163,10 @@ func _fire(at: Vector3, w_cm: float) -> void:
 	b.furn.add_child(e)
 	e.global_position = at
 	e.scale = Vector3(maxf(w_cm, 60.0) / 90.0, 0.55, 0.75)
-	# round 14 (asked, night 2: "still no fire"): particles alone do not read
-	# on every driver, so the fire ALSO gets plain meshes — an ember bed and
-	# three crossed flame planes. Meshes cannot not render; game.gd flickers
-	# their scale in _tick_props via g.flames.
+	# round 14: meshes, because particles do not read on every driver.
+	# round 15 (playtest: "some movement, but not a fire yet"): a fire is
+	# LOGS first — three of them, charred — with coals glowing between,
+	# and a layered flame: broad outer tongues and a white-hot core.
 	var emb := MeshInstance3D.new()
 	emb.name = "Ember bed"
 	var eb := BoxMesh.new()
@@ -181,11 +181,47 @@ func _fire(at: Vector3, w_cm: float) -> void:
 	emb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	b.furn.add_child(emb)
 	emb.global_position = at + Vector3(0, 0.015, 0)
-	for k in 3:
+	var logmat := b.mat_named("wood_dark", Color(0.30, 0.18, 0.10))
+	logmat.roughness = 1.0
+	var lw := maxf(w_cm, 60.0) / 100.0
+	for ls in [[0.0, 0.045, 0.05, 12.0], [0.02, 0.045, -0.04, -18.0], [-0.01, 0.115, 0.0, 38.0]]:
+		var log1 := MeshInstance3D.new()
+		log1.name = "Fire log"
+		var lcm := CylinderMesh.new()
+		lcm.top_radius = 0.034
+		lcm.bottom_radius = 0.040
+		lcm.height = lw * 0.52
+		log1.mesh = lcm
+		log1.material_override = logmat
+		log1.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.furn.add_child(log1)
+		log1.global_position = at + Vector3(float(ls[0]), float(ls[1]), float(ls[2]))
+		log1.rotation = Vector3(0, deg_to_rad(float(ls[3])), PI / 2.0)
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 31
+	for i in 9:
+		var coal := MeshInstance3D.new()
+		coal.name = "Coal"
+		var cbm := BoxMesh.new()
+		var cs := rng2.randf_range(0.018, 0.034)
+		cbm.size = Vector3(cs, cs * 0.6, cs)
+		coal.mesh = cbm
+		var cmat := StandardMaterial3D.new()
+		cmat.albedo_color = Color(0.05, 0.02, 0.01)
+		cmat.emission_enabled = true
+		cmat.emission = Color(1.0, 0.32, 0.05)
+		cmat.emission_energy_multiplier = rng2.randf_range(0.5, 1.7)
+		coal.material_override = cmat
+		coal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.furn.add_child(coal)
+		coal.global_position = at + Vector3(rng2.randf_range(-0.16, 0.16) * lw, 0.035, rng2.randf_range(-0.05, 0.05))
+		coal.rotation.y = rng2.randf() * TAU
+	for k in 5:
 		var fl := MeshInstance3D.new()
 		fl.name = "Fire flame"
 		var qm := QuadMesh.new()
-		qm.size = Vector2(0.38, 0.46)
+		var fh: float = [0.50, 0.40, 0.46, 0.36, 0.44][k]
+		qm.size = Vector2(0.40, fh)
 		fl.mesh = qm
 		var fmat2 := StandardMaterial3D.new()
 		fmat2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -196,9 +232,27 @@ func _fire(at: Vector3, w_cm: float) -> void:
 		fl.material_override = fmat2
 		fl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		b.furn.add_child(fl)
-		fl.global_position = at + Vector3(0, 0.24, 0)
-		fl.rotation.y = k * PI / 3.0
-		g.flames.append([fl, randf() * TAU, fl.scale])
+		fl.global_position = at + Vector3(0, 0.10 + fh / 2.0, 0)
+		fl.rotation.y = k * PI / 5.0
+		g.flames.append([fl, randf() * TAU, fl.scale, fl.rotation.y])
+	for k2 in 2:
+		var core := MeshInstance3D.new()
+		core.name = "Fire core"
+		var qm2 := QuadMesh.new()
+		qm2.size = Vector2(0.17, 0.24)
+		core.mesh = qm2
+		var cmat2 := StandardMaterial3D.new()
+		cmat2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cmat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		cmat2.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		cmat2.cull_mode = BaseMaterial3D.CULL_DISABLED
+		cmat2.albedo_texture = _flame_tex_core()
+		core.material_override = cmat2
+		core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.furn.add_child(core)
+		core.global_position = at + Vector3(0, 0.22, 0)
+		core.rotation.y = k2 * PI / 2.0 + 0.4
+		g.flames.append([core, randf() * TAU, core.scale, core.rotation.y])
 
 
 var _flame_t: Texture2D = null
@@ -222,6 +276,26 @@ func _flame_tex() -> Texture2D:
 	return _flame_t
 
 
+var _flame_c: Texture2D = null
+
+
+## The fire's white-hot heart: narrower and brighter than the outer tongue.
+func _flame_tex_core() -> Texture2D:
+	if _flame_c:
+		return _flame_c
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var nx := (float(x) / 63.0 - 0.5) * 2.0
+			var h := 1.0 - float(y) / 63.0
+			var halfw := 0.5 * pow(1.0 - h, 0.8)
+			var dd := absf(nx) / maxf(halfw, 0.05)
+			var a := pow(clampf(1.0 - dd, 0.0, 1.0), 1.2) * (1.0 - h * 0.3)
+			img.set_pixel(x, y, Color(1.0, 0.97, 0.88, a))
+	_flame_c = ImageTexture.create_from_image(img)
+	return _flame_c
+
+
 func _soft_disc() -> Texture2D:
 	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	for y in 32:
@@ -238,7 +312,7 @@ func light(at: Vector3, color: Color, energy: float, rng: float, kind := "fire")
 	l.omni_range = rng
 	# round 10 (the lighting pass): every practical falls off into a pool — the
 	# fire tightest, the TV softest — so rooms read as islands of motivated light
-	l.omni_attenuation = {"fire": 1.35, "tv": 1.15, "garland": 1.25}.get(kind, 1.3)
+	l.omni_attenuation = {"fire": 1.35, "tv": 1.15, "garland": 1.25, "steady": 1.55}.get(kind, 1.3)
 	l.shadow_enabled = kind != "tv"
 	b.root.add_child(l)
 	l.global_position = at
@@ -297,13 +371,17 @@ func build(list: Array) -> void:
 						# matte — the glare is gone and the dining room gains a colour.
 						var clothmat := StandardMaterial3D.new()
 						clothmat.albedo_color = Color(0.4, 0.12, 0.15)
-						clothmat.albedo_texture = TextureLib.get_texture("fabric")
+						clothmat.albedo_texture = TextureLib.get_texture("tablecloth")  # round 15: the woven check, not a flat sheet
 						if clothmat.albedo_texture:
-							clothmat.uv1_scale = Vector3(4, 4, 4)
+							clothmat.uv1_scale = Vector3(3, 3, 1)
 						clothmat.roughness = 0.96
 						clothmat.metallic_specular = 0.08
 						for mi in cloth.find_children("*", "MeshInstance3D", true, false):
 							(mi as MeshInstance3D).material_override = clothmat
+					elif cloth:
+						# round 15: any other cloth gets the check too, in
+						# the night's colour when it names one
+						b.dress_tablecloth(n, LevelBuilder.hex(int(f.get("cloth", 0))) if int(f.get("cloth", 0)) > 1 else Color(0.88, 0.86, 0.82))
 					if n:
 						# round 14 (asked: a prettier table — and night 8's still
 						# mirrored the light): real wood on the frame, and no
@@ -415,10 +493,12 @@ void fragment() {
 				b.shade_lamp(ln)  # round 14: a shade and a glowing bulb
 				# round 8 (asked): in the living room the floor lamp sits by the garland
 				# and out-shouts it — dimmed there, untouched elsewhere
+				# round 15 (playtest: still extra light around the floor
+				# lamp): a tighter pool that ends at the walls, not past them
 				if str(g.night.get("decor", "")) == "living":
-					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 0.7, 3.0, "steady")
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 0.62, 2.4, "steady")
 				else:
-					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.3, 3.8, "steady")
+					light(W(cx, cy, 138), Color8(0xff, 0xc2, 0x7a), 1.1, 3.0, "steady")
 			"plant":
 				var pn := b.spawn("furniture/plant", W(cx, cy), randf() * 360.0, b.furn)
 				b.collide(pn)
@@ -765,6 +845,28 @@ func _art_at(wall: String, along: float, model: String) -> bool:
 	return true
 
 
+
+## An unlit lamp: a dim warm bulb, and a shade over it (placed like
+## shade_lamp does, but without lighting the bulb).
+func _dim_lamp(n: Node3D) -> void:
+	var bulb: MeshInstance3D = null
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if "bulb" in m.name.to_lower():
+			bulb = m
+			for i in m.mesh.get_surface_count():
+				var d := StandardMaterial3D.new()
+				d.albedo_color = Color(0.30, 0.27, 0.22)
+				d.roughness = 0.35
+				m.set_surface_override_material(i, d)
+	if bulb == null:
+		return
+	var bc := LevelBuilder.world_aabb(bulb).get_center()
+	var shade := b.spawn("rooms/lamp_shade", bc, 0.0, n.get_parent())
+	if shade:
+		var sb := LevelBuilder.world_aabb(shade)
+		shade.global_position += bc + Vector3(0, 0.04, 0) - sb.get_center()
+
 func _floor_item(model: String, x: float, y: float) -> bool:
 	var p := W(x, y)
 	if _busy(p, 30.0) or not _free_box(p + Vector3.UP * 0.6, Vector3(44, 110, 44)):
@@ -772,6 +874,8 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 	var n := b.spawn(model, p, randf() * 360.0, b.furn)
 	if n:
 		b.collide(n)
+		if model == "furniture/floor_lamp":
+			_dim_lamp(n)  # round 15: this lamp is OFF — a bare bright bulb reads as a light that is not there
 		if model == "furniture/plant":
 			g.plants.append([n, n.rotation, randf() * TAU])  # round 12: it sways
 	return n != null
