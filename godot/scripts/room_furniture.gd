@@ -209,9 +209,14 @@ func build(list: Array) -> void:
 				var n := maxi(1, roundi(w / 63.0))
 				for i in n:
 					var seg := {"x": x + w / n * i, "y": y, "w": w / n, "h": d}
-					place("furniture/counter_section", seg, "counter", 0.0, 0.0)
+					var cn := place("furniture/counter_section", seg, "counter", 0.0, 0.0)
+					if cn:
+						b.apply_countertop(cn)  # round 12d
 			"fridge": place("furniture/fridge", f, "fridge", 0.0, null, "metal_matte")
-			"island": place("furniture/kitchen_island", f, "island", 0.0, 180.0)
+			"island":
+				var isl := place("furniture/kitchen_island", f, "island", 0.0, 180.0)
+				if isl:
+					b.apply_countertop(isl)  # round 12d
 			"box":
 				var ht := float(f.get("ht", 44))
 				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht, null, "cardboard")

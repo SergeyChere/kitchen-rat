@@ -253,6 +253,8 @@ func furn_piece(path: String, x: float, y: float, rot: float, surface: String, w
 		collide_box(n, surface)  # closed boxes: no way inside, a flat top to walk on
 	else:
 		collide(n, surface)
+	if path in ["furniture/counter_section", "furniture/counter_sink", "furniture/counter_corner", "furniture/kitchen_island"]:
+		apply_countertop(n)  # round 12d: the stone finally reaches the counters
 	return n
 
 
@@ -362,6 +364,51 @@ static func _takes_texture(tex_name: String, src: BaseMaterial3D) -> bool:
 	if hue < 0.0:
 		hue += 360.0
 	return hue >= 10.0 and hue <= 52.0
+
+
+## Round 12d: the countertop. The counter models (section / sink / corner /
+## island) wear their stock materials, so the stone texture — painted or
+## downloaded — never reached a single counter. The top is found by GEOMETRY,
+## not colour: among the thin slabs in the model's upper band, the one whose
+## top is highest. Fruit bowls, soap bottles and cabinet fronts sit elsewhere
+## (or are thicker than a slab) and keep the materials they were made with.
+func apply_countertop(n: Node3D) -> void:
+	var tex := TextureLib.get_texture("counter_stone")
+	if n == null or tex == null:
+		return
+	var inv := n.global_transform.affine_inverse()
+	var all := AABB()
+	var first := true
+	var mis: Array[MeshInstance3D] = []
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := c as MeshInstance3D
+		mis.append(mi)
+		var bb: AABB = (inv * mi.global_transform) * mi.get_aabb()
+		all = bb if first else all.merge(bb)
+		first = false
+	if first:
+		return
+	var cands: Array = []  # [mesh, surface, box]
+	var top_end := -1.0e9
+	for mi in mis:
+		var to_local := inv * mi.global_transform
+		for i in mi.mesh.get_surface_count():
+			var verts: PackedVector3Array = mi.mesh.surface_get_arrays(i)[Mesh.ARRAY_VERTEX]
+			if verts.is_empty():
+				continue
+			var sb := AABB(verts[0], Vector3.ZERO)
+			for v in verts:
+				sb = sb.expand(v)
+			sb = to_local * sb
+			if sb.size.y <= 0.08 and sb.position.y >= all.position.y + all.size.y * 0.78:
+				cands.append([mi, i, sb])
+				top_end = maxf(top_end, sb.end.y)
+	if cands.is_empty():
+		return
+	var stone := mat_named("counter_stone", Color(0.92, 0.92, 0.94))
+	for cd in cands:
+		if (cd[2] as AABB).end.y >= top_end - 0.015:
+			(cd[0] as MeshInstance3D).set_surface_override_material(int(cd[1]), stone)
 
 
 func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
@@ -802,11 +849,20 @@ func _room() -> void:
 	if not ResourceLoader.exists("res://assets/textures/" + floor_tex + ".png"): floor_tex = "floor_tile"
 	if not ResourceLoader.exists("res://assets/textures/" + wall_tex + ".png"): wall_tex = "wall_stripes"
 	var floor_mat := mat(Color.WHITE, floor_tex, Vector2(6, 3.75))
-	if str(pal.get("floor", "")) == "tile" and ResourceLoader.exists("res://assets/textures/ceramic_tile.png"):
-		# demo polish: real tile (tools/make_textures.py) instead of the placeholder pattern, tinted down
-		# to the old floor's tone (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before
-		floor_mat = mat(Color(0.30, 0.32, 0.45), "ceramic_tile", Vector2(6, 3.75))
-		floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
+	if str(pal.get("floor", "")) == "tile":
+		# round 12d: the real tile, asked from TextureLib (CDN pack → painted) —
+		# the old code looked for res://assets/textures/ceramic_tile.png, a file
+		# that never existed in the repo, so the check never fired and the
+		# downloaded Tiles141 went unused. Tinted down to the old floor's tone
+		# (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before.
+		var ct := TextureLib.get_texture("ceramic_tile", false)
+		if ct != null:
+			floor_mat = mat(Color(0.30, 0.32, 0.45))
+			floor_mat.albedo_texture = ct
+			floor_mat.uv1_scale = Vector3(6, 3.75, 1)
+			floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
+			_add_normal(floor_mat, "ceramic_tile")
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	var trim := mat(hex(0x7a4a2a))
 

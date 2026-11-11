@@ -639,3 +639,33 @@ their stock materials were never touched).
 **Testing.** Import clean; night 1 CI set all pass; boots nights
 2, 3, 4, 8 clean; bugs night 2, hides night 4 pass.
 
+## Round 12d — the second audit: plants, walls, ceiling, curtains, door, trim, counters (2026-11-10)
+
+Asked by name, checked by name. Clean as modelled, no pass ever
+touched them: the **plants** (terracotta pot, green leaves), the
+**curtains** (deep-red velvet in the window model), the **door**
+(dark wood, brass handle), the **ceiling** (flat night colour by
+design), the **walls** (the repo's own wall patterns), and the
+**baseboard trim** — which already takes the real `wood_dark`
+through `mat_named`, as intended.
+
+Two textures from the pack turned out to be wired to NOTHING:
+
+1. **The tile floor.** The floor code asked
+   `res://assets/textures/ceramic_tile.png` whether it existed;
+   it never did, so the check never fired and tile floors kept
+   the bundled placeholder pattern. The floor now asks TextureLib
+   (CDN pack → painted ceramic), tinted to the old floor's tone,
+   glazed roughness kept, normal attached.
+2. **Every countertop.** The counter models wear stock
+   materials, so `counter_stone` reached no counter anywhere.
+   `apply_countertop` now finds the worktop by geometry — the
+   thin slab in the model's upper band whose top is highest —
+   and dresses only it in the stone; cabinet fronts, the sink's
+   steel, soap bottles and the island's fruit bowl keep their own
+   materials. Wired into the kitchen builder and RoomFurniture's
+   counter / island placement.
+
+**Testing.** Import clean; night 1 CI set and walk pass; boots
+nights 2, 4, 8 clean.
+
