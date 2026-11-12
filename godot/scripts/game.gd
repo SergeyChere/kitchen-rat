@@ -188,6 +188,13 @@ func _ready() -> void:
 			(l as Light3D).shadow_enabled = false
 	for i in nest_pups.size():
 		nest_pups[i].visible = i < 4 - pups.size()
+	if Settings.quality != "low":
+		ContactShadow.attach(rat, Vector2(0.04, 0.085), 0.08, 0.7)
+		ContactShadow.attach(cat, Vector2(0.08, 0.2), 0.14, 0.65)
+		ContactShadow.attach(owner_ai, Vector2(0.12, 0.12), 0.24, 0.55)
+		ContactShadow.attach(dog, Vector2(0.11, 0.26), 0.17, 0.65)
+		for p in pups:
+			ContactShadow.attach(p, Vector2(0.02, 0.04), 0.045, 0.65)
 	if backdrop:
 		_start_backdrop()
 		return
