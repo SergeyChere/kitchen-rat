@@ -615,6 +615,7 @@ func build_contents() -> void:
 	_food()
 	_traps()
 	_ground_shadows()
+	_practicals()
 
 
 ## Soft dark patches on the floor under every piece of furniture and along the foot of the walls (what a
@@ -700,6 +701,87 @@ func _ground_shadows() -> void:
 	for wall in [[Vector3(o.x + w * 0.5, 0.003, o.z), Vector2(w * 0.5, 0.02)], [Vector3(o.x + w * 0.5, 0.003, o.z + d), Vector2(w * 0.5, 0.02)],
 			[Vector3(o.x, 0.003, o.z + d * 0.5), Vector2(0.02, d * 0.5)], [Vector3(o.x + w, 0.003, o.z + d * 0.5), Vector2(0.02, d * 0.5)]]:
 		_ground_shadow(wall[0], wall[1], 0.0, 0.38, 0.34, grp)
+
+
+## Warm lights against the cold moon (the It Takes Two scheme: every room has both).
+##  · every room: the hall light is on behind the door — a glowing gap under it and a warm streak across the floor
+##  · kitchens (the bluest rooms): a plug-in night-light on the wall by the mouse hole, a pool of amber at home's door
+func _practicals() -> void:
+	if OS.get_environment("HIDE").contains("warm"):  # dev: compare
+		return
+	var grp := group("Practicals")
+	var warm := Color(1.0, 0.7, 0.4)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.82, 0.55)
+	# the door (east wall): section j is 120 cm wide, the leaf sits in its middle
+	var door_j := clampi(floori(float(night.get("door", 300)) / 120.0), 0, 4)
+	var dy := door_j * 120.0 + 60.0
+	var gap := box("Door gap glow", W(957.5, dy, 0.6), Vector3(0.02, 0.012, 0.8), glow, grp, false)
+	(gap as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# the streak itself is painted on the floor (a light skimming the floor at that angle lights nothing in a
+	# toon-shaded scene): an additive wedge that starts as wide as the door and fades out 1.7 m into the room
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, shadows_disabled;
+uniform vec3 tint : source_color = vec3(1.0, 0.62, 0.3);
+void fragment() {
+	float along = 1.0 - UV.x;              // 0 at the door … 1 at the far end
+	float across = abs(UV.y - 0.5) * 2.0;  // 0 on the axis … 1 at the edge
+	float w = mix(0.62, 1.0, along);       // the wedge opens as it goes
+	float a = pow(1.0 - along, 2.2) * (1.0 - smoothstep(w * 0.55, w, across));
+	ALBEDO = tint * a * 0.8;
+}
+"""
+	var sm0 := ShaderMaterial.new()
+	sm0.shader = sh
+	var streak := MeshInstance3D.new()
+	streak.name = "Hall light on the floor"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.7, 1.25)
+	streak.mesh = pm
+	streak.material_override = sm0
+	streak.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	grp.add_child(streak)
+	streak.global_position = W(960 - 85, dy, 0.5)
+	var spill := OmniLight3D.new()  # and it warms whatever stands by the door
+	spill.name = "Hall light spill"
+	spill.light_color = warm
+	spill.light_energy = 0.9
+	spill.omni_range = 1.5
+	spill.omni_attenuation = 1.6
+	grp.add_child(spill)
+	spill.global_position = W(935, dy, 22)
+	if str(night.get("decor", "kitchen")) != "kitchen":
+		return
+	# the night-light: a little plug with a glowing amber dome, right of the hole
+	var plug := box("Night-light", W(262, 597, 15), Vector3(0.045, 0.06, 0.03), mat(hex(0xe8e2d4)), grp, false)
+	(plug as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var dome := MeshInstance3D.new()
+	dome.name = "Night-light dome"
+	var sm := SphereMesh.new()
+	sm.radius = 0.026
+	sm.height = 0.052
+	dome.mesh = sm
+	var amber := StandardMaterial3D.new()
+	amber.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	amber.albedo_color = Color(1.0, 0.74, 0.36)
+	dome.material_override = amber
+	dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	grp.add_child(dome)
+	dome.global_position = W(262, 594, 15)
+	var nl := OmniLight3D.new()
+	nl.name = "Night-light"
+	nl.light_color = Color(1.0, 0.64, 0.3)
+	nl.light_energy = 1.5
+	nl.omni_range = 2.6
+	nl.omni_attenuation = 1.5
+	nl.shadow_enabled = true
+	nl.shadow_bias = 0.15
+	nl.shadow_normal_bias = 4.0
+	grp.add_child(nl)
+	nl.global_position = W(262, 584, 17)
 
 
 func _lighting() -> void:
