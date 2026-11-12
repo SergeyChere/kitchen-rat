@@ -687,3 +687,45 @@ All 20 nights were looked at in overview shots after the lamp fixes.
 the pups, dog and awake cat; fur in motion; the
 cost of fur + depth of field on the user's laptop (both can be
 switched off: quality low, or the DOF checkbox).
+
+## Round 14 — watercolour (2026-11-12)
+
+The user changed the direction of the look: a hand-painted watercolour
+picture (his two reference images: the menu and the play view
+repainted). What carries it:
+
+1. **Painted surfaces.** `godot/assets/painted/` holds every picture
+   the game puts on a surface; `TextureLib` takes a file from there
+   before any other source. They are painted by
+   `tools/paint_textures.py` (layered brush patches, drying lines,
+   wobbling joints, pigment pooled on edges) and can be redrawn by
+   hand under the same name — README.md in that folder (Russian) has
+   the list and the rules. No normal maps under painted surfaces.
+2. **A wash on everything.** `toonify` lays `wash.png` over the own
+   colour of every plain, non-character material (model-space
+   triplanar). `HIDE=wash`.
+3. **Pen line.** Outline 3.4 mm, sepia (was 5.5 mm, near-black).
+4. **Paper.** `PaperFilter`: one pass over the 3D frame under the UI —
+   flat areas melt into a wash, pigment pools along edges, paper
+   tooth, a slight wobble, lifted darks, calmer colours. `HIDE=paper`.
+   Depth of field is off by default (new settings key).
+5. **Painted fur.** Locks instead of dots, a solid undercoat, colour
+   blocked in broad strokes; the rats are a warm grey with pink tail,
+   ears and paws.
+6. **Type.** Lora (OFL) for the menu and the HUD: `UI.font(weight)`.
+7. **Brightness.** "The locations look dark": ambient 0.38 → 0.78
+   (pantry ×1.3), bounce 0.34, ceiling glow 1.0, darks lifted.
+8. **A lived-in kitchen** (`_kitchen_life`, `HIDE=life`): fridge
+   magnets, notes and a drawing; a rail of pans and utensils; boards,
+   a pot, a knife block, bread box and bottles on the worktop; a
+   runner, a door mat, a calendar. The kettle and toaster had been
+   standing inside the counter (a raycast at build time finds
+   nothing); they are on the worktop now.
+
+**Checked.** Night-1 CI set after each step, plus `walk`, `upper`,
+`climb`; screenshots of the menu, kitchen, living room, pantry,
+basement, the nest and the cat.
+
+**Not checked.** Nights 5–20 in the new look beyond the four rooms
+above; frame rate with the paper pass on the user's laptop (it is
+off on quality low).
