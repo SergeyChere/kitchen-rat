@@ -877,3 +877,67 @@ furniture now gets set dressing derived from its measured world AABB
 
 Also here: `docs/TEXTURES_V2.md` — the shopping list for the v2 pack,
 moved into the project at Sergii's request.
+
+## Merge: main's Look passes 1–3 + shell fur (2026-11-11)
+
+Main moved while rounds 12b–17 sat in this branch (four commits after
+the PR #1 merge: bc02af0, 6ee4cb6, 8606589, 20cbfea), so main was merged
+back in by hand — no main commit was touched, and no round was dropped.
+Conflicts: two files (level_builder.gd, texture_gen.gd); the rest merged
+cleanly (hud.gd, main.gd, texture_lib.gd, project.godot).
+
+What came in from main:
+- Look pass 1: textures as DETAIL over designed colours
+  (TextureLib.get_detail/detail_colour, triplanar world mapping in
+  apply_texture, a `shade` argument), the grade pulled back inside the
+  range (brightness 1.2 → 1.05 etc. — a tenth of the frame clipped),
+  softer moon shaft (shaft_soft, feathered edges, distance fade), tile
+  floor via detail, moon shadow map tightened to 11.5 m, burrow light
+  rebuilt as a spot cone with a bounce fill, front earth walls, straw
+  bedding and a rag cloth in the nest.
+- Look pass 2: the kitchen — wood grain on counters/island/table,
+  cardboard on the box, deep-red tablecloth, the island top shaded down
+  (0.72), a ceiling that glows a little in its own colour.
+- Look pass 3: smooth characters (LevelBuilder.smooth_mesh averages
+  normals across shared vertices, finer 0.62 outline), candle/lamp
+  meshes stop casting a black disc under their own light, positional
+  shadow atlas subdivision in project settings.
+- Shell fur: 7 shader layers over the rat's, the pups' and the cat's
+  Grey/White materials (CUSTOM0 rest pose, NOFUR=1 / low quality opts
+  out); a HIDE= dev hook in main.gd and a GRADE= grade override.
+
+How the conflicts were resolved (both sides kept where possible):
+- apply_texture is main's rewrite (get_detail, triplanar, _takes, the
+  material cache, TILE_M). The round 12c gate (_takes_texture) and the
+  round 15 measured-mean tint (_tex_mean, the fabric ×0.85 deepen) are
+  gone — main's _takes and detail_colour do the same jobs. Kept from
+  the branch: the screen/tablecloth name skip, and _add_rough (round
+  16) wired into the new apply_texture.
+- Tile floor is main's get_detail version (cool grey-blue 0.31/0.32/
+  0.385, contrast 0.5, anisotropic) — it supersedes the round 14
+  warm-neutral tint, which was calibrated for the old raw-texture path;
+  the round 16 wood/concrete floor blocks are untouched. Main's warm
+  wall tint for tile kitchens applies to the repo-pattern wall; the
+  round 14 wallpaper (wallA) still replaces it when available.
+- Tall JSON lights keep the round 15 shaded lamp stand (main's slim
+  candle stand was the thing round 15 replaced); main's cast-shadow-off
+  fix was applied to the candle, the flame, and the lamp stand's base
+  and pole.
+- The fridge keeps its round 15 centred slot with three rat-width hide
+  gaps; the island and the box take main's surfacing (shade 0.72 on the
+  island top). The kitchen table keeps round 14's wood_dark — main's
+  second apply_texture("wood") call on it was a no-op (_takes skips
+  surfaces that already carry a texture) and was removed with a note.
+- The nest hole light keeps main's spot properties and the round 14
+  shadow (the wall must occlude it). The ceiling keeps main's glow AND
+  the round 14 dust motes.
+- smooth_mesh keeps the original tangents instead of nulling them:
+  they come from the UVs (unchanged by normal averaging), the shader
+  re-orthogonalises them, and round 13's fur normal maps need them.
+- "shaft" is now "shaft_soft" everywhere (main's rename, so players'
+  cached old shaft is not reused); all round 13–16 painters stay.
+- TextureGen's painted fur and main's shell fur coexist: toonify runs
+  first (smooth mesh + fur next_pass chain), _dress_character then
+  duplicates the toonified material and adds the painted fur texture
+  and normal map on the base pass; duplicate() shares the next_pass,
+  so the shells stay attached above the painted coat.
