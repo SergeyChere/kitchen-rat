@@ -110,39 +110,6 @@ func sparkle(at: Vector3, cheese: bool) -> void:
 	_particles(at, 10, Color(1.0, 0.85, 0.35, 0.95) if cheese else Color(0.95, 0.85, 0.6, 0.8), 0.025, 0.6, 0.04, 0.6, -1.2)
 
 
-func _motes() -> void:
-	# dust in the moonlight by the window
-	var win: Dictionary = g.night.get("window", {})
-	if float(win.get("w", 0)) <= 0.0:
-		return
-	var p := CPUParticles3D.new()
-	p.amount = 60
-	p.lifetime = 8.0
-	p.preprocess = 8.0
-	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(float(win.w) / 200.0, 0.7, 0.9)
-	p.direction = Vector3(0.2, -0.1, 0.3)
-	p.spread = 180.0
-	p.initial_velocity_min = 0.005
-	p.initial_velocity_max = 0.03
-	p.gravity = Vector3(0, -0.004, 0)
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.2
-	var q := QuadMesh.new()
-	q.size = Vector2(0.012, 0.012)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.albedo_texture = _make_dot()
-	m.albedo_color = Color(0.75, 0.82, 1.0, 0.5)
-	q.material = m
-	p.mesh = q
-	add_child(p)
-	p.global_position = Nights.world(float(win.x) + float(win.w) / 2.0, 100, 120)
-
-
 ## Noisy things and wobbly cups glint when she comes close, so every trap can be seen in advance.
 func _make_glints() -> void:
 	var marks := []
@@ -202,8 +169,7 @@ static func _fade_tex() -> ImageTexture:
 
 
 func _ready() -> void:
-	_make_beacon()
-	_motes()
+	_make_beacon()  # (the dust in the moonlight lives in LevelBuilder._dust_motes now: along the whole shaft)
 	_make_glints()
 	for z in g.zones:
 		if z is HideSpot:

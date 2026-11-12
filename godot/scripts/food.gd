@@ -69,9 +69,10 @@ func toss_scatter() -> void:
 	tw.tween_callback(func(): rotation = Vector3(0, randf() * TAU, 0))
 
 
-## Every few seconds a small four-pointed glint pops on a piece of food that lies waiting: it catches the
-## eye from across the room the way a collectible should, without an arrow or an icon over it.
-const GLINT := """
+## Food that lies waiting has a faint warm halo that slowly breathes: it can be found in a dark room from far
+## away without an arrow or an icon over it. (Round and soft on purpose — the sharp yellow stars in WorldFX
+## mean the opposite: "this thing makes noise".)
+const HALO := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, shadows_disabled;
 uniform float a = 0.0;
@@ -80,61 +81,45 @@ void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0] * sc, INV_VIEW_MATRIX[1] * sc, INV_VIEW_MATRIX[2] * sc, MODEL_MATRIX[3]);
 }
 void fragment() {
-	vec2 p = abs(UV - 0.5) * 2.0;
-	float star = max(0.0, 1.0 - (sqrt(p.x) + sqrt(p.y)));
-	float core = max(0.0, 1.0 - length(p) * 3.0);
-	ALBEDO = vec3(1.0, 0.94, 0.72) * (star * 2.2 + core) * a;
+	float d = length(UV - 0.5) * 2.0;
+	float g = max(0.0, 1.0 - d);
+	ALBEDO = vec3(1.0, 0.78, 0.42) * g * g * a;
 }
 """
-static var _glint_shader: Shader
-var _glint: MeshInstance3D
-var _glint_mat: ShaderMaterial
-var _glint_wait := 0.0
-var _glint_t := -1.0
-static var _glint_hold := OS.get_environment("GLINT") == "hold"
+static var _halo_shader: Shader
+static var _halo_hold := OS.get_environment("GLINT") == "hold"  # dev: every halo at full strength, for a screenshot
+var _halo: MeshInstance3D
+var _halo_mat: ShaderMaterial
+var _halo_t := randf() * TAU
+var _halo_a := 0.0
 
 
-func _tick_glint(dt: float) -> void:
+func _tick_halo(dt: float) -> void:
 	var on := visible and not carried and not hidden and not poison
-	if not on:
-		if _glint:
-			_glint.visible = false
-		_glint_t = -1.0
+	if not on and _halo == null:
 		return
-	if _glint_t < 0.0:
-		if _glint_wait <= 0.0:
-			_glint_wait = randf_range(1.5, 5.0)
-		_glint_wait -= dt
-		if _glint_wait > 0.0 and not _glint_hold:
-			return
-		if _glint == null:
-			if _glint_shader == null:
-				_glint_shader = Shader.new()
-				_glint_shader.code = GLINT
-			_glint_mat = ShaderMaterial.new()
-			_glint_mat.shader = _glint_shader
-			_glint = MeshInstance3D.new()
-			_glint.name = "Glint"
-			var q := QuadMesh.new()
-			q.size = Vector2(0.075, 0.075)
-			_glint.mesh = q
-			_glint.material_override = _glint_mat
-			_glint.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			_glint.top_level = true
-			add_child(_glint)
-		_glint_t = 0.0
-		_glint.global_position = global_position + Vector3(randf_range(-0.012, 0.012), randf_range(0.03, 0.05), randf_range(-0.012, 0.012))
-		_glint.visible = true
-	_glint_t += dt
-	var k := _glint_t / 0.6
-	if _glint_hold:  # dev: GLINT=hold keeps every glint lit, for a screenshot
-		k = 0.5
-	if k >= 1.0:
-		_glint_t = -1.0
-		_glint.visible = false
+	if _halo == null:
+		if _halo_shader == null:
+			_halo_shader = Shader.new()
+			_halo_shader.code = HALO
+		_halo_mat = ShaderMaterial.new()
+		_halo_mat.shader = _halo_shader
+		_halo = MeshInstance3D.new()
+		_halo.name = "Halo"
+		var q := QuadMesh.new()
+		q.size = Vector2(0.22, 0.22)
+		_halo.mesh = q
+		_halo.material_override = _halo_mat
+		_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_halo.top_level = true
+		add_child(_halo)
+	_halo_a = move_toward(_halo_a, 1.0 if on else 0.0, dt * 2.5)
+	_halo.visible = _halo_a > 0.01
+	if not _halo.visible:
 		return
-	_glint_mat.set_shader_parameter("a", sin(k * PI))
-	_glint.scale = Vector3.ONE * (0.55 + 0.45 * sin(k * PI))
+	_halo_t += dt * 1.7
+	_halo.global_position = global_position + Vector3.UP * 0.025
+	_halo_mat.set_shader_parameter("a", _halo_a * (0.7 if _halo_hold else 0.42 + 0.2 * sin(_halo_t)))
 
 
 func _process(dt: float) -> void:
@@ -142,7 +127,7 @@ func _process(dt: float) -> void:
 		reveal_t -= dt
 	if not carried and visible:
 		rotate_y(0.5 * dt)
-	_tick_glint(dt)
+	_tick_halo(dt)
 
 
 static func model_for(t: String) -> String:
