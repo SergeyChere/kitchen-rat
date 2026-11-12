@@ -1276,8 +1276,8 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	m.albedo_texture = dot
 	m.albedo_color = Color(0.72, 0.82, 1.0, 0.7)
 	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA  # none of them in her face
-	m.distance_fade_min_distance = 0.25
-	m.distance_fade_max_distance = 0.9
+	m.distance_fade_min_distance = 0.9   # (up close they were snowflakes; they are specks in a beam seen from a way off)
+	m.distance_fade_max_distance = 2.4
 	var q := QuadMesh.new()
 	q.size = Vector2(0.015, 0.015)
 	q.material = m
@@ -1550,6 +1550,46 @@ func _furniture() -> void:
 	furn_piece("furniture/stool", 100, 252, 0.0, "stool")
 	if bool(night.get("kitchenUpper", false)):
 		_kitchen_upper()
+	_backsplash()
+
+
+## Tiles on the wall behind the worktops (a kitchen without a backsplash is a room with cupboards): small cream
+## tiles from the worktop up to where the wall cabinets hang, stepping down under the window. They catch the
+## moon and the light strip under the cabinets.
+func _backsplash() -> void:
+	var tile := TextureLib.get_detail("ceramic_tile", 0.8)
+	if tile.is_empty() or OS.get_environment("HIDE").contains("splash"):
+		return
+	var m := mat(Color.WHITE)
+	m.albedo_texture = tile[0]
+	m.albedo_color = TextureLib.detail_colour(Color(0.8, 0.77, 0.68), float(tile[1]))
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE * (1.0 / 0.24)  # the scan is 2 × 2 tiles: 12 cm tiles
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.roughness = 0.3
+	_add_normal(m, "ceramic_tile")
+	var grp := group("Backsplash")
+	var win: Dictionary = night.get("window", {})
+	var wx := float(win.get("x", 0))
+	var ww := float(win.get("w", 0))
+	var lo := 92.0
+	var hi := 142.0
+	# north wall, x 0…830 (the fridge stands beyond): full height beside the window, a low strip under it
+	var spans := [[0.0, 830.0, hi]]
+	if ww > 0.0:
+		spans = [[0.0, wx - 28.0, hi], [wx - 28.0, wx + ww + 28.0, 108.0], [wx + ww + 28.0, 830.0, hi]]
+	for sp in spans:
+		var a: float = sp[0]
+		var b: float = sp[1]
+		var top: float = sp[2]
+		if b - a < 5.0:
+			continue
+		var t := box("Tiles", W((a + b) / 2.0, 0.7, (lo + top) / 2.0), Vector3((b - a) / 100.0, (top - lo) / 100.0, 0.014), m, grp, false)
+		(t as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# west wall, y 0…312
+	var wt := box("Tiles", W(0.7, 156, (lo + hi) / 2.0), Vector3(0.014, (hi - lo) / 100.0, 3.12), m, grp, false)
+	(wt as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## The kitchen's second level (night 1): wall cabinets over the counter left and right of the window, a shelf over
