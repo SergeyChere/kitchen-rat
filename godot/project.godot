@@ -32,6 +32,8 @@ common/physics_ticks_per_second=60
 
 [rendering]
 
+lights_and_shadows/positional_shadow/atlas_quadrant_0_subdivision=1
+
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 rendering_device/fallback_to_opengl3=true

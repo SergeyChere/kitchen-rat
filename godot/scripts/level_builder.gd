@@ -52,6 +52,54 @@ func spawn(path: String, pos: Vector3, rot_deg := 0.0, parent: Node3D = null) ->
 
 ## Flat banded shading with dark outlines, like the prototype's MeshToonMaterial. The outline grows in the mesh's
 ## own units, so models scaled on a root node (the imported characters) get it sized back to ~4 mm.
+## Characters come out of Blender flat-shaded: every face has its own normals, so a rounded back was shaded in
+## squares and the outline (pushed out along the normals) tore apart at every edge. This gives a character mesh
+## smooth normals: all vertices at one point share the average normal, across materials too. Real creases
+## (a vertex whose face looks more than ~80° away from the average) keep their own. Skin and materials are
+## kept; done once per mesh.
+static var _smoothed := {}
+
+
+static func smooth_mesh(mesh: Mesh) -> Mesh:
+	if mesh == null or OS.has_environment("FLAT"):  # dev: FLAT=1 shows the models as authored
+		return mesh
+	var id := mesh.get_instance_id()
+	if _smoothed.has(id):
+		return _smoothed[id]
+	var surfaces := []
+	var sum := {}
+	for si in mesh.get_surface_count():
+		var arr := mesh.surface_get_arrays(si)
+		surfaces.append(arr)
+		var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var ns = arr[Mesh.ARRAY_NORMAL]
+		if ns == null:
+			continue
+		for i in vs.size():
+			var k := Vector3i(roundi(vs[i].x * 20000.0), roundi(vs[i].y * 20000.0), roundi(vs[i].z * 20000.0))
+			sum[k] = sum.get(k, Vector3.ZERO) + (ns as PackedVector3Array)[i]
+	var out := ArrayMesh.new()
+	for si in surfaces.size():
+		var arr: Array = surfaces[si]
+		var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		if arr[Mesh.ARRAY_NORMAL] != null:
+			var ns: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+			for i in vs.size():
+				var k := Vector3i(roundi(vs[i].x * 20000.0), roundi(vs[i].y * 20000.0), roundi(vs[i].z * 20000.0))
+				var avg: Vector3 = (sum[k] as Vector3).normalized()
+				if avg.length() > 0.5 and avg.dot(ns[i]) > 0.17:
+					ns[i] = avg
+			arr[Mesh.ARRAY_NORMAL] = ns
+		arr[Mesh.ARRAY_TANGENT] = null  # stale now, and nothing on a character uses a normal map
+		var flags: int = int(mesh.surface_get_format(si)) & int(Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, flags)
+		out.surface_set_material(si, mesh.surface_get_material(si))
+		if mesh is ArrayMesh:
+			out.surface_set_name(si, (mesh as ArrayMesh).surface_get_name(si))
+	_smoothed[id] = out
+	return out
+
+
 func toonify(n: Node) -> void:
 	if _outline == null:
 		_outline = _outline_mat(OUTLINE)
@@ -61,8 +109,10 @@ func toonify(n: Node) -> void:
 		var sk := m.get_node_or_null(m.skeleton) as Skeleton3D if m.skin else null
 		if sk:
 			ref = sk
+			m.mesh = smooth_mesh(m.mesh)
 		var sc := ref.global_transform.basis.get_scale().x
-		var grow := snappedf(OUTLINE / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else OUTLINE
+		var line := OUTLINE * (0.62 if sk else 1.0)  # characters: a finer line (it is unbroken now that they are smooth)
+		var grow := snappedf(line / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else line
 		for i in m.mesh.get_surface_count():
 			var mat := m.mesh.surface_get_material(i)
 			if not (mat is BaseMaterial3D):
@@ -72,7 +122,7 @@ func toonify(n: Node) -> void:
 				var t := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
 				_cel(t)
 				if m.skin:
-					t.roughness = 0.5  # characters are faceted low-poly: a crisp step would chequer every face
+					t.roughness = 0.5  # characters: a soft step from light to shadow over their rounded bodies
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
 					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
@@ -547,8 +597,8 @@ func _lighting() -> void:
 	# the shadow map only has to cover the room and the nest (≈ 12 m), not the default 100 m: at 100 m a texel
 	# was 2.5 cm and the shadow crossing a 20 cm rat came out in blocks
 	moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	moon.directional_shadow_max_distance = 16.0
-	moon.directional_shadow_fade_start = 1.0
+	moon.directional_shadow_max_distance = 11.5  # the room's diagonal: every metre less is a finer shadow on her
+	moon.directional_shadow_fade_start = 0.95
 	root.add_child(moon)
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
@@ -574,7 +624,7 @@ func _lighting() -> void:
 		pl.omni_attenuation = 1.45  # round 10: a defined pool with real darkness past it, not an even wash
 		pl.shadow_enabled = true
 		pl.shadow_bias = 0.15
-		pl.shadow_normal_bias = 2.0
+		pl.shadow_normal_bias = 4.0  # her own shadow from a candle crossed her round back in centimetre steps
 		root.add_child(pl)
 		pl.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)))
 		g.flickers.append([pl, pl.light_energy, "steady"])
