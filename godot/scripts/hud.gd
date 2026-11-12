@@ -407,7 +407,7 @@ func _draw_tasks(g: Game, H: float) -> void:
 			rows.append([str(t.step + 1), CHEESE, CHEESE, "Step %d of %d" % [t.step + 1, t.chain.size()], Keys.text(str(t.chain[ci].text)), INK, 1.0, "cur"])
 			var hint := Keys.text(str(t.chain[ci].get("hint", "")))
 			if Settings.hints and hint != "":
-				rows.append(["", none, none, "", hint, Color(CHEESE.r, CHEESE.g, CHEESE.b, 0.8), 1.0, "hint"])
+				rows.append(["", none, none, "", hint, CHEESE, 1.0, "hint"])
 		elif not gdone:
 			var rescue := false
 			for pp in g.pups:
@@ -421,9 +421,9 @@ func _draw_tasks(g: Game, H: float) -> void:
 			continue  # done/failed side tasks flash in the announcements above, then leave the list
 		elif t.side[i].type == "keep":
 			# a rule for the whole night: nothing to wait for, it counts when the night ends
-			rows.append(["…", none, SAFE, "Side · counts when you finish the night", Keys.text(str(t.side[i].text)) + " (so far, so good)", Color(0.78, 0.92, 0.7), 1.0, ""])
+			rows.append(["…", none, SAFE, "Side · counts when you finish the night", Keys.text(str(t.side[i].text)) + " (so far, so good)", SAFE, 1.0, ""])
 		else:
-			rows.append(["", none, SAFE, "Side", Keys.text(str(t.side[i].text)), Color(0.78, 0.92, 0.7), 1.0, ""])
+			rows.append(["", none, SAFE, "Side", Keys.text(str(t.side[i].text)), SAFE, 1.0, ""])
 	for i in t.secret.size():
 		if t.secret_done.has(i):
 			rows.append(["★", Color(0.91, 0.72, 0.29), Color(0.91, 0.72, 0.29), "Secret", str(t.secret[i].text), INK, 1.0, ""])
