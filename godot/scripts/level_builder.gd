@@ -234,6 +234,16 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 	var white := StandardMaterial3D.new()
 	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	white.albedo_color = Color(1, 1, 1)
+	# eyelids in the colour of the coat around the eyes (see Blink)
+	var coat := Color(0.6, 0.56, 0.54)
+	for want in ["White", "Grey"]:
+		for i in m.mesh.get_surface_count():
+			var cm := m.mesh.surface_get_material(i) as BaseMaterial3D
+			if cm and cm.resource_name == want:
+				coat = cm.albedo_color
+	var lid_mat := mat(coat * 0.8)  # (the fur around it takes less direct light than a bare ball)
+	var blink := Blink.new()
+	blink.name = "Blink"
 	for side in [-1.0, 1.0]:
 		var c := Vector3.ZERO
 		var nrm := Vector3.ZERO
@@ -264,6 +274,22 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 		att.add_child(dot)
 		dot.position = to_head * (c + nrm * r * 0.8 + Vector3.UP * r * 0.45)
 		dot.scale = Vector3.ONE * to_head.basis.get_scale().x
+		blink.glints.append(dot)
+		var lid := MeshInstance3D.new()
+		lid.name = "Eyelid"
+		var lm := SphereMesh.new()
+		lm.radius = r * 1.1
+		lm.height = r * 2.2
+		lm.radial_segments = 10
+		lm.rings = 5
+		lid.mesh = lm
+		lid.material_override = lid_mat
+		lid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		att.add_child(lid)
+		lid.position = to_head * c
+		lid.scale = Vector3.ONE * to_head.basis.get_scale().x
+		blink.lids.append(lid)
+	att.add_child(blink)
 
 
 func toonify(n: Node) -> void:
