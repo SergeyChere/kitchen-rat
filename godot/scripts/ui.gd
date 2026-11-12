@@ -13,10 +13,29 @@ const BAD := Color(0.91, 0.4, 0.29)
 static var _theme: Theme
 
 
+## The game's typeface (round 14): Lora, a brush-cut serif (SIL Open Font License, assets/fonts/Lora-OFL.txt).
+## `weight` 400 … 700; glyphs it lacks (the hearts in the HUD) come from the engine's own font.
+static var _fonts := {}
+
+static func font(weight := 500) -> Font:
+	if _fonts.has(weight):
+		return _fonts[weight]
+	var f: Font = ThemeDB.fallback_font
+	if ResourceLoader.exists("res://assets/fonts/Lora.ttf"):
+		var fv := FontVariation.new()
+		fv.base_font = load("res://assets/fonts/Lora.ttf")
+		fv.variation_opentype = {"wght": weight}
+		fv.fallbacks = [ThemeDB.fallback_font]
+		f = fv
+	_fonts[weight] = f
+	return f
+
+
 static func theme() -> Theme:
 	if _theme:
 		return _theme
 	var t := Theme.new()
+	t.default_font = font()
 	t.default_font_size = 18
 	var normal := _box(Color(0.16, 0.15, 0.2), Color(0.3, 0.27, 0.32))
 	var hover := _box(Color(0.26, 0.21, 0.18), ACCENT)
@@ -75,6 +94,8 @@ static func label(text: String, size := 18, col := TEXT, center := false) -> Lab
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
+	if size >= 26:
+		l.add_theme_font_override("font", font(700))  # headings: the bold cut
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if center:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

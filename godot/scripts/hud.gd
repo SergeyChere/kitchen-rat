@@ -18,7 +18,7 @@ var _punch_at := -10.0
 
 func _ready() -> void:
 	layer = 10
-	font = ThemeDB.fallback_font
+	font = UI.font()
 	_canvas = Control.new()
 	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
