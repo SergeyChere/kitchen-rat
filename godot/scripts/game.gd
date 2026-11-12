@@ -68,7 +68,8 @@ var max_stars := 0
 var night_time := 0.0
 var grace_t := 0.0
 var in_hum := 0
-var state := "intro"  # intro, play, pause, won, lost
+var state := "intro"  # intro, play, pause, won, lost, backdrop
+var backdrop := false  # the night-1 kitchen living behind the main menu: no HUD, no rules, a slow camera
 var end_title := ""
 var end_text := ""
 
@@ -187,6 +188,9 @@ func _ready() -> void:
 			(l as Light3D).shadow_enabled = false
 	for i in nest_pups.size():
 		nest_pups[i].visible = i < 4 - pups.size()
+	if backdrop:
+		_start_backdrop()
+		return
 	Sfx.music_night(night.get("music", {}))
 	Sfx.music_duck(false)
 	if bool(night.get("storm", false)):
@@ -702,6 +706,8 @@ func _on_landed(drop: float) -> void:
 # ---------- loop ----------
 
 func _unhandled_input(e: InputEvent) -> void:
+	if state == "backdrop":
+		return
 	if state == "intro":
 		# Space / Esc / Enter skip (not a mouse click: the first click into the window must not skip the story)
 		var skip := e.is_action_pressed("jump") or e.is_action_pressed("pause") or e.is_action_pressed("ui_accept")
@@ -721,6 +727,9 @@ func _unhandled_input(e: InputEvent) -> void:
 
 func _process(dt: float) -> void:
 	fade = move_toward(fade, _fade_to, dt / 0.35)
+	if state == "backdrop":
+		_tick_backdrop(dt)
+		return
 	if state == "intro":
 		_tick_intro(dt)
 		return
@@ -1601,6 +1610,61 @@ func _cut_camera() -> void:
 		_cut_cam.near = 0.02
 		add_child(_cut_cam)
 	_cut_cam.current = true
+
+
+## The main menu's living background: she sits on the kitchen floor in the dark, breathing,
+## and the camera drifts slowly past her at floor height. Nothing hunts, nothing counts.
+const BACK_AT := Vector2(330, 500)   # room cm: where she stands — in the moon patch, not far from her own door
+const BACK_FACE := Vector2(470, 590) # room cm: what she faces (the camera hangs around that side)
+var _back_lift := 0.13               # how far above her the camera aims (m): more = more room, less rat
+var _back_side := 0.45               # where the camera hangs, as an angle from her nose (PI = right behind her)
+var _back_r := 0.75                  # …and how far away (m)
+
+func _start_backdrop() -> void:
+	state = "backdrop"
+	hud.visible = false
+	rat.frozen = true
+	var at := BACK_AT
+	var face := BACK_FACE
+	if OS.has_environment("BACK"):  # dev: BACK="x,y,facex,facey,lift" to try another spot
+		var v := OS.get_environment("BACK").split_floats(",")
+		at = Vector2(v[0], v[1])
+		face = Vector2(v[2], v[3])
+		if v.size() > 4: _back_lift = v[4]
+		if v.size() > 5: _back_side = v[5]
+		if v.size() > 6: _back_r = v[6]
+	rat.global_position = Nights.world(at.x, at.y, 1)
+	rat.rotation.y = Nights.yaw_to(Nights.world(face.x, face.y) - Nights.world(at.x, at.y))
+	rat.scripted = true   # (frozen alone leaves her in the falling pose: nothing moves her onto the floor)
+	rat.anim.play("idle")
+	for p in pups:
+		p.visible = false
+	_cut_camera()
+	_cut_cam.fov = 38.0
+	var d := Dof.new()
+	_cut_cam.add_child(d)
+	_cut_cam.set_meta("dof", d)
+	_cut_t = 0.0
+	_tick_backdrop(0.0)
+
+
+func _tick_backdrop(dt: float) -> void:
+	_cut_t += minf(dt, 0.05)
+	var c := rat.global_position + Vector3.UP * 0.07
+	# a slow arc in front of her, low enough that the room towers over both of them
+	var a := rat.rotation.y + _back_side + sin(_cut_t * 0.11) * 0.4
+	var r := _back_r + sin(_cut_t * 0.07 + 1.3) * 0.07
+	var pos := c + Vector3(sin(a) * r, 0.03 + sin(_cut_t * 0.09) * 0.02, cos(a) * r)
+	_cut_cam.global_position = pos
+	# she sits right of centre: the menu owns the left half
+	var right := (c - pos).cross(Vector3.UP).normalized()
+	_cut_cam.look_at(c - right * 0.2 + Vector3.UP * _back_lift)
+	var d: Dof = _cut_cam.get_meta("dof")
+	d.tick(pos.distance_to(c), true)
+	# now and then she lifts her nose and sniffs the air
+	var want := "sniff" if fmod(_cut_t, 13.0) > 9.5 else "idle"
+	if rat.anim.current != want:
+		rat.anim.play(want, 0.4)
 
 
 ## The nest scene before a night (and the prologue before night 1, the first time).

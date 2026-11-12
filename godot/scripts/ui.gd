@@ -90,6 +90,14 @@ static func button(text: String, cb: Callable, width := 320.0) -> Button:
 	return b
 
 
+## What a "solid" menu screen is painted with: the flat background, or — when the kitchen
+## is alive behind the menu — a dark veil the room still shows through.
+static func veil() -> Color:
+	if Main.I and is_instance_valid(Main.I.backdrop):
+		return Color(BG.r, BG.g, BG.b, 0.8)
+	return BG
+
+
 ## A centred panel on a dimmed (or solid) full-screen background. Returns [root, vbox].
 static func screen(parent: Node, dim := 0.6, solid := false, width := 560.0) -> Array:
 	var root := Control.new()
@@ -98,7 +106,7 @@ static func screen(parent: Node, dim := 0.6, solid := false, width := 560.0) -> 
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	parent.add_child(root)
 	var bg := ColorRect.new()
-	bg.color = BG if solid else Color(0, 0, 0.02, dim)
+	bg.color = (veil() if solid else Color(0, 0, 0.02, dim))
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 	var center := CenterContainer.new()

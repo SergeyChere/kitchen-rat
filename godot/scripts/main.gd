@@ -5,6 +5,7 @@ extends Node
 
 static var I: Main
 var game: Game
+var backdrop: Game  # the kitchen behind the menu (see Game.backdrop)
 var menu: Control
 var _args := {}
 var _frames := 0
@@ -31,6 +32,9 @@ func _ready() -> void:
 	if _args.has("quality"):  # dev: --quality=low|medium|high for screenshots (not saved)
 		Settings.quality = str(_args.quality)
 	if _args.has("night"):
+		if _args.has("via_menu"):  # dev: go through the menu (and its live backdrop) first, like a player does
+			show_menu()
+			await get_tree().create_timer(1.5).timeout
 		start_night(_args.night)
 	else:
 		show_menu()
@@ -101,6 +105,9 @@ func _unhandled_input(e: InputEvent) -> void:
 func start_night(id: String) -> void:
 	Sfx.play("click")
 	_clear()
+	if backdrop:
+		backdrop.queue_free()
+		backdrop = null
 	game = Game.new(id)
 	game.name = "Game"
 	add_child(game)
@@ -114,18 +121,47 @@ func show_menu() -> void:
 	Sfx.music_menu()
 	Sfx.music_duck(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var s := UI.screen(self, 0.0, true, 520.0)
-	menu = s[0]
+	_make_backdrop()
+	# the menu sits on the left over a soft shadow; the right of the screen is hers
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = UI.theme()
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(root)
+	menu = root
 	menu.set_meta("main", true)
-	var box: VBoxContainer = s[1]
-	var logo := TextureRect.new()
-	logo.texture = load("res://icon.png")
-	logo.custom_minimum_size = Vector2(140, 140)
-	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	box.add_child(logo)
-	box.add_child(UI.label("Kitchen Rat", 48, UI.ACCENT, true))
-	box.add_child(UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights. One hungry family.", 17, UI.DIM, true))
+	var shade := TextureRect.new()
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.02, 0.02, 0.05, 0.9))
+	grad.set_color(1, Color(0.02, 0.02, 0.05, 0.0))
+	grad.add_point(0.5, Color(0.02, 0.02, 0.05, 0.62))
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.width = 256
+	gt.height = 4
+	shade.texture = gt
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.anchor_right = 0.62
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(shade)
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	box.offset_left = 84
+	box.offset_right = 84 + 380
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 12)
+	root.add_child(box)
+	var title := UI.label("Kitchen Rat", 60, UI.ACCENT)
+	title.add_theme_constant_override("outline_size", 10)
+	title.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.85))
+	box.add_child(title)
+	var tag := UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights.\nOne hungry family.", 18, UI.TEXT)
+	box.add_child(tag)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 18)
+	box.add_child(gap)
 	var files := Nights.files()
 	var next := clampi(Progress.unlocked, 1, Nights.last_playable())
 	var play_text := "Play"
@@ -139,7 +175,21 @@ func show_menu() -> void:
 	box.add_child(UI.button("Achievements", show_achievements))
 	box.add_child(UI.button("Settings", func(): menu.hide(); UI.settings_panel(self, func(): if is_instance_valid(menu): menu.show())))
 	box.add_child(UI.button("Quit", get_tree().quit))
+	for b in box.find_children("*", "Button", false, false):
+		(b as Button).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	UI.focus_first(box)
+
+
+## The kitchen behind the menu: built once, kept while the player browses nights and settings,
+## dropped when a night starts.
+func _make_backdrop() -> void:
+	if is_instance_valid(backdrop) or _args.has("no_backdrop"):
+		return
+	backdrop = Game.new("kitchen")
+	backdrop.backdrop = true
+	backdrop.name = "Backdrop"
+	add_child(backdrop)
+	move_child(backdrop, 0)
 
 
 ## Night number (1…20) → start it.
@@ -180,7 +230,7 @@ func show_nights() -> void:
 	add_child(root)
 	menu = root
 	var bg := ColorRect.new()
-	bg.color = UI.BG
+	bg.color = UI.veil()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 	var outer := VBoxContainer.new()
