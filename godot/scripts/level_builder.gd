@@ -1224,6 +1224,65 @@ func add_working_clock(at: Vector3, rot_deg: float) -> void:
 	g.clock_hands = hands
 
 
+## Dust hanging in the moonlight: a few dozen specks drifting inside the shaft from the window down to its
+## patch on the floor. They only exist where the light is, so the beam reads as a volume of air.
+func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> void:
+	var length := from.y / -dir.y  # down to the floor
+	var p := CPUParticles3D.new()
+	p.name = "Dust motes"
+	p.amount = 120
+	p.lifetime = 11.0
+	p.preprocess = 11.0
+	p.randomness = 1.0
+	p.local_coords = true
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(width * 0.42, height * 0.36, length * 0.46)
+	p.direction = Vector3(0.3, -1.0, 0.2)
+	p.spread = 180.0
+	p.gravity = Vector3(0, -0.003, 0)
+	p.initial_velocity_min = 0.004
+	p.initial_velocity_max = 0.022
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.3
+	var ramp := Gradient.new()  # each speck swims into the light and out of it again
+	ramp.set_color(0, Color(1, 1, 1, 0))
+	ramp.set_color(1, Color(1, 1, 1, 0))
+	ramp.add_point(0.25, Color(1, 1, 1, 1))
+	ramp.add_point(0.7, Color(1, 1, 1, 0.8))
+	p.color_ramp = ramp
+	var dot := GradientTexture2D.new()
+	var dg := Gradient.new()
+	dg.set_color(0, Color(1, 1, 1, 1))
+	dg.set_color(1, Color(1, 1, 1, 0))
+	dot.gradient = dg
+	dot.fill = GradientTexture2D.FILL_RADIAL
+	dot.fill_from = Vector2(0.5, 0.5)
+	dot.fill_to = Vector2(0.5, 0.0)
+	dot.width = 32
+	dot.height = 32
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.billboard_keep_scale = true
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = dot
+	m.albedo_color = Color(0.72, 0.82, 1.0, 0.85)
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA  # none of them in her face
+	m.distance_fade_min_distance = 0.25
+	m.distance_fade_max_distance = 0.9
+	var q := QuadMesh.new()
+	q.size = Vector2(0.02, 0.02)
+	q.material = m
+	p.mesh = q
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(p)
+	# the box lies along the beam: its long axis (z) is the moon's direction
+	var mid := from + dir * (length * 0.5)
+	p.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP), mid)
+
+
 ## One sheet of the fake moon shaft (see _walls): a single quad, no shadow, additive.
 func _add_shaft_quad(verts: Array, uvs: Array, mat: Material) -> void:
 	var st := SurfaceTool.new()
@@ -1405,6 +1464,8 @@ func _room() -> void:
 		var d := Vector3(wcx, bot, z0)
 		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
 			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		if Settings.quality != "low" and not OS.get_environment("HIDE").contains("motes"):
+			_dust_motes(Vector3(wcx, (top + bot) / 2.0, z0), sdir, ww, top - bot)
 		# round 3: a living sky outside the window — the moon, clouds drifting past it, branches
 		# swaying (window_sky.gd). The clouds also dim the moonlight itself, via Game.moon_cloud.
 		var sky := WindowSky.new()
