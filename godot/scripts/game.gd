@@ -388,9 +388,9 @@ func _make_extras() -> void:
 		vacuum.dock = Nights.pos(dock) + Vector3(-0.3, 0, 0)
 		vacuum.global_position = vacuum.dock
 		vacuum.grid = NavGrid.new(self, [], 0.04, 0.075, 0.05)
-		vacuum.visible = false
-		if bool(night.get("vacuumStart", false)):
-			vacuum.start()
+		# it sits on its dock, charging; on its own nights it wakes up after a while (vacuumDelay, seconds of
+		# play), on the others an event starts it
+		vacuum.park(float(night.get("vacuumDelay", 40.0)) if bool(night.get("vacuumStart", false)) else -1.0)
 	for sd in night.get("sleepers", []):
 		var z := Sleeper.new()
 		z.name = "Sleeper"

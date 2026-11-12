@@ -14,6 +14,23 @@ var _stun := 0.0
 var _bump := 0.0
 var _ride := 0.0
 var _led: OmniLight3D
+var _wait := -1.0        # seconds of play until it wakes up by itself (-1: it waits for an event)
+var _charge: OmniLight3D # the slow amber "charging" light while it sits on its dock
+var _said := false
+
+
+## It starts the night on its dock, charging: there to be seen (and dreaded) before it moves.
+func park(delay := -1.0) -> void:
+	visible = true
+	global_position = dock
+	_wait = delay
+	_charge = OmniLight3D.new()
+	_charge.light_color = Color(1.0, 0.62, 0.2)
+	_charge.light_energy = 0.3
+	_charge.omni_range = 0.6
+	_charge.omni_attenuation = 0.6
+	add_child(_charge)
+	_charge.position = Vector3(0, 0.16, 0)
 
 
 func start() -> void:
@@ -22,6 +39,9 @@ func start() -> void:
 	on = true
 	visible = true
 	global_position = dock
+	if _charge:
+		_charge.queue_free()
+		_charge = null
 	path.clear()
 	Sfx.play("beep", global_position)
 	Sfx.loop("hum_loop", self)
@@ -45,7 +65,23 @@ func stun() -> void:
 
 
 func _process(dt: float) -> void:
-	if not on or not G.playing():
+	if not on:
+		if _charge:  # breathing, the way a charging light does; green for the last seconds
+			var t := Time.get_ticks_msec() / 1000.0
+			_charge.light_energy = 0.22 + 0.16 * sin(t * 2.2)
+			if _wait >= 0.0 and _wait < 4.0:
+				_charge.light_color = Color(0.4, 1.0, 0.5)
+		if _wait >= 0.0 and G.playing():
+			_wait -= dt
+			if _wait < 4.0 and not _said:
+				_said = true
+				Sfx.play("beep", global_position, -6.0, 1.3)
+				G.bubble_on("Charged: 100%", self, 0.3, 2.2)
+			if _wait <= 0.0:
+				_wait = -1.0
+				start()
+		return
+	if not G.playing():
 		return
 	speed = 0.0
 	_bump = maxf(0.0, _bump - dt)
