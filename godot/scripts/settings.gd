@@ -15,7 +15,7 @@ static var fullscreen := false
 static var vsync := true
 static var calm := false  # more time, the cat hears and sees less
 static var resolution := "1280x720"  # windowed size
-static var dof := true  # soft far background (the "macro lens" look)
+static var dof := false  # soft far background (the "macro lens" look). Off since round 14: a painting is sharp all over
 static var show_fps := false  # frames per second in the corner
 static var colorblind := false  # poison shows purple instead of green
 static var keys := {}  # action → ["key", physical keycode] | ["mouse", button] (rebound keys only)
@@ -40,7 +40,7 @@ static func load_all() -> void:
 		calm = bool(c.get_value("game", "calm", calm))
 		colorblind = bool(c.get_value("game", "colorblind", colorblind))
 		resolution = str(c.get_value("video", "resolution", resolution))
-		dof = bool(c.get_value("video", "dof", dof))
+		dof = bool(c.get_value("video", "dof_blur", dof))
 		show_fps = bool(c.get_value("video", "show_fps", show_fps))
 		keys = c.get_value("controls", "keys", {})
 	apply()
@@ -60,7 +60,7 @@ static func save() -> void:
 	c.set_value("game", "calm", calm)
 	c.set_value("game", "colorblind", colorblind)
 	c.set_value("video", "resolution", resolution)
-	c.set_value("video", "dof", dof)
+	c.set_value("video", "dof_blur", dof)
 	c.set_value("video", "show_fps", show_fps)
 	c.set_value("controls", "keys", keys)
 	c.save(FILE)

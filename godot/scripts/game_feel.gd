@@ -53,7 +53,9 @@ func _init(game: Game) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if Settings.quality != "low":
+	if PaperFilter.wanted():
+		g.add_child(PaperFilter.new())  # round 14: the painting-on-paper pass replaces the film grain and vignette
+	elif Settings.quality != "low":
 		var grade := ColorRect.new()
 		grade.set_anchors_preset(Control.PRESET_FULL_RECT)
 		grade.mouse_filter = Control.MOUSE_FILTER_IGNORE

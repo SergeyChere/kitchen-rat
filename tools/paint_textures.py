@@ -209,7 +209,25 @@ def paint_rooms():
     repaint("wall_brick", 271, blotch=1.9, wobble=3.0)
 
 
+def paint_paper():
+    """The sheet itself: the tooth of cold-pressed paper, laid over the whole picture by PaperFilter (one texel
+    per screen pixel), and read again much enlarged as the slow wobble of the hand."""
+    global N
+    keep = N
+    N = 512
+    tooth = blur(noise(301, 1.1, n=N), 0.8)
+    tooth /= tooth.std()
+    lumps = noise(302, 2.2, n=N)
+    v = 0.5 + 0.14 * tooth + 0.07 * lumps
+    Image.fromarray(np.clip(v * 255.0, 0, 255).astype(np.uint8), "L").save(os.path.join(OUT, "paper.png"), optimize=True)
+    print("painted paper")
+    N = keep
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
+    paint_paper()
+    if "--paper" in sys.argv:
+        sys.exit(0)
     paint_patterns()
     paint_rooms()
