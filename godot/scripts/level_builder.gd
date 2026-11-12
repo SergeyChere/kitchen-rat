@@ -91,13 +91,87 @@ static func smooth_mesh(mesh: Mesh) -> Mesh:
 					ns[i] = avg
 			arr[Mesh.ARRAY_NORMAL] = ns
 		arr[Mesh.ARRAY_TANGENT] = null  # stale now, and nothing on a character uses a normal map
+		var rest := PackedFloat32Array()  # where each vertex is in the rest pose: the fur's strands are placed by it
+		rest.resize(vs.size() * 3)
+		for i in vs.size():
+			rest[i * 3] = vs[i].x
+			rest[i * 3 + 1] = vs[i].y
+			rest[i * 3 + 2] = vs[i].z
+		arr[Mesh.ARRAY_CUSTOM0] = rest
 		var flags: int = int(mesh.surface_get_format(si)) & int(Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+		flags |= int(Mesh.ARRAY_CUSTOM_RGB_FLOAT) << int(Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, flags)
 		out.surface_set_material(si, mesh.surface_get_material(si))
 		if mesh is ArrayMesh:
 			out.surface_set_name(si, (mesh as ArrayMesh).surface_get_name(si))
 	_smoothed[id] = out
 	return out
+
+
+static func _has_material(mesh: Mesh, mat_name: String) -> bool:
+	for i in mesh.get_surface_count():
+		var mm := mesh.surface_get_material(i)
+		if mm and mm.resource_name == mat_name:
+			return true
+	return false
+
+
+## Fur in shells: the coat is drawn again in thin layers pushed out along the (smooth) normals, each layer keeping
+## only the dots where a strand is still that long. Strands sit in little cells of the rest pose (CUSTOM0, set by
+## smooth_mesh), so they stay put while she moves. Dark at the roots, the coat's colour at the tips.
+const FUR_LAYERS := 7
+const FUR := """
+shader_type spatial;
+render_mode diffuse_toon, specular_disabled, cull_back;
+uniform vec3 coat : source_color;
+uniform float h = 0.5;        // this layer: 0 at the skin … 1 at the tips
+uniform float len = 0.004;    // fur length (mesh units)
+uniform float density = 800.0; // strands per mesh unit
+varying vec3 rp;
+float hash3(vec3 p) {
+	p = fract(p * 0.3183099 + vec3(0.1, 0.17, 0.13));
+	p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+void vertex() {
+	rp = CUSTOM0.xyz;
+	VERTEX += NORMAL * len * h;
+}
+void fragment() {
+	vec3 p = rp * density;
+	vec3 c = floor(p);
+	float r = hash3(c);                      // how long this strand is
+	float d = length(fract(p) - 0.5) * 2.0;  // distance from the strand's axis
+	if (r * 0.75 + 0.25 < h || d > mix(1.05, 0.35, h)) {
+		discard;
+	}
+	ALBEDO = coat * mix(0.84, 1.05, h) * (0.96 + 0.08 * hash3(c + 7.0));
+	ROUGHNESS = 0.6;
+}
+"""
+static var _fur_shader: Shader
+
+
+## Returns the first pass of the chain: `after` (the outline) → shell 1 → … → shell N.
+static func _fur(after: Material, coat: Color, length: float, scale: float) -> Material:
+	if _fur_shader == null:
+		_fur_shader = Shader.new()
+		_fur_shader.code = FUR
+	var first: Material = after.duplicate() if after else null  # the outline is shared: this chain needs its own
+	var prev: Material = first
+	for i in FUR_LAYERS:
+		var sm := ShaderMaterial.new()
+		sm.shader = _fur_shader
+		sm.set_shader_parameter("coat", coat)
+		sm.set_shader_parameter("h", float(i + 1) / FUR_LAYERS)
+		sm.set_shader_parameter("len", length)
+		sm.set_shader_parameter("density", scale / 0.0011)  # a strand every ~1.1 mm of the world
+		if prev:
+			prev.next_pass = sm
+		else:
+			first = sm
+		prev = sm
+	return first
 
 
 func toonify(n: Node) -> void:
@@ -126,6 +200,14 @@ func toonify(n: Node) -> void:
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
 					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
+					var furry := 0.0  # fur length in metres: the rat's and the cat's coats
+					if sk and mat.resource_name in ["Grey", "White"] and Settings.quality != "low" and not OS.has_environment("NOFUR"):
+						if sk.find_bone("Tail1") >= 0:
+							furry = 0.0045
+						elif _has_material(m.mesh, "CatIris"):
+							furry = 0.009
+					if furry > 0.0:
+						t.next_pass = _fur(t.next_pass as Material, t.albedo_color, furry / maxf(sc, 0.0001), sc)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
 
