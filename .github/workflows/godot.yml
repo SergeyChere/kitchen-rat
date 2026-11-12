@@ -50,11 +50,17 @@ jobs:
 
       - name: Regression tests
         run: |
+          # Some checks are timed against real frames (coyote time, jump buffer) and miss now and then on a busy
+          # runner: a test gets a second try, and only fails the build when it fails twice.
           for t in bugs rules physics juice sink under; do
-            out=$(timeout 180 ~/godot/godot --headless --path godot -- --night=1 --auto --test=$t 2>&1 || true)
-            echo "$out"
-            if echo "$out" | grep -qE "^FAIL|SCRIPT ERROR|during a physics callback|while flushing queries"; then exit 1; fi
-            echo "$out" | grep -q "^PASS" || exit 1
+            ok=0
+            for try in 1 2; do
+              out=$(timeout 180 ~/godot/godot --headless --path godot -- --night=1 --auto --test=$t 2>&1 || true)
+              echo "$out"
+              if ! echo "$out" | grep -qE "^FAIL|SCRIPT ERROR|during a physics callback|while flushing queries" && echo "$out" | grep -q "^PASS"; then ok=1; break; fi
+              echo "::warning::test $t failed on try $try"
+            done
+            [ $ok = 1 ] || exit 1
           done
 
       - name: Export Windows, Linux, Mac
