@@ -1274,12 +1274,12 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	m.billboard_keep_scale = true
 	m.vertex_color_use_as_albedo = true
 	m.albedo_texture = dot
-	m.albedo_color = Color(0.72, 0.82, 1.0, 0.85)
+	m.albedo_color = Color(0.72, 0.82, 1.0, 0.7)
 	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA  # none of them in her face
 	m.distance_fade_min_distance = 0.25
 	m.distance_fade_max_distance = 0.9
 	var q := QuadMesh.new()
-	q.size = Vector2(0.02, 0.02)
+	q.size = Vector2(0.015, 0.015)
 	q.material = m
 	p.mesh = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
