@@ -1324,6 +1324,11 @@ func _room() -> void:
 		floor_mat.uv1_scale = Vector3(6, 3.75, 1)
 		floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		_add_normal(floor_mat, "ceramic_tile")
+		if not OS.get_environment("HIDE").contains("gloss"):
+			# glazed tiles: the moon and the lamps leave a sheen on them, broken up by the grout lines
+			floor_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+			floor_mat.roughness = 0.46
+			floor_mat.metallic_specular = 0.2
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	if str(pal.get("floor", "")) == "tile":
 		wall_mat.albedo_color = Color(1.0, 0.95, 0.84)  # kitchens: the blue wall under blue moonlight, same story
