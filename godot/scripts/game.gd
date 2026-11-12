@@ -1646,11 +1646,11 @@ func _start_backdrop() -> void:
 	rat.anim.play("idle")
 	for p in pups:
 		p.visible = false
+	for f in find_children("*", "Food", true, false):  # no random piece of cheese under her feet in the title picture
+		if (f as Node3D).global_position.distance_to(rat.global_position) < 0.7:
+			(f as Node3D).visible = false
 	_cut_camera()
 	_cut_cam.fov = 38.0
-	var d := Dof.new()
-	_cut_cam.add_child(d)
-	_cut_cam.set_meta("dof", d)
 	_cut_t = 0.0
 	_tick_backdrop(0.0)
 
@@ -1666,8 +1666,6 @@ func _tick_backdrop(dt: float) -> void:
 	# she sits right of centre: the menu owns the left half
 	var right := (c - pos).cross(Vector3.UP).normalized()
 	_cut_cam.look_at(c - right * 0.2 + Vector3.UP * _back_lift)
-	var d: Dof = _cut_cam.get_meta("dof")
-	d.tick(pos.distance_to(c), true)
 	# now and then she lifts her nose and sniffs the air
 	var want := "sniff" if fmod(_cut_t, 13.0) > 9.5 else "idle"
 	if rat.anim.current != want:

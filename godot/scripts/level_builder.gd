@@ -166,7 +166,9 @@ void fragment() {
 	vec3 jit = vec3(hash3(c + 3.1), hash3(c + 5.7), hash3(c + 9.3)) - 0.5;
 	float d = length(fract(p) - 0.5 - jit * 0.5) * 2.0; // distance from the lock's (jittered) axis
 	// thick and overlapping at the root (no bare skin between locks), a fine point at the tip
-	if (r * 0.6 + 0.4 < tone || d > mix(1.5, 0.25, tone)) {
+	// (the lowest layer is a solid undercoat in the coat's own colour: the model's skin under it is another
+	// colour, and every gap between locks showed it as a dark dash)
+	if (h > 0.08 && (r * 0.6 + 0.4 < tone || d > mix(1.5, 0.25, tone))) {
 		discard;
 	}
 	// the colour is laid in two or three flat tones with brush-shaped borders, as a painter blocks in fur:
@@ -177,7 +179,7 @@ void fragment() {
 	vec3 base = mix(coat, vec3(dot(coat, vec3(0.3, 0.59, 0.11))) * vec3(1.1, 1.0, 0.88), grey) * shade;
 	vec3 col = base * mix(0.93, 1.0, smoothstep(0.34, 0.52, s1));
 	col = mix(col, base * vec3(1.1, 1.06, 0.99), smoothstep(0.66, 0.76, s2) * 0.6);
-	ALBEDO = col * mix(0.92, 1.03, tone);
+	ALBEDO = col;  // one flat tone through the whole depth of the coat: the gaps between locks must not read as dots
 	ROUGHNESS = 0.6;
 }
 // The lamps and the moon are tuned for a dark floor; a pale animal standing in the moon patch next to the
