@@ -152,6 +152,8 @@ func _lift(dt: float) -> void:
 
 var _breath_base := Vector3.ZERO
 var _eyes_done := false
+var _eyes: CatEyes
+var _blink := 3.0
 
 
 func _living_model(dt: float) -> void:
@@ -167,6 +169,11 @@ func _living_model(dt: float) -> void:
 		_breath_base = m.scale
 	if not _eyes_done:
 		_eyes_done = true
+		var sk := find_child("Skeleton3D", true, false) as Skeleton3D
+		if sk and sk.find_bone("Eyes") >= 0:
+			_eyes = CatEyes.new()
+			_eyes.name = "Eyelids"
+			sk.add_child(_eyes)
 		var eyes := find_child("Eyes", true, false) as MeshInstance3D
 		if eyes:
 			eyes.scale = Vector3.ONE * 0.92
@@ -183,6 +190,13 @@ func _living_model(dt: float) -> void:
 					elif nm.contains("Eye"):
 						d.albedo_color = Color(0.07, 0.06, 0.06)
 					eyes.set_surface_override_material(i, d)
+	# Her eyes: shut while she is fast asleep (they used to stay open, two amber lights on a sleeping cat), half a
+	# moment shut every few seconds when she is awake. Stirring, they are already open: that is the warning.
+	if _eyes:
+		_blink -= dt
+		if _blink < -0.12:
+			_blink = randf_range(2.5, 6.5)
+		_eyes.shut = (mode == Mode.SLEEP and _stage == 0) or _blink < 0.0
 	if mode == Mode.SLEEP:
 		var b := 1.0 + 0.02 * sin(Time.get_ticks_msec() / 1000.0 * TAU / 3.4)
 		m.scale = Vector3(_breath_base.x * (2.0 - b), _breath_base.y * b, _breath_base.z * (2.0 - b))
