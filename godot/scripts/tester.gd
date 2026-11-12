@@ -49,9 +49,13 @@ func _run(host: Node) -> void:
 		g.cam.snap(r.rotation.y)
 		await _wait(host, 0.4)
 		_check("no jump onto the table from the floor", not r.has_jump_target())
+		# round 11 deleted the tall climb up a table leg (the user's call): the way onto the table is the chair
+		r.teleport(Nights.world(596, 420, 43), Nights.yaw_to(Vector3.RIGHT))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.5)
 		await _press(host, "jump")
 		await _wait(host, 1.8)
-		_check("climbed up the table leg onto the table", r.surface_id == "table", "surface " + r.surface_id + " y %.2f" % r.global_position.y)
+		_check("from the chair one spring takes her onto the table", r.surface_id == "table", "surface " + r.surface_id + " y %.2f" % r.global_position.y)
 		# walk off the north edge (not running): she climbs down
 		r.teleport(Nights.world(700, 395, 76), Nights.yaw_to(Vector3.FORWARD))
 		g.cam.snap(r.rotation.y)

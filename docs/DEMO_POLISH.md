@@ -645,11 +645,45 @@ user's laptop does not start Forward+), and each item was pushed to
    Dev: `--via_menu`, `--no_backdrop`,
    `BACK="x,y,facex,facey,lift,side,r"`.
 
+9. **Lamps.** Same lesson again in the burrow: the hole light plus
+   its fill turned brown twigs orange and her coat white. Dimmer,
+   and the nest heap has a wood grain.
+10. **Characters in bright light.** Body materials: the built-in rim
+    is added once per lamp in range, shadowed or not — down from
+    0.35 to 0.12; pale skin 10% darker. Coat: direct light at 0.6.
+11. **Eyes.** `Blink` (scripts/blink.gd): coat-coloured lids on the
+    Head bone of the rat and pups, a blink every 2–6 s, shut while
+    the sleep clip plays (`BLINK=shut`). The cat's eyes hang on one
+    animated bone, so `CatEyes` (a skeleton modifier) closes them:
+    shut while fast asleep, open the moment she stirs.
+12. **Contact shadows.** `ContactShadow`: a soft patch under the
+    rat, pups, cat, dog and owner on whatever surface is below,
+    fading as she leaves the ground (`HIDE=blob`).
+13. **The room.** Dust motes along the whole moon shaft (the older
+    cloud by the window in WorldFX is removed); a tiled backsplash
+    behind the worktops (`HIDE=splash`); the sink water is a small
+    shader with swells, crests and rings around a swimmer.
+14. **Food halo.** Waiting food has a round warm halo that breathes.
+    Round on purpose: the sharp yellow stars in WorldFX mean "this
+    makes noise". (`GLINT=hold` for a screenshot.)
+15. **Robot vacuum.** Sits on its dock from the first second with a
+    charging light; on its own nights it says "Charged: 100%" and
+    leaves after `vacuumDelay` seconds of play (40 by default).
+16. **Menu to night** dips to black; **Show FPS** setting; the depth
+    of field switches itself off for the session after five seconds
+    under 24 fps.
+17. **CI** gives a test a second try (the timed jump checks miss on
+    a busy runner). The `climb` test no longer expects the table-leg
+    climb that round 11 deleted: the way up is the chair.
+
 **Checked.** Night 1 CI set after every item; night start through
 the menu (`--via_menu --test=bugs`); screenshots of the kitchen,
 living rooms (nights 2, 3), pantry (4), kitchen night 5, the cat
 and the rat up close, the mouse hole and the door.
 
-**Not checked.** Pups and the owner up close; fur in motion; the
+All 20 nights were looked at in overview shots after the lamp fixes.
+
+**Not checked.** The owner up close; blinking and contact shadows on
+the pups, dog and awake cat; fur in motion; the
 cost of fur + depth of field on the user's laptop (both can be
 switched off: quality low, or the DOF checkbox).
