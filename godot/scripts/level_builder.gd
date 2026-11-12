@@ -161,13 +161,13 @@ void fragment() {
 	ROUGHNESS = 0.6;
 }
 // The lamps and the moon are tuned for a dark floor; a pale animal standing in the moon patch next to the
-// night-light burnt out to a white blob. So the coat takes direct light at three quarters, and the glow along
+// night-light burnt out to a white blob. So the coat takes direct light at six tenths, and the glow along
 // its edge now needs the light to actually reach it (the built-in rim ignores shadow and distance: every
 // lamp in range added to it). In shade — most of the game — nothing changes.
 void light() {
 	float lit = smoothstep(-0.6, 0.6, dot(NORMAL, LIGHT));
 	float edge = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 5.0);
-	DIFFUSE_LIGHT += (lit * 0.74 + edge * 0.5 * (0.35 + 0.65 * lit)) * ATTENUATION * LIGHT_COLOR / PI;
+	DIFFUSE_LIGHT += (lit * 0.6 + edge * 0.38 * (0.35 + 0.65 * lit)) * ATTENUATION * LIGHT_COLOR / PI;
 }
 """
 static var _fur_shader: Shader
@@ -317,6 +317,12 @@ func toonify(n: Node) -> void:
 				_cel(t)
 				if m.skin:
 					t.roughness = 0.5  # characters: a soft step from light to shadow over their rounded bodies
+					# The built-in rim is added once per lamp in range, shadowed or not, whatever the distance:
+					# with the moon, its fill and a lamp or two her tail and paws came out as pure white. Bodies
+					# keep a hint of it, and pale skin gives the moon patch a little headroom.
+					t.rim = 0.12
+					if t.albedo_texture == null and t.albedo_color.v > 0.7 and not mat.resource_name.begins_with("Whisker"):
+						t.albedo_color = t.albedo_color.darkened(0.1)
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
 					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
