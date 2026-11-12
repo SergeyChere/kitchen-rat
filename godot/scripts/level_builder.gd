@@ -302,10 +302,11 @@ static func surface_props(tex_name: String) -> Array:
 func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> StandardMaterial3D:
 	# round 6: the texture comes from TextureLib (CDN pack → repo file → painted
 	# in-engine by TextureGen) — no Python step and no heavy binaries in the repo
-	var tex := TextureLib.get_texture(tex_name)
-	if tex != null:
+	var det := TextureLib.get_detail(tex_name)  # the grain only: the colour is the one asked for
+	if not det.is_empty():
 		var m := mat(color)
-		m.albedo_texture = tex
+		m.albedo_texture = det[0]
+		m.albedo_color = TextureLib.detail_colour(m.albedo_color, float(det[1]))
 		m.uv1_scale = Vector3(tiling.x, tiling.y, 1)
 		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		m.set_meta("tile_m", 0.5)  # one texture tile ~ 0.5 m: box() scales the UV by the box size
@@ -326,30 +327,59 @@ static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
 		m.normal_texture = n
 
 
-## Give a placed model a real surface (demo polish, plan point 2): the generated texture laid over its
-## toon materials, tinted by `tint` (the furniture's own colour from the night data, white = as authored).
-## The tint is divided by the textures' average brightness (~0.45), so the result lands near the
-## requested colour instead of going twice as dark. No texture file -> no change at all.
+## Give a placed model a real surface: the texture's grain / weave / scratches laid over the materials it
+## belongs on, each keeping its OWN designed colour (the purple sofa stays purple with gold cushions, the
+## books in the bookcase stay books). `tint` (a colour for the piece from the night data) replaces the
+## colour of those materials when given. Mapped in world space, so the grain is the same size on a big
+## panel and on a thin leg. No texture -> no change at all.
 func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
-	var tex := TextureLib.get_texture(tex_name) if n != null else null
-	if tex == null:
+	var det := TextureLib.get_detail(tex_name) if n != null else []
+	if det.is_empty():
 		return
-	var c := Color(clampf(tint.r / 0.45, 0.0, 1.0), clampf(tint.g / 0.45, 0.0, 1.0), clampf(tint.b / 0.45, 0.0, 1.0))
+	var cache := {}
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		for i in m.mesh.get_surface_count():
 			var src := m.get_active_material(i) as BaseMaterial3D
-			if src == null:
+			if src == null or not _takes(tex_name, src):
 				continue
-			var t := src.duplicate() as BaseMaterial3D
-			t.albedo_texture = tex
-			t.albedo_color = c
-			t.uv1_scale = Vector3(2.0, 2.0, 1.0)
-			var p := surface_props(tex_name)
-			t.roughness = float(p[0])
-			t.metallic = float(p[1])
-			_add_normal(t, tex_name)
-			m.set_surface_override_material(i, t)
+			var key := src.get_instance_id()
+			if not cache.has(key):
+				var t := src.duplicate() as BaseMaterial3D
+				t.albedo_texture = det[0]
+				t.albedo_color = TextureLib.detail_colour(src.albedo_color if tint == Color.WHITE else tint, float(det[1]))
+				t.uv1_triplanar = true
+				t.uv1_world_triplanar = true
+				t.uv1_triplanar_sharpness = 4.0
+				t.uv1_scale = Vector3.ONE * (1.0 / TILE_M.get(tex_name, 0.5))
+				t.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+				var p := surface_props(tex_name)
+				t.roughness = float(p[0])
+				t.metallic = float(p[1])
+				_add_normal(t, tex_name)
+				cache[key] = t
+			m.set_surface_override_material(i, cache[key])
+
+
+## How big one tile of each texture is in the world (m).
+const TILE_M := {"wood": 0.6, "wood_dark": 0.6, "fabric": 0.3, "leather": 0.4, "metal_matte": 0.5, "cardboard": 0.4, "plastic": 0.4}
+
+
+## Does this material of a model take the surface `tex_name`? Wood grain goes on the wooden parts (warm browns),
+## not on the books or the TV; brushed metal and plastic on the pale body, not on the door glass or the magnets;
+## fabric and cardboard on everything but the near-black bits (legs, gaps). Glowing and see-through parts never.
+static func _takes(tex_name: String, src: BaseMaterial3D) -> bool:
+	if src.emission_enabled or src.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or src.albedo_texture != null:
+		return false
+	var c := src.albedo_color
+	if c.v < 0.16:
+		return false
+	match tex_name:
+		"wood", "wood_dark":
+			return c.h > 0.015 and c.h < 0.14 and c.s > 0.3 and c.v < 0.9
+		"metal_matte", "plastic":
+			return c.s < 0.3 and c.v > 0.35
+	return true
 
 
 func mat(color: Color, texture := "", tiling := Vector2.ONE) -> StandardMaterial3D:
@@ -467,21 +497,31 @@ func _lighting() -> void:
 	env.glow_bloom = 0.08
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.adjustment_enabled = true  # bright and vivid, not realistic
-	env.adjustment_brightness = 1.2  # a touch more than the linear era: ACES darkens the mids
-	env.adjustment_contrast = 1.06
-	env.adjustment_saturation = 1.12
+	# The grade keeps each room's character (round 8) but stays inside the range: at 1.2 / 1.17 a tenth of the
+	# frame clipped to pure white or neon (measured on screenshots: lit floors, rugs, sofas, the cat). Vivid,
+	# not burnt.
+	env.adjustment_brightness = 1.05
+	env.adjustment_contrast = 1.04
+	env.adjustment_saturation = 1.02
 	match kind:  # round 8: the per-room grade (see the ambient tint above)
 		"living", "dining":
-			env.adjustment_brightness = 1.17
-			env.adjustment_contrast = 1.08
-			env.adjustment_saturation = 1.17
+			env.adjustment_brightness = 1.02
+			env.adjustment_contrast = 1.05
+			env.adjustment_saturation = 1.03
 		"pantry":
-			env.adjustment_brightness = 1.23
-			env.adjustment_contrast = 1.04
-			env.adjustment_saturation = 0.97
+			env.adjustment_brightness = 1.08
+			env.adjustment_contrast = 1.03
+			env.adjustment_saturation = 0.95
 		"kids":
-			env.adjustment_brightness = 1.21
-			env.adjustment_saturation = 1.19
+			env.adjustment_brightness = 1.06
+			env.adjustment_saturation = 1.06
+	if OS.has_environment("GRADE"):  # dev: GRADE=brightness,contrast,saturation[,linear|filmic|aces|agx] to compare grades
+		var gv := OS.get_environment("GRADE").split(",")
+		env.adjustment_brightness = float(gv[0])
+		env.adjustment_contrast = float(gv[1])
+		env.adjustment_saturation = float(gv[2])
+		if gv.size() > 3:
+			env.tonemap_mode = {"linear": Environment.TONE_MAPPER_LINEAR, "filmic": Environment.TONE_MAPPER_FILMIC, "aces": Environment.TONE_MAPPER_ACES, "agx": Environment.TONE_MAPPER_AGX}.get(gv[3], Environment.TONE_MAPPER_ACES)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	g.env = env
@@ -496,6 +536,11 @@ func _lighting() -> void:
 	moon.shadow_blur = 1.2  # fairly crisp, but no stair-steps on the small rat
 	moon.shadow_bias = 0.08  # no striped shadow acne on flat tops
 	moon.shadow_normal_bias = 2.5
+	# the shadow map only has to cover the room and the nest (≈ 12 m), not the default 100 m: at 100 m a texel
+	# was 2.5 cm and the shadow crossing a 20 cm rat came out in blocks
+	moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	moon.directional_shadow_max_distance = 16.0
+	moon.directional_shadow_fade_start = 1.0
 	root.add_child(moon)
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
@@ -516,7 +561,7 @@ func _lighting() -> void:
 	for l in night.get("lights", []):
 		var pl := OmniLight3D.new()
 		pl.light_color = hex(l.get("c", 0xffa860))
-		pl.light_energy = float(l.get("i", 1.0)) * 1.6
+		pl.light_energy = float(l.get("i", 1.0)) * 1.3  # 1.6 burnt the floor under it to white
 		pl.omni_range = float(l.get("r", 500)) / 100.0
 		pl.omni_attenuation = 1.45  # round 10: a defined pool with real darkness past it, not an even wash
 		pl.shadow_enabled = true
@@ -536,6 +581,7 @@ func _lighting() -> void:
 		base.mesh = bm
 		base.material_override = mat(hex(0x2a2320))
 		root.add_child(base)
+		base.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF  # no black disc under its own lamp
 		base.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 7.0)
 		var flame := MeshInstance3D.new()
 		flame.name = "Candle glow"
@@ -548,6 +594,7 @@ func _lighting() -> void:
 		fmat.albedo_color = hex(l.get("c", 0xffa860))
 		flame.material_override = fmat
 		root.add_child(flame)
+		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF  # no black disc under its own lamp
 		flame.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)) - 2.0)
 		# round 6: the candle stood on AIR (a light at h=60 in an empty corner) — now a
 		# slim stand carries it down to the floor, so the light visibly stands on something
@@ -562,6 +609,7 @@ func _lighting() -> void:
 			pole.mesh = pm
 			pole.material_override = mat(hex(0x2a2320))
 			root.add_child(pole)
+			pole.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF  # no black disc under its own lamp
 			pole.global_position = W(float(l.x), float(l.y), (lh - 8.0) / 2.0)
 			var foot := MeshInstance3D.new()
 			foot.name = "Candle stand foot"
@@ -572,6 +620,7 @@ func _lighting() -> void:
 			foot.mesh = dm
 			foot.material_override = mat(hex(0x2a2320))
 			root.add_child(foot)
+			foot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF  # no black disc under its own lamp
 			foot.global_position = W(float(l.x), float(l.y), 0.6)
 
 	var room := OmniLight3D.new()  # the ceiling light: off at night, the owner switches it on
@@ -764,13 +813,25 @@ func _room() -> void:
 	if not ResourceLoader.exists("res://assets/textures/" + floor_tex + ".png"): floor_tex = "floor_tile"
 	if not ResourceLoader.exists("res://assets/textures/" + wall_tex + ".png"): wall_tex = "wall_stripes"
 	var floor_mat := mat(Color.WHITE, floor_tex, Vector2(6, 3.75))
-	if str(pal.get("floor", "")) == "tile" and ResourceLoader.exists("res://assets/textures/ceramic_tile.png"):
-		# demo polish: real tile (tools/make_textures.py) instead of the placeholder pattern, tinted down
-		# to the old floor's tone (its mean was ~(0.25, 0.27, 0.38)) so the night stays as dark as before
-		floor_mat = mat(Color(0.30, 0.32, 0.45), "ceramic_tile", Vector2(6, 3.75))
-		floor_mat.roughness = 0.32  # glazed tile: smooth enough for the moon patch to read on it
+	var tile := TextureLib.get_detail("ceramic_tile") if str(pal.get("floor", "")) == "tile" else []
+	if not tile.is_empty():
+		# real tile instead of the placeholder pattern (the texture pack's, or the painted one): its joints and
+		# glaze as detail over the old floor's own tone, so the night stays as dark and as blue as before.
+		# (This looked for res://assets/textures/ceramic_tile.png, which is never in the repo — it never ran.)
+		floor_mat = mat(Color.WHITE)
+		floor_mat.albedo_texture = tile[0]
+		floor_mat.albedo_color = TextureLib.detail_colour(Color(0.27, 0.29, 0.42), float(tile[1]))
+		floor_mat.uv1_scale = Vector3(6, 3.75, 1)
+		floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		_add_normal(floor_mat, "ceramic_tile")
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	var trim := mat(hex(0x7a4a2a))
+	# The room itself (floor, walls) is shaded softly: lamps and candles lay POOLS of light on it that fade out.
+	# With the toon step every pool was a hard-edged disc (a white plate on the floor under the candle). Things
+	# in the room keep their toon shading.
+	for sm in [floor_mat, wall_mat]:
+		(sm as StandardMaterial3D).diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT
+		(sm as StandardMaterial3D).rim_enabled = false
 
 	# floor (a thin solid slab) and ceiling (no collision, casts no shadow)
 	var fl := box("Floor", Vector3(0, -0.05, 0), Vector3(9.6, 0.1, 6.0), floor_mat, root)
@@ -875,8 +936,13 @@ func _room() -> void:
 		smat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		smat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 		smat.render_priority = 1
+		# seen from across the room it is a shaft of moonlight; with the camera inside it (up on the counter,
+		# by the window) the sheet was a hard white wedge over half the screen — it fades out near the camera
+		smat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+		smat.distance_fade_min_distance = 2.5
+		smat.distance_fade_max_distance = 7.5
 		# round 6: softer — a hint of a shaft, not a searchlight (asked for)
-		var stex := TextureLib.get_texture("shaft")
+		var stex := TextureLib.get_texture("shaft_soft")
 		if stex != null:
 			smat.albedo_texture = stex
 			smat.albedo_color = Color(0.5, 0.62, 1.0, 0.26)
@@ -893,7 +959,7 @@ func _room() -> void:
 		var c := Vector3(wcx, top, z0)
 		var d := Vector3(wcx, bot, z0)
 		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
-			[Vector2(0.5, 0), Vector2(0.5, 0.3), Vector2(0.5, 1), Vector2(0.5, 0.7)], smat)
+			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
 		# round 3: a living sky outside the window — the moon, clouds drifting past it, branches
 		# swaying (window_sky.gd). The clouds also dim the moonlight itself, via Game.moon_cloud.
 		var sky := WindowSky.new()
@@ -1330,27 +1396,39 @@ func _nest() -> void:
 	# Now the light SPILLS THROUGH THE MOUSE HOLE from the kitchen: the lamp sits just inside
 	# the hole, a warm glow disc marks the hole itself, and bedding mounds + a cloth give the
 	# burrow some shape.
-	var glow := MeshInstance3D.new()
-	glow.name = "Hole glow"
-	var gm := SphereMesh.new()
-	gm.radius = 0.13
-	gm.height = 0.26
-	glow.mesh = gm
-	glow.scale = Vector3(1.15, 0.85, 0.25)
-	var gmat := StandardMaterial3D.new()
-	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	gmat.albedo_color = Color(1.0, 0.8, 0.55)
-	glow.material_override = gmat
-	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	nest.add_child(glow)
-	glow.global_position = W(180, 604, 40)
-	var light := OmniLight3D.new()
+	# The burrow's front wall: earth around the mouse hole, so from inside she doesn't look at the back of the
+	# kitchen's wallpaper (the wall section's rear face).
+	box("Front", W(89, 608, 50), Vector3(1.58, 1.0, 0.04), earth, nest, false)
+	box("Front", W(221, 608, 50), Vector3(0.58, 1.0, 0.04), earth, nest, false)
+	box("Front", W(180, 608, 60), Vector3(0.24, 0.8, 0.04), earth, nest, false)
+	# The light SPILLS IN THROUGH THE MOUSE HOLE (round 5): a soft warm cone from the hole across the burrow's
+	# floor and bedding. It used to be an omni 20 cm from the wall, which burnt a white patch around the hole.
+	var light := SpotLight3D.new()
+	light.name = "Hole light"
 	light.light_color = Color8(0xff, 0xd0, 0xa0)
-	light.light_energy = 0.95
-	light.omni_range = 2.8
-	light.omni_attenuation = 1.2  # round 10: the nest stays a pocket of warm dark
+	light.light_energy = 1.5
+	light.spot_range = 3.2
+	light.spot_angle = 62.0
+	light.spot_angle_attenuation = 0.6
+	light.spot_attenuation = 0.9
 	nest.add_child(light)
-	light.global_position = W(180, 622, 42)
+	light.global_position = W(180, 613, 20)  # just inside the front wall, in the mouth of the hole
+	light.look_at(W(140, 730, 0), Vector3.UP)
+	var fillc := OmniLight3D.new()  # the bounce of that light off the floor: keeps the corners readable
+	fillc.name = "Burrow fill"
+	fillc.light_color = Color8(0xe8, 0xa8, 0x78)
+	fillc.light_energy = 0.7
+	fillc.omni_range = 2.6
+	fillc.omni_attenuation = 0.8
+	nest.add_child(fillc)
+	fillc.global_position = W(130, 690, 60)
+	# bedding: flat heaps of straw and wood shavings, softly shaded (a toon-shaded dark dome read as a pit)
+	var straw := StandardMaterial3D.new()
+	straw.albedo_color = hex(0xa88a52)
+	straw.roughness = 1.0
+	straw.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	var straw2 := straw.duplicate() as StandardMaterial3D
+	straw2.albedo_color = hex(0x8f7445)
 	for mnd in [[95, 705, 0.55, 0.42], [168, 712, 0.48, 0.38], [128, 660, 0.42, 0.34], [205, 668, 0.36, 0.3]]:
 		var mound := MeshInstance3D.new()
 		mound.name = "Bedding"
@@ -1358,10 +1436,11 @@ func _nest() -> void:
 		mm.radius = 0.3
 		mm.height = 0.6
 		mound.mesh = mm
-		mound.scale = Vector3(mnd[2], 0.16, mnd[3])
-		mound.material_override = earth
+		mound.scale = Vector3(mnd[2], 0.1, mnd[3])
+		mound.material_override = straw if int(mnd[0]) % 2 == 1 else straw2
+		mound.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		nest.add_child(mound)
-		mound.global_position = W(mnd[0], mnd[1], 2)
+		mound.global_position = W(mnd[0], mnd[1], 1)
 	var cloth := box("Old cloth", W(140, 700, 1), Vector3(0.8, 0.025, 0.55), mat(Color(0.42, 0.2, 0.18)), nest)
 	cloth.rotation.y = 0.4
 	for p in [[70, 715, 20, "sleep"], [105, 735, -60, "sleep"], [80, 745, 150, "idle"], [125, 705, 200, "sniff"]]:

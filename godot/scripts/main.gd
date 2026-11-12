@@ -51,6 +51,10 @@ func _process(_dt: float) -> void:
 			var p := str(_args.at).split(",")
 			game.rat.teleport(Nights.world(float(p[0]), float(p[1]), float(p[3]) if p.size() > 3 else 1.0), deg_to_rad(float(p[2])) if p.size() > 2 else PI)
 			game.cam.snap(game.rat.rotation.y)
+		if OS.has_environment("HIDE"):  # dev: HIDE="Moon shaft,Lamp" hides nodes by name, to find what draws something
+			for pat in OS.get_environment("HIDE").split(","):
+				for hn in game.find_children("*" + pat + "*", "Node3D", true, false):
+					(hn as Node3D).visible = false
 		if _args.has("carry"):  # dev: start with a cheese in her teeth
 			var f := game.spawn_food(str(_args.carry) if str(_args.carry) != "" else "cheese", game.rat.global_position, "", false)
 			game.rat.carry(f)

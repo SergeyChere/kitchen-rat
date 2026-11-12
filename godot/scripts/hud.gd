@@ -245,15 +245,17 @@ func _draw_hud() -> void:
 
 	# top-right: are you seen, and how loud are you
 	var chip := _chip(g)
-	_canvas.draw_rect(Rect2(W - 252, 12, 240, 58), PANEL)
-	_text(Vector2(W - 242, 33), chip[0], 15, chip[1], 220)
+	# the box grows to the left for the long lines ("Up high, but the owner can reach you" was cut off)
+	var cw := maxf(240.0, font.get_string_size(str(chip[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 22.0)
+	_canvas.draw_rect(Rect2(W - 12 - cw, 12, cw, 58), PANEL)
+	_text(Vector2(W - 2 - cw, 33), chip[0], 15, chip[1])
 	var lvl := 3 if g.rat.running and g.rat.moving() else (1 if g.rat.moving() and not g.rat.sneaking else 0)
 	if g.rat.jumping: lvl = 1
 	var ntext := "Loud: running" if lvl == 3 else ("Quiet: walking" if lvl == 1 else ("Silent: sneaking" if g.rat.sneaking else "Silent"))
 	var warn := g.noisy_near != ""
 	for i in 3:
-		_canvas.draw_rect(Rect2(W - 242 + i * 18, 46, 14, 12), NOISE if i < lvl else (Color(1, 0.62, 0.2, 0.55 + 0.35 * sin(Time.get_ticks_msec() / 150.0)) if warn else BAR_BG))
-	_text(Vector2(W - 182, 57), ("Careful: " + g.noisy_near.trim_suffix("!").trim_suffix("…")) if warn else ntext, 13, Color(1, 0.7, 0.3) if warn else HINT)
+		_canvas.draw_rect(Rect2(W - 2 - cw + i * 18, 46, 14, 12), NOISE if i < lvl else (Color(1, 0.62, 0.2, 0.55 + 0.35 * sin(Time.get_ticks_msec() / 150.0)) if warn else BAR_BG))
+	_text(Vector2(W + 58 - cw, 57), ("Careful: " + g.noisy_near.trim_suffix("!").trim_suffix("…")) if warn else ntext, 13, Color(1, 0.7, 0.3) if warn else HINT)
 
 	_draw_banner_and_bubbles(W)
 

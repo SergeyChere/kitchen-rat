@@ -50,6 +50,56 @@ static func get_texture(tex_name: String, generate := true) -> Texture2D:
 	return t
 
 
+## The texture as SURFACE DETAIL only: grayscale, levelled to a mid brightness, with the factor that brings a
+## colour multiplied by it back to that colour on average. A material is then  designed colour × detail:
+## the grain, weave or scratches of the texture, the palette of the model — whatever pack is installed
+## (a pale oak and a near-black walnut give the same brown shelf, each with its own grain).
+## Returns [texture, gain] or [] when the texture doesn't exist.
+static var _detail := {}
+
+
+static func get_detail(tex_name: String) -> Array:
+	if _detail.has(tex_name):
+		return _detail[tex_name]
+	var out := []
+	var t := get_texture(tex_name)
+	if t != null:
+		var img := t.get_image()
+		if img != null:
+			if img.is_compressed():
+				img.decompress()
+			img.clear_mipmaps()
+			img.convert(Image.FORMAT_RGB8)
+			var small := img.duplicate() as Image
+			small.resize(32, 32, Image.INTERPOLATE_BILINEAR)
+			var m := 0.0
+			for y in 32:
+				for x in 32:
+					var c := small.get_pixel(x, y)
+					m += (c.r + c.g + c.b) / 3.0
+			m /= 1024.0
+			img.adjust_bcs(0.72 / maxf(m, 0.02), 1.0, 0.0)  # gray, mean ~0.72 (sRGB)
+			small = img.duplicate() as Image
+			small.resize(32, 32, Image.INTERPOLATE_BILINEAR)
+			var lin := 0.0
+			for y in 32:
+				for x in 32:
+					lin += small.get_pixel(x, y).srgb_to_linear().r
+			lin /= 1024.0
+			img.generate_mipmaps()
+			out = [ImageTexture.create_from_image(img), 1.0 / maxf(lin, 0.05)]
+	_detail[tex_name] = out
+	return out
+
+
+## `colour` (as designed, sRGB) pre-multiplied so that colour × detail texture averages back to `colour`.
+static func detail_colour(colour: Color, gain: float) -> Color:
+	var l := colour.srgb_to_linear()
+	var o := Color(l.r * gain, l.g * gain, l.b * gain, 1.0).linear_to_srgb()
+	o.a = colour.a
+	return o
+
+
 ## Join the painter thread before exit (Main._exit_tree) — it normally finished
 ## long before the player quits; files are written via .tmp + rename regardless.
 static func shutdown() -> void:
@@ -106,6 +156,7 @@ static func _on_downloaded(result: int, code: int, _headers: PackedStringArray, 
 			if m != null:
 				m.store_string("1")
 			_cache.clear()  # the next level build picks the real pack up
+			_detail.clear()
 	if _http != null:
 		_http.queue_free()
 		_http = null

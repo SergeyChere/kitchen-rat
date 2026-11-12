@@ -10,7 +10,7 @@ extends RefCounted
 
 const S := 256
 
-## All paintable material names (the shaft gradient is separate: make("shaft")).
+## All paintable material names (the shaft gradient is separate: make("shaft_soft")).
 const NAMES := ["wood", "wood_dark", "ceramic_tile", "fabric", "leather",
 	"metal_matte", "cardboard", "plastic", "counter_stone", "cheese"]
 
@@ -38,7 +38,7 @@ static func make_image(tex_name: String) -> Image:
 		"counter_stone": img = _stone()
 		"cheese": img = _cheese()
 		"cheese_normal": img = _cheese_normal()
-		"shaft": img = _shaft()
+		"shaft_soft": img = _shaft()
 		_: return null
 	if img == null:
 		return null
@@ -50,7 +50,7 @@ static func make_image(tex_name: String) -> Image:
 ## thread, so the first night does not pay for painting). Skips files that exist.
 static func make_all_files(dir: String) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
-	for n in NAMES + ["shaft"]:
+	for n in NAMES + ["shaft_soft"]:
 		var p: String = dir + "/" + str(n) + ".png"
 		if FileAccess.file_exists(p) or FileAccess.file_exists("user://textures/" + str(n) + ".png"):
 			continue
@@ -301,7 +301,9 @@ static func _shaft() -> Image:
 		var a := pow(1.0 - v, 1.6)
 		for x in S:
 			var u := float(x) / S
-			var edge := 0.25 + 0.75 * pow(sin(PI * u), 1.2)
+			# feathered right down to nothing at the sides: at 25 % the sheet's edge drew a hard diagonal line
+			# across the room (the texture is "shaft_soft" so players' cached "shaft" is not reused)
+			var edge := pow(sin(PI * u), 1.6)
 			_put(data, x, y, Color(0.78, 0.84, 1.0, a * edge))
 	return _img(data)
 
