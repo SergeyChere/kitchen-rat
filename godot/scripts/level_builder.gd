@@ -159,6 +159,8 @@ void fragment() {
 	}
 	ALBEDO = coat * mix(0.9, 1.04, tone) * (0.97 + 0.06 * hash3(c + 7.0));
 	ROUGHNESS = 0.6;
+	RIM = 0.22;       // light catches the edge of the coat: a soft glowing outline against the dark room
+	RIM_TINT = 0.25;
 }
 """
 static var _fur_shader: Shader
@@ -189,6 +191,74 @@ static func _fur(after: Material, coat: Color, length: float, scale: float, z_fr
 	return first
 
 
+## A white glint in each eye (the rat and her pups: two black beads without one look blind). The eyes are the
+## mesh's "Eye" surface; each glint is a tiny unshaded sphere riding the Head bone, set on the eye's upper outer
+## side, where a lamp above would reflect.
+func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
+	var hb := sk.find_bone("Head")
+	if hb < 0 or sk.has_node("Catchlights"):
+		return
+	var si := -1
+	for i in m.mesh.get_surface_count():
+		var mm := m.mesh.surface_get_material(i)
+		if mm and mm.resource_name == "Eye":
+			si = i
+	if si < 0:
+		return
+	var arr := m.mesh.surface_get_arrays(si)
+	var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var ns: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+	var att := BoneAttachment3D.new()
+	att.name = "Catchlights"
+	sk.add_child(att)
+	att.bone_name = "Head"
+	# a skinned vertex ends up at  bone pose × bind pose × vertex : so in the Head bone's own space (where the
+	# attachment's children live) a point of the mesh is  bind pose × point
+	var to_head := Transform3D.IDENTITY
+	var found := false
+	for bi in m.skin.get_bind_count():
+		if m.skin.get_bind_name(bi) == &"Head" or m.skin.get_bind_bone(bi) == hb:
+			to_head = m.skin.get_bind_pose(bi)
+			found = true
+			break
+	if not found:
+		att.queue_free()
+		return
+	var white := StandardMaterial3D.new()
+	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	white.albedo_color = Color(1, 1, 1)
+	for side in [-1.0, 1.0]:
+		var c := Vector3.ZERO
+		var nrm := Vector3.ZERO
+		var cnt := 0
+		for i in vs.size():
+			if vs[i].x * side > 0.0:
+				c += vs[i]
+				nrm += ns[i]
+				cnt += 1
+		if cnt < 3:
+			continue
+		c /= cnt
+		nrm = Vector3(side, 0.0, 0.45).normalized()  # outward and a little forward (the eye is a whole ball: its normals average to nothing)
+		var r := 0.0
+		for i in vs.size():
+			if vs[i].x * side > 0.0:
+				r = maxf(r, vs[i].distance_to(c))
+		var dot := MeshInstance3D.new()
+		dot.name = "Glint"
+		var sm := SphereMesh.new()
+		sm.radius = r * 0.3
+		sm.height = r * 0.6
+		sm.radial_segments = 8
+		sm.rings = 4
+		dot.mesh = sm
+		dot.material_override = white
+		dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		att.add_child(dot)
+		dot.position = to_head * (c + nrm * r * 0.8 + Vector3.UP * r * 0.45)
+		dot.scale = Vector3.ONE * to_head.basis.get_scale().x
+
+
 func toonify(n: Node) -> void:
 	if _outline == null:
 		_outline = _outline_mat(OUTLINE)
@@ -199,6 +269,8 @@ func toonify(n: Node) -> void:
 		if sk:
 			ref = sk
 			m.mesh = smooth_mesh(m.mesh)
+		if sk:
+			_catchlights(m, sk)
 		var sc := ref.global_transform.basis.get_scale().x
 		var line := OUTLINE * (0.62 if sk else 1.0)  # characters: a finer line (it is unbroken now that they are smooth)
 		var grow := snappedf(line / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else line
