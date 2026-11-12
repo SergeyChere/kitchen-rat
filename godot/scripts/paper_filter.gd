@@ -41,10 +41,12 @@ void fragment() {
 	col *= 1.0 - 0.3 * edge * strength;
 	float l = lum(col);
 	col *= 1.0 + (grain - 0.5) * 2.0 * mix(0.24, 0.1, clamp(l * 1.4, 0.0, 1.0)) * strength;
-	col = mix(vec3(lum(col)), col, 0.93);
+	// watercolour has no true black and no neon: the darks are lifted toward the paper, the colours calmed
+	col = mix(vec3(lum(col)), col, 0.86);
+	col = col * 0.92 + vec3(0.06, 0.06, 0.075) * strength;
 	col *= mix(vec3(1.0), vec3(1.035, 1.0, 0.93), clamp(l * 1.3, 0.0, 1.0) * strength);
 	vec2 v = SCREEN_UV - 0.5;
-	col *= 1.0 - 0.16 * smoothstep(0.5, 1.05, length(v * vec2(1.4, 1.0)));
+	col *= 1.0 - 0.09 * smoothstep(0.5, 1.05, length(v * vec2(1.4, 1.0)));
 	COLOR = vec4(col, 1.0);
 }
 """

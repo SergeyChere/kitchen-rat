@@ -166,14 +166,14 @@ def paint_patterns():
     u = ((xx + wobx) / (N / 2.0)) % 1.0
     w = ((yy + woby) / (N / 2.0)) % 1.0
     d = np.minimum(np.minimum(u, 1 - u), np.minimum(w, 1 - w)) * (N / 2.0)   # px to the nearest joint
-    joint = np.exp(-(d / 5.0) ** 2)
+    joint = np.exp(-(d / 7.0) ** 2)
     pool = np.exp(-(d / 22.0) ** 2)
     shade = np.zeros((N, N))
     tones = np.array([[0.05, -0.04], [-0.05, 0.03]])
     ix = (((xx + wobx) // (N / 2.0)) % 2).astype(int)
     iy = (((yy + woby) // (N / 2.0)) % 2).astype(int)
     shade = tones[iy, ix]
-    v = wash(194, blotch=1.5, pools=1.0) + shade - 0.34 * joint - 0.07 * pool
+    v = wash(194, blotch=1.5, pools=1.0) + shade - 0.5 * joint - 0.08 * pool
     save_grey("ceramic_tile", blur(v, 0.6))
 
 

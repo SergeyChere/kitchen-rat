@@ -175,8 +175,8 @@ void fragment() {
 	float s1 = vnoise(sp);
 	float s2 = vnoise(sp * 1.7 + 7.3);
 	vec3 base = mix(coat, vec3(dot(coat, vec3(0.3, 0.59, 0.11))) * vec3(1.1, 1.0, 0.88), grey) * shade;
-	vec3 col = base * mix(0.9, 1.0, smoothstep(0.36, 0.5, s1));
-	col = mix(col, base * vec3(1.12, 1.08, 1.0), smoothstep(0.6, 0.72, s2) * 0.7);
+	vec3 col = base * mix(0.93, 1.0, smoothstep(0.34, 0.52, s1));
+	col = mix(col, base * vec3(1.1, 1.06, 0.99), smoothstep(0.66, 0.76, s2) * 0.6);
 	ALBEDO = col * mix(0.92, 1.03, tone);
 	ROUGHNESS = 0.6;
 }
@@ -345,6 +345,9 @@ func toonify(n: Node) -> void:
 					t.rim = 0.12
 					if t.albedo_texture == null and t.albedo_color.v > 0.7 and not mat.resource_name.begins_with("Whisker"):
 						t.albedo_color = t.albedo_color.darkened(0.1)
+					# round 14: tail, ears and paws are a clear painted pink, not a near-white that the lamps bleach
+					if mat.resource_name == "Pink" and sk.find_bone("Tail1") >= 0:
+						t.albedo_color = Color(0.83, 0.56, 0.55)
 				# Round 14, watercolour: every plain painted thing (not the characters — their skin moves) gets the
 				# wash laid over its own colour: patches of brushwork and drying lines instead of a flat fill.
 				# Mapped in the model's own space, so the pattern travels with a thing that is pushed or carried.
@@ -371,7 +374,7 @@ func toonify(n: Node) -> void:
 						var box := m.mesh.get_aabb()
 						var rat_coat := furry < 0.01  # the rats: a grey coat a shade darker than the model's brown
 						t.next_pass = _fur(t.next_pass as Material, t.albedo_color, furry / maxf(sc, 0.0001), sc, box.end.z, box.position.z,
-								0.75 if rat_coat else 0.0, 0.95 if rat_coat else 1.0)
+								0.75 if rat_coat else 0.0, 0.7 if rat_coat else 0.9)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
 
@@ -957,10 +960,11 @@ func _lighting() -> void:
 			ascale = 0.78  # warm-keyed rooms: the fill drops so the fire/lamps own them
 		"pantry":
 			atint = Color(0.9, 0.99, 1.07)
+			ascale = 1.3  # round 14: dark wood walls and a dark floor: it needs more fill than the pale kitchen
 		"kids":
 			atint = Color(1.03, 0.98, 1.02)
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)
-	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.38 * ascale * float(pal.get("hemi", 0.8)) / 0.8  # round 4/10: the FILL of the cinematic scheme — low and cool against the keys; the motivated sources carry the room
+	env.ambient_light_color = Color(0.5, 0.56, 0.8) * atint * 0.78 * ascale * float(pal.get("hemi", 0.8)) / 0.8  # round 14: 0.78 (it was 0.38 — "the locations look dark"): a painted night is blue, not black. Before: round 4/10: the FILL of the cinematic scheme — low and cool against the keys; the motivated sources carry the room
 	env.ambient_light_energy = 1.0
 	env.fog_enabled = true
 	env.fog_light_color = hex(pal.get("fog", 0x0e1220))
@@ -1031,7 +1035,7 @@ func _lighting() -> void:
 	var fill := DirectionalLight3D.new()
 	fill.name = "Moon fill"
 	fill.light_color = Color(0.6, 0.7, 1.0)
-	fill.light_energy = 0.22
+	fill.light_energy = 0.34  # round 14 (0.22): the user found the painted rooms too dark
 	fill.shadow_enabled = false
 	root.add_child(fill)
 	fill.rotation = Vector3(deg_to_rad(-50.0), deg_to_rad(-15.0), 0)
@@ -1385,7 +1389,7 @@ func _room() -> void:
 	ceil_mat.rim_enabled = false
 	ceil_mat.emission_enabled = true
 	ceil_mat.emission = hex(pal.get("ceil", 0x22263a))
-	ceil_mat.emission_energy_multiplier = 0.55
+	ceil_mat.emission_energy_multiplier = 1.0  # round 14 (0.55): the ceiling is part of the picture, not a black lid
 	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), ceil_mat, root, false)
 	var cb := StaticBody3D.new()  # the rat and the camera bump into the ceiling (up on the cabinets)
 	cb.collision_layer = 1 | 4
