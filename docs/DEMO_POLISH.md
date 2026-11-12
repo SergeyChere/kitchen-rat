@@ -690,3 +690,32 @@ Refined while porting:
   re-checked against main's furniture: night JSONs and the room
   layouts are unchanged since the merge, so the measured positions
   still land.
+
+
+## Ghibli UI redesign (2026-11-12)
+
+`muse/details-ui`. The whole interface is redrawn in a Ghibli storybook
+mood — warm, fairytale, hand-drawn *by mood*, not a copy: no Ghibli art,
+characters or fonts (the push channel is text-only anyway; the font stays
+ThemeDB.fallback_font). Behaviour is untouched: same screens, buttons,
+settings, flows, HUD information and test hooks (--screen, --shot,
+--auto, --night).
+
+Palette (ui.gd theme, hud.gd header consts): parchment panels
+(0.96, 0.91, 0.79) with a warm brown border and a soft drop shadow,
+ink-brown text (0.25, 0.19, 0.13), leaf-green headings (0.28, 0.48,
+0.26), deep amber for cheese/stars, red kept loud for danger. Headings
+that sit on the dark veil instead of paper use ACCENT_LIGHT/TEXT_LIGHT
+(warm amber-cream). Buttons are rounded paper pills (radius 24, honey
+on hover); sliders and scrollbars are tan with a leaf-green grabber;
+the menu veil and screen dim are a warm dusk umber, and the live kitchen
+behind the menu is untouched.
+
+HUD (hud.gd): all panels are parchment cards drawn through one shared
+_panel() helper (rounded, bordered, soft shadow); the task panel is a
+field-journal page; banners are painted title cards (green title, ink
+subtitle); the nest bar is leaf-green with a gold punch flash; hearts
+are warm red and wanted stars deep amber; toasts and world-space tags
+stay bright over the 3D view. Pause/results screens needed no code
+changes — they are built from UI.screen/label/button and take the new
+theme for free.

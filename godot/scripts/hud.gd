@@ -2,8 +2,10 @@ class_name Hud
 extends CanvasLayer
 ## The night's HUD, like the prototype: night and clock, lives and wanted stars, nest progress, noise, tasks in the
 ## bottom-left corner, banners and toasts; speech bubbles float in the world (Label3D). Drawn in code, no UI assets.
+## Ghibli storybook look: parchment cards with ink text and leaf-green accents; danger states stay red and loud.
 
 var _canvas: Control
+var _panel_box: StyleBoxFlat
 var _toasts := []  # [text, time]
 var _banner_t := ""
 var _banner_s := ""
@@ -24,6 +26,14 @@ func _ready() -> void:
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.draw.connect(_draw_hud)
 	add_child(_canvas)
+	_panel_box = StyleBoxFlat.new()
+	_panel_box.bg_color = PANEL
+	_panel_box.border_color = PANEL_BORDER
+	_panel_box.set_border_width_all(1)
+	_panel_box.set_corner_radius_all(12)
+	_panel_box.shadow_color = Color(0, 0, 0, 0.25)
+	_panel_box.shadow_size = 6
+	_panel_box.shadow_offset = Vector2(0, 3)
 
 
 func toast(text: String) -> void:
@@ -91,17 +101,31 @@ func _process(dt: float) -> void:
 
 # ---------- drawing ----------
 
-const PANEL := Color(0.05, 0.06, 0.1, 0.72)
-const BAR_BG := Color(1, 1, 1, 0.15)
-const BAR := Color(1, 0.72, 0.35, 0.95)
-const NOISE := Color(1, 0.35, 0.3, 0.9)
+const PANEL := Color(0.96, 0.90, 0.77, 0.88)
+const PANEL_BORDER := Color(0.55, 0.42, 0.28, 0.85)
+const BAR_BG := Color(0.45, 0.38, 0.28, 0.28)
+const BAR := Color(0.35, 0.58, 0.30, 0.95)
+const NOISE := Color(0.85, 0.25, 0.20, 0.9)
 const SLEEP := Color(0.55, 0.65, 1.0, 0.9)
-const HINT := Color(0.85, 0.85, 0.75)
-const BAD := Color(0.91, 0.4, 0.29)
+const HINT := Color(0.45, 0.38, 0.30)
+const BAD := Color(0.82, 0.22, 0.15)
+const CREAM := Color(0.98, 0.94, 0.82)  # text floating over the 3D view, not on a card
+const CHEESE := Color(0.78, 0.55, 0.16)  # deep amber, readable on parchment
+const SAFE := Color(0.30, 0.52, 0.26)
+const INK := Color(0.25, 0.19, 0.13)
+const MUTED := Color(0.50, 0.44, 0.36)
 
 
-func _text(p: Vector2, s: String, size := 15, col := Color.WHITE, width := -1.0, align := HORIZONTAL_ALIGNMENT_LEFT) -> void:
+func _text(p: Vector2, s: String, size := 15, col := INK, width := -1.0, align := HORIZONTAL_ALIGNMENT_LEFT) -> void:
 	_canvas.draw_string(font, p, s, align, width, size, col)
+
+
+## One parchment card; alpha fades the whole card (banners, achievements).
+func _panel(r: Rect2, alpha := 1.0) -> void:
+	_panel_box.bg_color = Color(PANEL.r, PANEL.g, PANEL.b, PANEL.a * alpha)
+	_panel_box.border_color = Color(PANEL_BORDER.r, PANEL_BORDER.g, PANEL_BORDER.b, PANEL_BORDER.a * alpha)
+	_panel_box.shadow_color = Color(0, 0, 0, 0.25 * alpha)
+	_canvas.draw_style_box(_panel_box, r)
 
 
 func _wrap(p: Vector2, s: String, width: float, size := 14, col := Color.WHITE, align := HORIZONTAL_ALIGNMENT_LEFT) -> float:
@@ -218,11 +242,20 @@ func _draw_hud() -> void:
 
 	# top-left: night, clock, lives, wanted level and what's going on in the house
 	var wanted := bool(n.get("wanted", false))
-	_canvas.draw_rect(Rect2(12, 12, 300, 104 if wanted else 80), PANEL)
+	_panel(Rect2(12, 12, 300, 104 if wanted else 80))
 	_text(Vector2(22, 34), "Night %d · %s" % [int(n.number), str(n.name)], 17)
 	_text(Vector2(22, 58), _clock(g) + "  ·  dawn at 06:00", 14, HINT)
 	var lives := "♥".repeat(maxi(0, g.lives)) + "♡".repeat(maxi(0, 3 - g.lives))
-	_text(Vector2(22, 82), "Lives " + lives + (("    Wanted " + ("★".repeat(g.stars) + "☆".repeat(5 - g.stars))) if wanted else ""), 15)
+	var lx := 22.0
+	_text(Vector2(lx, 82), "Lives ", 15)
+	lx += font.get_string_size("Lives ", HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	_text(Vector2(lx, 82), lives, 15, Color(0.82, 0.30, 0.22))
+	lx += font.get_string_size(lives, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	if wanted:
+		var stars := "★".repeat(g.stars) + "☆".repeat(5 - g.stars)
+		_text(Vector2(lx, 82), "    Wanted ", 15)
+		lx += font.get_string_size("    Wanted ", HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		_text(Vector2(lx, 82), stars, 15, CHEESE)
 	if wanted:
 		_text(Vector2(22, 104), _house_text(g), 13, HINT, 280)
 
@@ -238,8 +271,8 @@ func _draw_hud() -> void:
 		_last_counts = key
 	var pk := clampf(1.0 - (now - _punch_at) / 0.45, 0.0, 1.0)
 	pk = pk * pk
-	_canvas.draw_rect(Rect2(bx - 10, 12, bw + 20, 52), PANEL)
-	_text(Vector2(bx, 32 + pk * 2.0), "Nest  %d / %d     Carrying  %d / %d" % [g.fed, goal, g.rat.carry_weight(), g.rat.capacity], 14 + int(round(pk * 5.0)), Color.WHITE.lerp(Color(1.0, 0.85, 0.3), pk))
+	_panel(Rect2(bx - 10, 12, bw + 20, 52))
+	_text(Vector2(bx, 32 + pk * 2.0), "Nest  %d / %d     Carrying  %d / %d" % [g.fed, goal, g.rat.carry_weight(), g.rat.capacity], 14 + int(round(pk * 5.0)), INK.lerp(Color(0.85, 0.62, 0.20), pk))
 	_canvas.draw_rect(Rect2(bx, 42, bw, 12), BAR_BG)
 	_canvas.draw_rect(Rect2(bx, 42, bw * clampf(float(g.fed) / maxf(1.0, goal), 0.0, 1.0), 12), BAR.lerp(Color(1.0, 0.9, 0.5), pk * 0.7))
 
@@ -247,27 +280,27 @@ func _draw_hud() -> void:
 	var chip := _chip(g)
 	# the box grows to the left for the long lines ("Up high, but the owner can reach you" was cut off)
 	var cw := maxf(240.0, font.get_string_size(str(chip[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 22.0)
-	_canvas.draw_rect(Rect2(W - 12 - cw, 12, cw, 58), PANEL)
+	_panel(Rect2(W - 12 - cw, 12, cw, 58))
 	_text(Vector2(W - 2 - cw, 33), chip[0], 15, chip[1])
 	var lvl := 3 if g.rat.running and g.rat.moving() else (1 if g.rat.moving() and not g.rat.sneaking else 0)
 	if g.rat.jumping: lvl = 1
 	var ntext := "Loud: running" if lvl == 3 else ("Quiet: walking" if lvl == 1 else ("Silent: sneaking" if g.rat.sneaking else "Silent"))
 	var warn := g.noisy_near != ""
 	for i in 3:
-		_canvas.draw_rect(Rect2(W - 2 - cw + i * 18, 46, 14, 12), NOISE if i < lvl else (Color(1, 0.62, 0.2, 0.55 + 0.35 * sin(Time.get_ticks_msec() / 150.0)) if warn else BAR_BG))
-	_text(Vector2(W + 58 - cw, 57), ("Careful: " + g.noisy_near.trim_suffix("!").trim_suffix("…")) if warn else ntext, 13, Color(1, 0.7, 0.3) if warn else HINT)
+		_canvas.draw_rect(Rect2(W - 2 - cw + i * 18, 46, 14, 12), NOISE if i < lvl else (Color(0.85, 0.45, 0.10, 0.55 + 0.35 * sin(Time.get_ticks_msec() / 150.0)) if warn else BAR_BG))
+	_text(Vector2(W + 58 - cw, 57), ("Careful: " + g.noisy_near.trim_suffix("!").trim_suffix("…")) if warn else ntext, 13, Color(0.80, 0.42, 0.08) if warn else HINT)
 
 	_draw_banner_and_bubbles(W)
 
 	# the pups that came along
 	if not g.pups.is_empty():
 		var py := 78.0
-		_canvas.draw_rect(Rect2(W - 252, py, 240, 26 + 20 * g.pups.size()), PANEL)
+		_panel(Rect2(W - 252, py, 240, 26 + 20 * g.pups.size()))
 		_text(Vector2(W - 242, py + 18), "Pups  ·  %s wait/follow  ·  %s fetch" % [Keys.label("pups"), Keys.label("fetch")], 12, HINT)
 		for i in g.pups.size():
 			var pp: Pup = g.pups[i]
 			var st: String = ["following", "waiting", "fetching", "bringing food", "CAUGHT! Rescue!", "STUCK! Help!"][pp.mode]
-			_text(Vector2(W - 242, py + 40 + 20 * i), "%s · %s" % [pp.title, st], 14, BAD if pp.lost() else Color.WHITE)
+			_text(Vector2(W - 242, py + 40 + 20 * i), "%s · %s" % [pp.title, st], 14, BAD if pp.lost() else INK)
 
 	_draw_tasks(g, H)
 
@@ -287,42 +320,42 @@ func _draw_hud() -> void:
 				var rot := PackedVector2Array()
 				for p in pts:
 					rot.append(c2 + p.rotated(-ang))
-				_canvas.draw_rect(Rect2(W / 2 - 132, H - 70, 264, 44), PANEL)
+				_panel(Rect2(W / 2 - 132, H - 70, 264, 44))
 				_canvas.draw_colored_polygon(rot, BAR)
 				_text(Vector2(W / 2 - 92, H - 41), "to the pups · %.1f m%s" % [to.length(), " · jump down" if g.rat.global_position.y > 0.3 else ""], 15)
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-			_text(Vector2(0, H / 2), "Click to look around", 18, Color(1, 1, 1, 0.8), W, HORIZONTAL_ALIGNMENT_CENTER)
+			_text(Vector2(0, H / 2), "Click to look around", 18, Color(CREAM.r, CREAM.g, CREAM.b, 0.85), W, HORIZONTAL_ALIGNMENT_CENTER)
 
 	for i in _ach.size():
 		var a := clampf(float(_ach[i][1]), 0.0, 1.0)
 		var r := Rect2(W - 332, H - 150 - i * 74, 320, 64)
-		_canvas.draw_rect(r, Color(0.12, 0.1, 0.06, 0.92 * a))
-		_canvas.draw_rect(Rect2(r.position, Vector2(6, r.size.y)), Color(BAR.r, BAR.g, BAR.b, a))
+		_panel(r, a)
+		_canvas.draw_rect(Rect2(r.position + Vector2(0, 12), Vector2(6, r.size.y - 24)), Color(BAR.r, BAR.g, BAR.b, a))
 		_text(r.position + Vector2(18, 24), "ACHIEVEMENT UNLOCKED", 12, Color(BAR.r, BAR.g, BAR.b, a))
-		_text(r.position + Vector2(18, 48), "★ " + str(_ach[i][0]), 18, Color(1, 1, 1, a))
+		_text(r.position + Vector2(18, 48), "★ " + str(_ach[i][0]), 18, Color(INK.r, INK.g, INK.b, a))
 	_canvas.draw_rect(Rect2(0, 0, W, H), Color(0, 0, 0, g.fade))
 
 
 func _key_prompt(W: float, H: float, t: String) -> void:
 	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 32
-	_canvas.draw_rect(Rect2(W / 2 - w / 2, H - 70, w, 40), PANEL)
-	_text(Vector2(0, H - 44), t, 16, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
+	_panel(Rect2(W / 2 - w / 2, H - 70, w, 40))
+	_text(Vector2(0, H - 44), t, 16, INK, W, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_banner_and_bubbles(W: float) -> void:
 	if _banner_time > 0.0:
 		var a := clampf(_banner_time, 0.0, 1.0)
-		_canvas.draw_rect(Rect2(W / 2 - 360, 86, 720, 80), Color(PANEL.r, PANEL.g, PANEL.b, PANEL.a * a))
+		_panel(Rect2(W / 2 - 360, 86, 720, 80), a)
 		if _banner_t != "":
-			_text(Vector2(0, 118), _banner_t, 24, Color(1, 1, 1, a), W, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(Vector2(0, 150 if _banner_t != "" else 132), _banner_s, 16, Color(1, 1, 1, a), W, HORIZONTAL_ALIGNMENT_CENTER)
+			_text(Vector2(0, 118), _banner_t, 24, Color(0.28, 0.48, 0.26, a), W, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(Vector2(0, 150 if _banner_t != "" else 132), _banner_s, 16, Color(INK.r, INK.g, INK.b, a), W, HORIZONTAL_ALIGNMENT_CENTER)
 	for i in _toasts.size():
-		_text(Vector2(0, 196 + i * 26), _toasts[i][0], 16, Color.WHITE, W, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(Vector2(0, 196 + i * 26), _toasts[i][0], 16, CREAM, W, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _chip(g: Game) -> Array:
 	var r := g.rat
-	if r.hidden() or r.in_nest: return ["Hidden", Color(0.6, 0.88, 0.48)]
+	if r.hidden() or r.in_nest: return ["Hidden", SAFE]
 	if g.owner_ai.sees: return ["The owner sees you!", BAD]
 	if g.cat.sees and g.cat.mode == CatAI.Mode.WATCH: return ["The cat is waiting below", BAD]
 	if g.cat.sees: return ["The cat sees you!", BAD]
@@ -330,9 +363,9 @@ func _chip(g: Game) -> Array:
 	for z in g.sleepers:
 		if z.sees_rat(): return ["Spotted!", BAD]
 	if r.global_position.y >= 0.3:
-		if g.owner_ai.in_room(): return ["Up high, but the owner can reach you", Color(0.95, 0.76, 0.3)]
-		return ["Up high: the cat can’t reach you", Color.WHITE]
-	return ["Unseen", Color.WHITE]
+		if g.owner_ai.in_room(): return ["Up high, but the owner can reach you", CHEESE]
+		return ["Up high: the cat can’t reach you", INK]
+	return ["Unseen", INK]
 
 
 func _house_text(g: Game) -> String:
@@ -352,13 +385,7 @@ func _house_text(g: Game) -> String:
 	return "The cat is prowling"
 
 
-const CHEESE := Color(0.95, 0.76, 0.31)
-const SAFE := Color(0.61, 0.88, 0.42)
-const INK := Color(0.93, 0.9, 0.85)
-const MUTED := Color(0.6, 0.6, 0.63)
-
-
-## The task panel, as in the prototype: small and quiet. The goal with its bar, tasks just done (yellow ✔, fading),
+## The task panel, as in the prototype: small and quiet — now a field-journal page. The goal with its bar, tasks just done (yellow ✔, fading),
 ## ONE current main task (yellow badge with its number, and its hint), then the side tasks in green.
 func _draw_tasks(g: Game, H: float) -> void:
 	var w := 330.0
@@ -413,10 +440,13 @@ func _draw_tasks(g: Game, H: float) -> void:
 	var x := 12.0
 	var y := H - 14.0 - total
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.063, 0.07, 0.11, 0.8)
-	box.border_color = Color(0.19, 0.21, 0.29)
+	box.bg_color = PANEL
+	box.border_color = PANEL_BORDER
 	box.set_border_width_all(1)
-	box.set_corner_radius_all(12)
+	box.set_corner_radius_all(16)
+	box.shadow_color = Color(0, 0, 0, 0.25)
+	box.shadow_size = 6
+	box.shadow_offset = Vector2(0, 3)
 	_canvas.draw_style_box(box, Rect2(x, y, w, total))
 	_canvas.draw_string(font, Vector2(x + 12, y + 20), "TONIGHT", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, CHEESE)
 	var yy := y + 30.0
@@ -444,8 +474,8 @@ func _draw_tasks(g: Game, H: float) -> void:
 		_canvas.draw_multiline_string(font, Vector2(tx, ty + size + 1), r[4], HORIZONTAL_ALIGNMENT_LEFT, tw, size, -1, col)
 		if r[7] == "bar":
 			var by := ty + size + 7
-			_canvas.draw_rect(Rect2(tx, by, tw, 4), Color(1, 1, 1, 0.1))
+			_canvas.draw_rect(Rect2(tx, by, tw, 4), BAR_BG)
 			_canvas.draw_rect(Rect2(tx, by, tw * clampf(float(g.fed) / maxf(1.0, goal), 0.0, 1.0), 4), CHEESE)
 		yy += heights[k]
 		if r[7] == "bar":
-			_canvas.draw_line(Vector2(x + 12, yy - 3), Vector2(x + w - 12, yy - 3), Color(0.19, 0.21, 0.29), 1.0)
+			_canvas.draw_line(Vector2(x + 12, yy - 3), Vector2(x + w - 12, yy - 3), Color(0.55, 0.42, 0.28, 0.6), 1.0)

@@ -1,14 +1,18 @@
 class_name UI
-## Shared look for the menus (main menu, pause, results): a warm, dark theme drawn in code, and the settings panel
-## the main menu and the pause menu both open.
+## Shared look for the menus (main menu, pause, results): a Ghibli storybook theme drawn in code —
+## warm parchment panels, ink-brown text, leaf-green headings — and the settings panel the main menu
+## and the pause menu both open. ACCENT/TEXT live on parchment; ACCENT_LIGHT/TEXT_LIGHT on the dark veil.
 
-const BG := Color(0.055, 0.07, 0.125)
-const PANEL := Color(0.08, 0.09, 0.15, 0.94)
-const ACCENT := Color(0.95, 0.72, 0.35)
-const TEXT := Color(0.95, 0.93, 0.88)
-const DIM := Color(0.72, 0.72, 0.78)
-const GOOD := Color(0.6, 0.88, 0.48)
-const BAD := Color(0.91, 0.4, 0.29)
+const BG := Color(0.09, 0.07, 0.05)
+const PANEL := Color(0.96, 0.91, 0.79, 0.97)
+const PANEL_BORDER := Color(0.55, 0.42, 0.28)
+const ACCENT := Color(0.28, 0.48, 0.26)
+const ACCENT_LIGHT := Color(0.98, 0.78, 0.42)
+const TEXT := Color(0.25, 0.19, 0.13)
+const TEXT_LIGHT := Color(0.96, 0.92, 0.84)
+const DIM := Color(0.47, 0.40, 0.32)
+const GOOD := Color(0.25, 0.48, 0.24)
+const BAD := Color(0.78, 0.24, 0.16)
 
 static var _theme: Theme
 
@@ -18,10 +22,10 @@ static func theme() -> Theme:
 		return _theme
 	var t := Theme.new()
 	t.default_font_size = 18
-	var normal := _box(Color(0.16, 0.15, 0.2), Color(0.3, 0.27, 0.32))
-	var hover := _box(Color(0.26, 0.21, 0.18), ACCENT)
-	var pressed := _box(Color(0.36, 0.26, 0.16), ACCENT)
-	var disabled := _box(Color(0.1, 0.1, 0.13), Color(0.18, 0.18, 0.22))
+	var normal := _box(Color(0.99, 0.96, 0.89), Color(0.62, 0.50, 0.34))
+	var hover := _box(Color(0.98, 0.88, 0.62), ACCENT)
+	var pressed := _box(Color(0.94, 0.78, 0.45), ACCENT)
+	var disabled := _box(Color(0.85, 0.83, 0.78), Color(0.65, 0.63, 0.58))
 	for cls in ["Button", "OptionButton"]:
 		t.set_stylebox("normal", cls, normal)
 		t.set_stylebox("hover", cls, hover)
@@ -29,30 +33,44 @@ static func theme() -> Theme:
 		t.set_stylebox("focus", cls, hover)
 		t.set_stylebox("disabled", cls, disabled)
 		t.set_color("font_color", cls, TEXT)
-		t.set_color("font_hover_color", cls, Color.WHITE)
-		t.set_color("font_focus_color", cls, Color.WHITE)
-		t.set_color("font_disabled_color", cls, Color(0.45, 0.45, 0.5))
+		t.set_color("font_hover_color", cls, ACCENT)
+		t.set_color("font_focus_color", cls, ACCENT)
+		t.set_color("font_disabled_color", cls, Color(0.55, 0.52, 0.46))
 	t.set_color("font_color", "Label", TEXT)
 	t.set_color("font_color", "CheckBox", TEXT)
-	t.set_color("font_hover_color", "CheckBox", Color.WHITE)
+	t.set_color("font_hover_color", "CheckBox", ACCENT)
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = PANEL
-	panel.set_corner_radius_all(14)
+	panel.set_corner_radius_all(18)
 	panel.set_content_margin_all(26)
-	panel.border_color = Color(0.25, 0.22, 0.28)
-	panel.set_border_width_all(1)
+	panel.border_color = PANEL_BORDER
+	panel.set_border_width_all(2)
+	panel.shadow_color = Color(0, 0, 0, 0.22)
+	panel.shadow_size = 10
+	panel.shadow_offset = Vector2(0, 4)
 	t.set_stylebox("panel", "PanelContainer", panel)
 	var grab := StyleBoxFlat.new()
 	grab.bg_color = ACCENT
 	grab.set_corner_radius_all(6)
 	var track := StyleBoxFlat.new()
-	track.bg_color = Color(0.22, 0.22, 0.28)
+	track.bg_color = Color(0.80, 0.72, 0.56)
 	track.set_corner_radius_all(4)
 	track.content_margin_top = 4
 	track.content_margin_bottom = 4
 	t.set_stylebox("slider", "HSlider", track)
 	t.set_stylebox("grabber_area", "HSlider", grab)
 	t.set_stylebox("grabber_area_highlight", "HSlider", grab)
+	var scroll_bg := StyleBoxFlat.new()
+	scroll_bg.bg_color = Color(0.80, 0.72, 0.56)
+	scroll_bg.set_corner_radius_all(4)
+	var scroll_grab := StyleBoxFlat.new()
+	scroll_grab.bg_color = ACCENT
+	scroll_grab.set_corner_radius_all(4)
+	for bar in ["VScrollBar", "HScrollBar"]:
+		t.set_stylebox("scroll", bar, scroll_bg)
+		t.set_stylebox("grabber", bar, scroll_grab)
+		t.set_stylebox("grabber_highlight", bar, scroll_grab)
+		t.set_stylebox("grabber_pressed", bar, scroll_grab)
 	_theme = t
 	return t
 
@@ -62,7 +80,10 @@ static func _box(bg: Color, border: Color) -> StyleBoxFlat:
 	s.bg_color = bg
 	s.border_color = border
 	s.set_border_width_all(2)
-	s.set_corner_radius_all(10)
+	s.set_corner_radius_all(24)
+	s.shadow_color = Color(0, 0, 0, 0.16)
+	s.shadow_size = 4
+	s.shadow_offset = Vector2(0, 2)
 	s.content_margin_left = 18
 	s.content_margin_right = 18
 	s.content_margin_top = 10
@@ -91,7 +112,7 @@ static func button(text: String, cb: Callable, width := 320.0) -> Button:
 
 
 ## What a "solid" menu screen is painted with: the flat background, or — when the kitchen
-## is alive behind the menu — a dark veil the room still shows through.
+## is alive behind the menu — a warm dusk veil the room still shows through.
 static func veil() -> Color:
 	if Main.I and is_instance_valid(Main.I.backdrop):
 		return Color(BG.r, BG.g, BG.b, 0.8)
@@ -106,7 +127,7 @@ static func screen(parent: Node, dim := 0.6, solid := false, width := 560.0) -> 
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	parent.add_child(root)
 	var bg := ColorRect.new()
-	bg.color = (veil() if solid else Color(0, 0, 0.02, dim))
+	bg.color = (veil() if solid else Color(0.10, 0.07, 0.04, dim))
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 	var center := CenterContainer.new()

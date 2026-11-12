@@ -192,9 +192,9 @@ func show_menu() -> void:
 	menu.set_meta("main", true)
 	var shade := TextureRect.new()
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.02, 0.02, 0.05, 0.9))
-	grad.set_color(1, Color(0.02, 0.02, 0.05, 0.0))
-	grad.add_point(0.5, Color(0.02, 0.02, 0.05, 0.62))
+	grad.set_color(0, Color(0.07, 0.06, 0.04, 0.9))
+	grad.set_color(1, Color(0.07, 0.06, 0.04, 0.0))
+	grad.add_point(0.5, Color(0.07, 0.06, 0.04, 0.62))
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.width = 256
@@ -213,11 +213,11 @@ func show_menu() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 12)
 	root.add_child(box)
-	var title := UI.label("Kitchen Rat", 60, UI.ACCENT)
+	var title := UI.label("Kitchen Rat", 60, UI.ACCENT_LIGHT)
 	title.add_theme_constant_override("outline_size", 10)
 	title.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.85))
 	box.add_child(title)
-	var tag := UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights.\nOne hungry family.", 18, UI.TEXT)
+	var tag := UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights.\nOne hungry family.", 18, UI.TEXT_LIGHT)
 	box.add_child(tag)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 18)
@@ -301,7 +301,7 @@ func show_nights() -> void:
 	outer.offset_bottom = -24
 	outer.add_theme_constant_override("separation", 10)
 	root.add_child(outer)
-	outer.add_child(UI.label("Choose a night", 34, UI.ACCENT, true))
+	outer.add_child(UI.label("Choose a night", 34, UI.ACCENT_LIGHT, true))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -314,7 +314,7 @@ func show_nights() -> void:
 	var files := Nights.files()
 	for i in files.size():
 		if i % 5 == 0:
-			list.add_child(UI.label(ACTS[i / 5], 22, UI.ACCENT))
+			list.add_child(UI.label(ACTS[i / 5], 22, UI.ACCENT_LIGHT))
 			grid = GridContainer.new()
 			grid.columns = 5
 			grid.add_theme_constant_override("h_separation", 8)
