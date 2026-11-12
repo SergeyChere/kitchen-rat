@@ -35,7 +35,9 @@ func _ready() -> void:
 		if _args.has("via_menu"):  # dev: go through the menu (and its live backdrop) first, like a player does
 			show_menu()
 			await get_tree().create_timer(1.5).timeout
-		start_night(_args.night)
+			await enter_night(_args.night)
+		else:
+			start_night(_args.night)
 	else:
 		show_menu()
 		if _args.get("screen", "") == "nights": show_nights()
@@ -100,6 +102,32 @@ func _unhandled_input(e: InputEvent) -> void:
 		show_menu()
 	elif e.is_action_pressed("pause") and menu and game == null and not menu.has_meta("main"):
 		show_menu()
+
+
+## From the menu into a night: the menu and its kitchen dip to black first (the night then fades in from
+## black by itself), instead of the picture jumping while the room is built.
+func enter_night(id: String) -> void:
+	if not is_instance_valid(backdrop) or has_node("Dip"):
+		if not has_node("Dip"):
+			start_night(id)
+		return
+	Sfx.play("click")
+	var layer := CanvasLayer.new()
+	layer.name = "Dip"
+	layer.layer = 50
+	add_child(layer)
+	var black := ColorRect.new()
+	black.color = Color(0, 0, 0, 0)
+	black.set_anchors_preset(Control.PRESET_FULL_RECT)
+	black.mouse_filter = Control.MOUSE_FILTER_STOP  # no second click while it fades
+	layer.add_child(black)
+	var tw := create_tween()
+	tw.tween_property(black, "color:a", 1.0, 0.3)
+	await tw.finished
+	start_night(id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	layer.queue_free()
 
 
 func start_night(id: String) -> void:
@@ -199,7 +227,7 @@ func start_number(n: int) -> void:
 		show_menu()
 		return
 	var f: String = files[n - 1]
-	start_night(f.substr(f.find("_") + 1))
+	enter_night(f.substr(f.find("_") + 1))
 
 
 func show_achievements() -> void:
@@ -282,7 +310,7 @@ func show_nights() -> void:
 		b.disabled = not open
 		b.tooltip_text = str(d.get("blurb", ""))
 		b.add_theme_font_size_override("font_size", 15)
-		b.pressed.connect(func(): Sfx.play("click"); start_night(id))
+		b.pressed.connect(func(): enter_night(id))
 		grid.add_child(b)
 	outer.add_child(UI.button("Back", show_menu, 220))
 	UI.focus_first(list)
