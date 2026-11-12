@@ -332,13 +332,20 @@ static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
 ## books in the bookcase stay books). `tint` (a colour for the piece from the night data) replaces the
 ## colour of those materials when given. Mapped in world space, so the grain is the same size on a big
 ## panel and on a thin leg. No texture -> no change at all.
-func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
+## `shade` darkens (< 1) the designed colour of the parts that take the surface: a pale top under the moon
+## came out pure white.
+func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE, shade := 1.0) -> void:
 	var det := TextureLib.get_detail(tex_name) if n != null else []
 	if det.is_empty():
 		return
 	var cache := {}
-	for mi in n.find_children("*", "MeshInstance3D", true, false):
+	var meshes := n.find_children("*", "MeshInstance3D", true, false)
+	if n is MeshInstance3D:
+		meshes.append(n)
+	for mi in meshes:
 		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
 		for i in m.mesh.get_surface_count():
 			var src := m.get_active_material(i) as BaseMaterial3D
 			if src == null or not _takes(tex_name, src):
@@ -347,7 +354,8 @@ func apply_texture(n: Node3D, tex_name: String, tint := Color.WHITE) -> void:
 			if not cache.has(key):
 				var t := src.duplicate() as BaseMaterial3D
 				t.albedo_texture = det[0]
-				t.albedo_color = TextureLib.detail_colour(src.albedo_color if tint == Color.WHITE else tint, float(det[1]))
+				var base := src.albedo_color if tint == Color.WHITE else tint
+				t.albedo_color = TextureLib.detail_colour(Color(base.r * shade, base.g * shade, base.b * shade, base.a), float(det[1]))
 				t.uv1_triplanar = true
 				t.uv1_world_triplanar = true
 				t.uv1_triplanar_sharpness = 4.0
@@ -813,18 +821,22 @@ func _room() -> void:
 	if not ResourceLoader.exists("res://assets/textures/" + floor_tex + ".png"): floor_tex = "floor_tile"
 	if not ResourceLoader.exists("res://assets/textures/" + wall_tex + ".png"): wall_tex = "wall_stripes"
 	var floor_mat := mat(Color.WHITE, floor_tex, Vector2(6, 3.75))
-	var tile := TextureLib.get_detail("ceramic_tile") if str(pal.get("floor", "")) == "tile" else []
+	var tile := TextureLib.get_detail("ceramic_tile", 0.5) if str(pal.get("floor", "")) == "tile" else []
 	if not tile.is_empty():
 		# real tile instead of the placeholder pattern (the texture pack's, or the painted one): its joints and
 		# glaze as detail over the old floor's own tone, so the night stays as dark and as blue as before.
 		# (This looked for res://assets/textures/ceramic_tile.png, which is never in the repo — it never ran.)
 		floor_mat = mat(Color.WHITE)
 		floor_mat.albedo_texture = tile[0]
-		floor_mat.albedo_color = TextureLib.detail_colour(Color(0.27, 0.29, 0.42), float(tile[1]))
+		# a cool grey-blue: the moon and its fill are blue already, and a blue floor under blue light came out
+		# electric ultramarine (measured: saturation 0.74). The stains of the scan are flattened (contrast 0.5).
+		floor_mat.albedo_color = TextureLib.detail_colour(Color(0.31, 0.32, 0.385), float(tile[1]))
 		floor_mat.uv1_scale = Vector3(6, 3.75, 1)
 		floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		_add_normal(floor_mat, "ceramic_tile")
 	var wall_mat := mat(Color.WHITE, wall_tex)
+	if str(pal.get("floor", "")) == "tile":
+		wall_mat.albedo_color = Color(1.0, 0.95, 0.84)  # kitchens: the blue wall under blue moonlight, same story
 	var trim := mat(hex(0x7a4a2a))
 	# The room itself (floor, walls) is shaded softly: lamps and candles lay POOLS of light on it that fade out.
 	# With the toon step every pool was a hard-edged disc (a white plate on the floor under the candle). Things
@@ -837,7 +849,15 @@ func _room() -> void:
 	var fl := box("Floor", Vector3(0, -0.05, 0), Vector3(9.6, 0.1, 6.0), floor_mat, root)
 	var fm := (fl as MeshInstance3D).mesh as BoxMesh
 	fm.size = Vector3(9.6, 0.1, 6.0)
-	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), mat(hex(pal.get("ceil", 0x22263a))), root, false)
+	# the ceiling faces away from every light, so it was a pure black void over the room: it glows a little in
+	# its own colour instead (the night's bounce light), enough to close the room at the top
+	var ceil_mat := mat(hex(pal.get("ceil", 0x22263a)))
+	ceil_mat.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT
+	ceil_mat.rim_enabled = false
+	ceil_mat.emission_enabled = true
+	ceil_mat.emission = hex(pal.get("ceil", 0x22263a))
+	ceil_mat.emission_energy_multiplier = 0.55
+	var ceil := box("Ceiling", Vector3(0, 2.55, 0), Vector3(9.6, 0.1, 6.0), ceil_mat, root, false)
 	var cb := StaticBody3D.new()  # the rat and the camera bump into the ceiling (up on the cabinets)
 	cb.collision_layer = 1 | 4
 	cb.collision_mask = 0
@@ -996,22 +1016,30 @@ func _hide(kind: String, x: float, y: float, w: float, d: float, rot := 0.0) -> 
 func _furniture() -> void:
 	# levels.js kitchenFurniture: counters along the north and west walls, fridge, island, a box as a step,
 	# the table with chairs, a low shelf and a stool. Fronts face into the room.
-	furn_piece("furniture/counter_corner", 36, 36, 0.0, "counter", 72, 72)
+	# Surfaces (look pass 2): wood grain on the worktops, the island's butcher block and the table (only their
+	# wooden parts take it: the cream fronts and the blue body stay painted), cardboard on the box, a woven red
+	# cloth. The island's pale top is shaded down: under the moon it was pure white and the white rat vanished
+	# on it.
+	apply_texture(furn_piece("furniture/counter_corner", 36, 36, 0.0, "counter", 72, 72), "wood")
 	var n := 12
 	var w := (830.0 - 72.0) / n
 	for i in n:
 		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
+		apply_texture(piece, "wood")
 		if i == 6 and piece:
 			_sink_water(piece)
 	for j in 4:
-		furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72)
+		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
 	furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
-	furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90)
-	furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44)
+	apply_texture(furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90), "wood", Color.WHITE, 0.72)
+	apply_texture(furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44), "cardboard")
 	var table := furn_piece("furniture/table_kitchen", 720, 445, 0.0, "table", 200, 130)
 	if table:
 		var cloth := table.find_child("tablecloth*", true, false) as Node3D
+		if cloth:
+			apply_texture(cloth, "fabric", Color(0.62, 0.13, 0.1))  # a deep red: the pale one washed out to pink
+		apply_texture(table, "wood")
 		var spec := {}
 		for f in night.get("furn", []):
 			if str(f.t) == "table": spec = f
@@ -1429,20 +1457,51 @@ func _nest() -> void:
 	straw.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	var straw2 := straw.duplicate() as StandardMaterial3D
 	straw2.albedo_color = hex(0x8f7445)
+	# Each heap is a low mound with loose straws lying over and around it (thin sticks at every angle): seen from
+	# rat height one smooth mound read as a giant bread roll.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var straw_mats := [straw, straw2, straw.duplicate()]
+	(straw_mats[2] as StandardMaterial3D).albedo_color = hex(0xc4a868)
+	var stick := BoxMesh.new()
+	stick.size = Vector3(1, 1, 1)
 	for mnd in [[95, 705, 0.55, 0.42], [168, 712, 0.48, 0.38], [128, 660, 0.42, 0.34], [205, 668, 0.36, 0.3]]:
 		var mound := MeshInstance3D.new()
 		mound.name = "Bedding"
 		var mm := SphereMesh.new()
 		mm.radius = 0.3
 		mm.height = 0.6
+		mm.radial_segments = 14
+		mm.rings = 6
 		mound.mesh = mm
-		mound.scale = Vector3(mnd[2], 0.1, mnd[3])
-		mound.material_override = straw if int(mnd[0]) % 2 == 1 else straw2
+		mound.scale = Vector3(mnd[2], 0.07, mnd[3])
+		mound.material_override = straw2
 		mound.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		nest.add_child(mound)
-		mound.global_position = W(mnd[0], mnd[1], 1)
-	var cloth := box("Old cloth", W(140, 700, 1), Vector3(0.8, 0.025, 0.55), mat(Color(0.42, 0.2, 0.18)), nest)
-	cloth.rotation.y = 0.4
+		mound.global_position = W(mnd[0], mnd[1], 0.5)
+		for i in 46:
+			var a := rng.randf() * TAU
+			var r := sqrt(rng.randf()) * 1.25  # some straws spill out past the heap
+			var off := Vector3(cos(a) * r * 0.3 * float(mnd[2]), 0.0, sin(a) * r * 0.3 * float(mnd[3]))
+			var hgt := 0.021 * maxf(1.0 - r * r, 0.0) + 0.004 + rng.randf() * 0.006
+			var st := MeshInstance3D.new()
+			st.name = "Straw"
+			st.mesh = stick
+			st.material_override = straw_mats[rng.randi() % 3]
+			st.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			nest.add_child(st)
+			st.global_position = W(mnd[0], mnd[1], 0.0) + off + Vector3.UP * hgt
+			st.rotation = Vector3(rng.randf_range(-0.22, 0.22), rng.randf() * PI, rng.randf_range(-0.08, 0.08))
+			st.scale = Vector3(rng.randf_range(0.07, 0.15), 0.005, rng.randf_range(0.005, 0.008))
+	# the old cloth: a rag in three overlapping pieces lying a little askew, with a patch sewn on
+	var rag := mat(Color(0.5, 0.22, 0.2))
+	var rag2 := mat(Color(0.42, 0.18, 0.17))
+	for cl in [[140, 700, 0.62, 0.44, 0.4, rag, 1.0], [118, 712, 0.38, 0.3, 0.75, rag2, 1.6], [160, 690, 0.3, 0.34, 0.1, rag2, 1.4]]:
+		var piece := box("Old cloth", W(cl[0], cl[1], cl[6]), Vector3(cl[2], 0.012, cl[3]), cl[5], nest, false)
+		piece.rotation.y = cl[4]
+		(piece as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var patch := box("Cloth patch", W(150, 706, 2.3), Vector3(0.13, 0.006, 0.11), mat(Color(0.25, 0.38, 0.5)), nest, false)
+	patch.rotation.y = 0.9
 	for p in [[70, 715, 20, "sleep"], [105, 735, -60, "sleep"], [80, 745, 150, "idle"], [125, 705, 200, "sniff"]]:
 		var o := W(p[0], p[1], 60)
 		var hit := g.ray(o, o + Vector3.DOWN * 1.0)  # on top of the nest bedding, not inside it

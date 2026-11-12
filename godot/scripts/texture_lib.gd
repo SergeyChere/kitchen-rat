@@ -58,9 +58,11 @@ static func get_texture(tex_name: String, generate := true) -> Texture2D:
 static var _detail := {}
 
 
-static func get_detail(tex_name: String) -> Array:
-	if _detail.has(tex_name):
-		return _detail[tex_name]
+## `contrast` < 1 flattens the detail (a floor wants its joints, not every stain of the scan).
+static func get_detail(tex_name: String, contrast := 1.0) -> Array:
+	var dkey := tex_name if is_equal_approx(contrast, 1.0) else "%s@%.2f" % [tex_name, contrast]
+	if _detail.has(dkey):
+		return _detail[dkey]
 	var out := []
 	var t := get_texture(tex_name)
 	if t != null:
@@ -79,6 +81,8 @@ static func get_detail(tex_name: String) -> Array:
 					m += (c.r + c.g + c.b) / 3.0
 			m /= 1024.0
 			img.adjust_bcs(0.72 / maxf(m, 0.02), 1.0, 0.0)  # gray, mean ~0.72 (sRGB)
+			if not is_equal_approx(contrast, 1.0):
+				img.adjust_bcs(1.0, contrast, 1.0)
 			small = img.duplicate() as Image
 			small.resize(32, 32, Image.INTERPOLATE_BILINEAR)
 			var lin := 0.0
@@ -88,7 +92,7 @@ static func get_detail(tex_name: String) -> Array:
 			lin /= 1024.0
 			img.generate_mipmaps()
 			out = [ImageTexture.create_from_image(img), 1.0 / maxf(lin, 0.05)]
-	_detail[tex_name] = out
+	_detail[dkey] = out
 	return out
 
 
