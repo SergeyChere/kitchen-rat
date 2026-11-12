@@ -23,6 +23,7 @@ var _pitch_t := -16.0
 const SMOOTH := 18.0  # 1/s: how fast the view catches up with the hand (most of the way in ~60 ms)
 var arm: SpringArm3D
 var cam: Camera3D
+var dof: Dof
 ## From GDQuest's third-person controller (MIT): the camera follows the height of the ground she stands on, eased, not
 ## her body, so hops and little drops don't bob the view.
 var _ground_y := INF
@@ -49,6 +50,8 @@ func _ready() -> void:
 	cam.fov = 60.0
 	arm.add_child(cam)
 	cam.current = true
+	dof = Dof.new()
+	cam.add_child(dof)
 
 
 func snap(new_yaw: float) -> void:
@@ -128,6 +131,8 @@ func _process(_dt: float) -> void:
 		# hidden in the rat's-eye view, and when a wall has pushed the camera right up to her
 		rat.model.visible = not first_person and cam.global_position.distance_to(global_position) > 0.2
 	_tick_shake(_dt)
+	if dof:
+		dof.tick(cam.global_position.distance_to(global_position), not first_person)
 	if target is Rat:
 		(target as Rat).cam_yaw = yaw
 
