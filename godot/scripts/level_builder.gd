@@ -1550,6 +1550,9 @@ func _hide(kind: String, x: float, y: float, w: float, d: float, rot := 0.0) -> 
 	z.id = kind
 
 
+var _worktop := 0.92  # height of the kitchen worktop (m), measured from the first counter section
+
+
 func _furniture() -> void:
 	# levels.js kitchenFurniture: counters along the north and west walls, fridge, island, a box as a step,
 	# the table with chairs, a low shelf and a stool. Fronts face into the room.
@@ -1563,11 +1566,13 @@ func _furniture() -> void:
 	for i in n:
 		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
 		apply_texture(piece, "wood")
+		if i == 0 and piece:
+			_worktop = world_aabb(piece).end.y
 		if i == 6 and piece:
 			_sink_water(piece)
 	for j in 4:
 		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
-	furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
+	var fridge := furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
 	apply_texture(furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90), "wood", Color.WHITE, 0.72)
 	apply_texture(furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44), "cardboard")
@@ -1596,6 +1601,188 @@ func _furniture() -> void:
 	if bool(night.get("kitchenUpper", false)):
 		_kitchen_upper()
 	_backsplash()
+	_kitchen_life(fridge)
+
+
+## A plain painted material for the small things below: the wash over its colour, the pen line round it.
+func _paint(color: Color) -> StandardMaterial3D:
+	var m := mat(color)
+	var w := TextureLib.get_detail("wash", 1.9)
+	if not w.is_empty():
+		m.albedo_texture = w[0]
+		m.albedo_color = TextureLib.detail_colour(color, float(w[1]))
+		m.uv1_triplanar = true
+		m.uv1_scale = Vector3.ONE * (1.0 / 0.5)
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if _outline == null:
+		_outline = _outline_mat(OUTLINE)
+	m.next_pass = _outline_mat(OUTLINE * 0.6)
+	return m
+
+
+## A small decorative block: no collision, no shadow of its own to speak of. `tilt` turns it in its own plane
+## (degrees, around the axis that points out of a north-facing wall).
+func _bit(parent: Node3D, at: Vector3, size: Vector3, m: Material, tilt := 0.0, yaw := 0.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = m
+	parent.add_child(mi)
+	mi.global_position = at
+	mi.rotation_degrees = Vector3(0, yaw, tilt)
+	return mi
+
+
+func _round(parent: Node3D, at: Vector3, radius: float, height: float, m: Material, face_out := false) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = radius
+	cm.bottom_radius = radius
+	cm.height = height
+	cm.radial_segments = 14
+	cm.rings = 1
+	mi.mesh = cm
+	mi.material_override = m
+	parent.add_child(mi)
+	mi.global_position = at
+	if face_out:
+		mi.rotation_degrees = Vector3(90, 0, 0)  # the flat side looks into the room from a north or south wall
+	return mi
+
+
+## The things a lived-in kitchen collects (the user: "throw some random things in, so the room comes alive"):
+## magnets, notes and a child's drawing on the fridge; a rail of pans and utensils over the worktop; a pot, a
+## knife block, a chopping board, a bread box and bottles on it; a runner by the sink, a mat at the door, a
+## calendar on the wall. All of it is scenery: nothing here is a task, a noise or an obstacle on the floor.
+func _kitchen_life(fridge: Node3D) -> void:
+	if OS.get_environment("HIDE").contains("life"):
+		return
+	var grp := group("Kitchen life")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7741
+	var steel := _paint(Color(0.62, 0.64, 0.68))
+	var dark := _paint(Color(0.2, 0.19, 0.22))
+	var wood := _paint(Color(0.62, 0.42, 0.24))
+	var paper := _paint(Color(0.93, 0.91, 0.84))
+
+	# --- the fridge door: magnets, two notes, a drawing
+	if fridge:
+		var fb := world_aabb(fridge)
+		var z := fb.end.z + 0.003
+		var cx := fb.get_center().x
+		var bright := [Color(0.86, 0.22, 0.2), Color(0.96, 0.78, 0.2), Color(0.3, 0.62, 0.32), Color(0.24, 0.42, 0.8), Color(0.93, 0.5, 0.16), Color(0.82, 0.4, 0.62)]
+		# the drawing: a sheet with a sun, a house and grass in crayon colours
+		var sheet := Vector3(cx - 0.3, 1.5, z)
+		_bit(grp, sheet, Vector3(0.21, 0.16, 0.002), paper, -4.0)
+		_round(grp, sheet + Vector3(0.06, 0.04, 0.002), 0.022, 0.002, _paint(Color(0.97, 0.8, 0.2)), true)
+		_bit(grp, sheet + Vector3(-0.03, -0.01, 0.002), Vector3(0.07, 0.06, 0.002), _paint(Color(0.85, 0.3, 0.25)), -4.0)
+		_bit(grp, sheet + Vector3(-0.03, 0.035, 0.0025), Vector3(0.06, 0.06, 0.002), _paint(Color(0.45, 0.3, 0.6)), 41.0)
+		_bit(grp, sheet + Vector3(0.0, -0.06, 0.002), Vector3(0.19, 0.025, 0.002), _paint(Color(0.36, 0.66, 0.34)), -4.0)
+		_round(grp, sheet + Vector3(0.0, 0.07, 0.006), 0.014, 0.008, _paint(bright[0]), true)
+		# a shopping list and a note
+		_bit(grp, Vector3(cx + 0.02, 1.58, z), Vector3(0.075, 0.13, 0.002), _paint(Color(0.97, 0.93, 0.6)), 3.0)
+		_bit(grp, Vector3(cx + 0.02, 1.635, z + 0.004), Vector3(0.028, 0.028, 0.008), _paint(bright[3]), 3.0)
+		_bit(grp, Vector3(cx + 0.22, 1.42, z), Vector3(0.1, 0.1, 0.002), _paint(Color(0.99, 0.72, 0.78)), -7.0)
+		_round(grp, Vector3(cx + 0.22, 1.46, z + 0.004), 0.013, 0.008, _paint(bright[2]), true)
+		# and a scatter of loose magnets
+		for i in 9:
+			var at := Vector3(cx + rng.randf_range(-0.42, 0.42), rng.randf_range(1.08, 1.72), z + 0.004)
+			var c: Color = bright[i % bright.size()]
+			if i % 3 == 0:
+				_round(grp, at, rng.randf_range(0.011, 0.017), 0.008, _paint(c), true)
+			else:
+				_bit(grp, at, Vector3(rng.randf_range(0.022, 0.04), rng.randf_range(0.022, 0.034), 0.008), _paint(c), rng.randf_range(-25.0, 25.0))
+
+	# --- a rail over the worktop, left of the window: a frying pan, a saucepan, a ladle, a spatula, a whisk, a mitt
+	var rail_h := 138.0
+	_bit(grp, W(205, 3.2, rail_h), Vector3(2.2, 0.014, 0.014), steel)
+	for bx in [98.0, 312.0]:
+		_bit(grp, W(bx, 1.6, rail_h), Vector3(0.02, 0.03, 0.032), steel)
+	var copper := _paint(Color(0.72, 0.4, 0.22))
+	# frying pan (its bottom toward the room), hanging by the end of its handle
+	_bit(grp, W(125, 3.4, rail_h - 6.5), Vector3(0.022, 0.13, 0.012), dark)
+	_round(grp, W(125, 4.2, rail_h - 21.5), 0.09, 0.03, dark, true)
+	_round(grp, W(125, 5.8, rail_h - 21.5), 0.074, 0.004, _paint(Color(0.3, 0.29, 0.32)), true)
+	# copper saucepan
+	_bit(grp, W(160, 3.4, rail_h - 6.0), Vector3(0.02, 0.12, 0.012), dark)
+	_round(grp, W(160, 5.5, rail_h - 18.0), 0.062, 0.06, copper, true)
+	# ladle
+	_bit(grp, W(192, 3.4, rail_h - 10.5), Vector3(0.012, 0.21, 0.008), steel)
+	_round(grp, W(192, 4.4, rail_h - 22.5), 0.03, 0.022, steel, true)
+	# spatula
+	_bit(grp, W(214, 3.4, rail_h - 9.0), Vector3(0.012, 0.18, 0.008), wood)
+	_bit(grp, W(214, 3.4, rail_h - 21.5), Vector3(0.05, 0.075, 0.005), dark)
+	# whisk
+	_bit(grp, W(236, 3.4, rail_h - 6.5), Vector3(0.014, 0.13, 0.012), wood)
+	var whisk := MeshInstance3D.new()
+	var wm := SphereMesh.new()
+	wm.radius = 0.026
+	wm.height = 0.11
+	wm.radial_segments = 10
+	wm.rings = 6
+	whisk.mesh = wm
+	whisk.material_override = steel
+	grp.add_child(whisk)
+	whisk.global_position = W(236, 3.6, rail_h - 18.0)
+	# an oven mitt and a checked towel
+	_bit(grp, W(268, 3.6, rail_h - 9.5), Vector3(0.1, 0.17, 0.02), _paint(Color(0.8, 0.26, 0.22)), 4.0)
+	_bit(grp, W(268, 4.7, rail_h - 14.5), Vector3(0.1, 0.03, 0.004), _paint(Color(0.95, 0.9, 0.8)), 4.0)
+	_bit(grp, W(298, 3.4, rail_h - 12.0), Vector3(0.11, 0.24, 0.008), _paint(Color(0.93, 0.9, 0.82)))
+	for k in 3:
+		_bit(grp, W(298, 3.9, rail_h - 5.0 - k * 7.0), Vector3(0.11, 0.022, 0.004), _paint(Color(0.24, 0.42, 0.8)))
+
+	# --- on the worktop, at the back by the tiles (the front two thirds stay clear for her)
+	var top := _worktop
+	if top > 0.5 and top < 1.2:
+		# a chopping board leaning on the tiles
+		var board := _bit(grp, Vector3(W(180, 7).x, top + 0.17, W(180, 7).z), Vector3(0.3, 0.36, 0.022), wood)
+		board.rotation_degrees = Vector3(-13, 0, 0)
+		_bit(grp, Vector3(W(214, 9.5).x, top + 0.13, W(214, 9.5).z), Vector3(0.2, 0.27, 0.016), _paint(Color(0.78, 0.6, 0.38))).rotation_degrees = Vector3(-16, 0, 6)
+		# a pot with its lid
+		var pot := Vector3(W(400, 16).x, top, W(400, 16).z)
+		_round(grp, pot + Vector3(0, 0.06, 0), 0.1, 0.12, _paint(Color(0.82, 0.3, 0.2)))
+		_round(grp, pot + Vector3(0, 0.127, 0), 0.105, 0.014, _paint(Color(0.74, 0.26, 0.18)))
+		_round(grp, pot + Vector3(0, 0.146, 0), 0.02, 0.024, dark)
+		for hx in [-0.115, 0.115]:
+			_bit(grp, pot + Vector3(hx, 0.095, 0), Vector3(0.035, 0.014, 0.05), dark)
+		var pb := StaticBody3D.new()
+		var ps := CollisionShape3D.new()
+		var pc := CylinderShape3D.new()
+		pc.radius = 0.11
+		pc.height = 0.15
+		ps.shape = pc
+		pb.add_child(ps)
+		grp.add_child(pb)
+		pb.global_position = pot + Vector3(0, 0.075, 0)
+		# a knife block
+		var kb := Vector3(W(690, 13).x, top, W(690, 13).z)
+		var block := box("Knife block", kb + Vector3(0, 0.1, 0), Vector3(0.1, 0.2, 0.13), wood, grp)
+		for k in 4:
+			_bit(grp, kb + Vector3(-0.03 + (k % 2) * 0.06, 0.225, -0.03 + (k / 2) * 0.05), Vector3(0.02, 0.06, 0.03), dark)
+		# the bread box and three bottles (oil, vinegar, sauce)
+		var bread := spawn("props/bread_box", Vector3(W(775, 18).x, top, W(775, 18).z), 0.0, decor)
+		collide(bread)
+		for k in 3:
+			var bot := spawn("props/bottle", Vector3(W(600 + k * 11, 9 + (k % 2) * 3).x, top, W(600, 9 + (k % 2) * 3).z), rng.randf_range(0.0, 360.0), decor)
+			collide(bot)
+
+	# --- on the floor and the walls
+	var runner := _paint(Color(0.7, 0.24, 0.2))
+	_bit(grp, W(483, 110, 0.5), Vector3(1.3, 0.008, 0.55), runner)
+	for k in 5:
+		_bit(grp, W(483 - 52 + k * 26, 110, 0.75), Vector3(0.05, 0.008, 0.55), _paint(Color(0.93, 0.87, 0.72)))
+	_bit(grp, W(905, 320, 0.5), Vector3(0.45, 0.008, 0.75), _paint(Color(0.52, 0.4, 0.28)))
+	# a calendar on the east wall, between the fridge and the door
+	var cal := W(958.6, 170, 150)
+	_bit(grp, cal, Vector3(0.006, 0.42, 0.3), paper)
+	_bit(grp, cal + Vector3(-0.002, 0.15, 0), Vector3(0.006, 0.11, 0.3), _paint(Color(0.8, 0.26, 0.22)))
+	for r in 4:
+		for c in 6:
+			if (r * 6 + c) % 5 != 3:
+				_bit(grp, cal + Vector3(-0.003, 0.05 - r * 0.055, -0.115 + c * 0.046), Vector3(0.004, 0.03, 0.03), _paint(Color(0.72, 0.74, 0.8)))
+	for mi in grp.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Tiles on the wall behind the worktops (a kitchen without a backsplash is a room with cupboards): small cream
@@ -1688,11 +1875,13 @@ func _kitchen_upper() -> void:
 			if jar:
 				jar.scale *= 0.8
 				collide(jar)
-	var ket := spawn("rooms/kettle", on_top(260, 30), 180.0, decor)
+	# (not on_top(): the colliders built this frame are not in the physics world yet, the ray found nothing, and
+	# the kettle and the toaster have been standing on the FLOOR inside the counter, out of sight)
+	var ket := spawn("rooms/kettle", Vector3(W(260, 30).x, _worktop, W(260, 30).z), 180.0, decor)
 	collide(ket)
 	if ket:
 		g.kettle_pos = ket.global_position + Vector3.UP * 0.17  # world_fx steams here
-	var toast := spawn("furniture/toaster", on_top(340, 28), 180.0, decor)
+	var toast := spawn("furniture/toaster", Vector3(W(340, 28).x, _worktop, W(340, 28).z), 180.0, decor)
 	if toast:
 		var tb := world_aabb(toast)
 		toast.global_position -= Vector3(tb.get_center().x - W(340, 28).x, 0, tb.get_center().z - W(340, 28).z)
