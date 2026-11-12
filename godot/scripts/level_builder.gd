@@ -159,8 +159,15 @@ void fragment() {
 	}
 	ALBEDO = coat * mix(0.9, 1.04, tone) * (0.97 + 0.06 * hash3(c + 7.0));
 	ROUGHNESS = 0.6;
-	RIM = 0.22;       // light catches the edge of the coat: a soft glowing outline against the dark room
-	RIM_TINT = 0.25;
+}
+// The lamps and the moon are tuned for a dark floor; a pale animal standing in the moon patch next to the
+// night-light burnt out to a white blob. So the coat takes direct light at three quarters, and the glow along
+// its edge now needs the light to actually reach it (the built-in rim ignores shadow and distance: every
+// lamp in range added to it). In shade — most of the game — nothing changes.
+void light() {
+	float lit = smoothstep(-0.6, 0.6, dot(NORMAL, LIGHT));
+	float edge = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 5.0);
+	DIFFUSE_LIGHT += (lit * 0.74 + edge * 0.5 * (0.35 + 0.65 * lit)) * ATTENUATION * LIGHT_COLOR / PI;
 }
 """
 static var _fur_shader: Shader
@@ -820,11 +827,11 @@ void fragment() {
 	var spill := OmniLight3D.new()  # and it warms whatever stands by the door
 	spill.name = "Hall light spill"
 	spill.light_color = warm
-	spill.light_energy = 0.9
-	spill.omni_range = 1.5
-	spill.omni_attenuation = 1.6
+	spill.light_energy = 0.32      # (0.9 with a falloff of 1.6, this close to the floor, was ten times that under it)
+	spill.omni_range = 1.6
+	spill.omni_attenuation = 0.6
 	grp.add_child(spill)
-	spill.global_position = W(935, dy, 22)
+	spill.global_position = W(925, dy, 30)
 	if str(night.get("decor", "kitchen")) != "kitchen":
 		return
 	# the night-light: a little plug with a glowing amber dome, right of the hole
@@ -846,14 +853,18 @@ void fragment() {
 	var nl := OmniLight3D.new()
 	nl.name = "Night-light"
 	nl.light_color = Color(1.0, 0.64, 0.3)
-	nl.light_energy = 1.5
-	nl.omni_range = 2.6
-	nl.omni_attenuation = 1.5
+	# A small pool of amber, no more. Godot's lamps follow an inverse-power law: with the lamp 10 cm off the
+	# wall and a falloff of 1.5 the wall next to it got forty times the lamp's energy — the wall, the floor and
+	# she were burnt to white right at her own door. So: a little out from the wall, a nearly flat falloff
+	# (the range window shapes the pool instead), and a third of the energy.
+	nl.light_energy = 0.24
+	nl.omni_range = 1.5
+	nl.omni_attenuation = 0.6
 	nl.shadow_enabled = true
 	nl.shadow_bias = 0.15
 	nl.shadow_normal_bias = 4.0
 	grp.add_child(nl)
-	nl.global_position = W(262, 584, 17)
+	nl.global_position = W(262, 576, 20)
 
 
 func _lighting() -> void:
