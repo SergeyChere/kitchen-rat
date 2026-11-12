@@ -1551,6 +1551,122 @@ func _furniture() -> void:
 	if bool(night.get("kitchenUpper", false)):
 		_kitchen_upper()
 	_backsplash()
+	_kitchen_details()
+
+
+## A bare box mesh (no collision, no shadow) for small built-up props.
+func _mesh_box(size: Vector3, material: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = material
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+func _kcyl(nm: String, center: Vector3, r: float, h: float, m: Material, r_top := -1.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = nm
+	var cm := CylinderMesh.new()
+	cm.top_radius = r if r_top < 0.0 else r_top
+	cm.bottom_radius = r
+	cm.height = h
+	mi.mesh = cm
+	mi.material_override = m
+	decor.add_child(mi)
+	mi.global_position = center
+	return mi
+
+
+## Details (ported from round 17): the fixed-layout kitchen gets its set
+## dressing — hanging pans that sway with the plants, a dish rack by the sink,
+## spice jars, a paper-towel roll, a bin, fruit on the table and a towel on
+## the counter front. All non-solid decor; every node has a unique name.
+## Port notes: the pans hang from wall rails now (they hung from thin air);
+## the towel got a hook peg, since main has no oven door to hang it on; a soap
+## dispenser and a sponge joined the sink, clear of the basin and the rack.
+func _kitchen_details() -> void:
+	var iron := mat(Color(0.16, 0.16, 0.17))
+	iron.metallic = 0.7
+	iron.roughness = 0.42
+	for px in [150.0, 205.0, 560.0, 620.0]:
+		var grp := Node3D.new()
+		grp.name = "Hanging pan " + str(int(px))
+		decor.add_child(grp)
+		grp.global_position = W(px, 8, 134)
+		var pan := MeshInstance3D.new()
+		pan.name = "Pan"
+		var pm := CylinderMesh.new()
+		pm.top_radius = 0.095; pm.bottom_radius = 0.082; pm.height = 0.028
+		pan.mesh = pm
+		pan.material_override = iron
+		pan.rotation.x = PI / 2.0
+		pan.position = Vector3(0, -0.15, 0.03)
+		grp.add_child(pan)
+		var hd := _mesh_box(Vector3(0.03, 0.15, 0.012), iron)
+		hd.name = "Pan handle"
+		hd.position = Vector3(0, -0.03, 0.03)
+		grp.add_child(hd)
+		g.plants.append([grp, grp.rotation, randf() * TAU])
+	# the rails the pans hang from: one per pair, with standoff mounts screwed
+	# into the wall (through the backsplash tiles where they run — the tiles
+	# are only 1.4 cm proud of the wall). The handle tops end at 138.5 cm,
+	# exactly where the rails run; the cabinet strips are at 143, clear above.
+	var rails := [[177.5, 0.95], [590.0, 1.0]]
+	for ri in 2:
+		var rcx := float(rails[ri][0])
+		var rlen := float(rails[ri][1])
+		box("Pan rail " + str(ri), W(rcx, 11, 138.5), Vector3(rlen, 0.014, 0.014), iron, decor, false)
+		var mi := 0
+		for mx in [rcx - rlen / 2.0 + 0.08, rcx + rlen / 2.0 - 0.08]:
+			box("Rail mount " + str(ri) + " " + str(mi), W(mx, 5.5, 138.5), Vector3(0.02, 0.02, 0.11), iron, decor, false)
+			mi += 1
+	var ceramic := mat(Color(0.92, 0.90, 0.85))
+	ceramic.roughness = 0.25
+	box("Dish rack", W(520, 40, 93), Vector3(0.36, 0.025, 0.26), mat(Color(0.88, 0.87, 0.84)), decor, false)
+	for i in 3:
+		var pl := _kcyl("Plate " + str(i), W(505.0 + float(i) * 11.0, 40, 99), 0.085, 0.008, ceramic)
+		pl.rotation.z = 1.35
+	# soap and sponge by the sink: the basin runs x 463–503, so both sit on
+	# solid counter — the soap east of the rack, the sponge west of the basin
+	_kcyl("Soap dispenser", W(530, 20, 97.5), 0.035, 0.11, mat(Color(0.90, 0.87, 0.80)))
+	_kcyl("Soap pump", W(530, 20, 104.5), 0.011, 0.04, iron)
+	box("Soap pump head", W(528, 20, 106.5), Vector3(0.05, 0.015, 0.02), iron, decor, false)
+	box("Sponge", W(455, 20, 93.5), Vector3(0.09, 0.03, 0.06), mat(Color(0.85, 0.75, 0.20)), decor, false)
+	var spice_cols := [Color(0.62, 0.25, 0.12), Color(0.80, 0.58, 0.15), Color(0.35, 0.45, 0.20), Color(0.90, 0.88, 0.82)]
+	for i in 4:
+		var sx := 100.0 + float(i) * 16.0
+		_kcyl("Spice jar " + str(i), W(sx, 12, 96.5), 0.026, 0.085, mat(spice_cols[i]))
+		_kcyl("Spice lid " + str(i), W(sx, 12, 101.3), 0.028, 0.014, mat(Color(0.20, 0.18, 0.16)))
+	_kcyl("Towel holder", W(700, 32, 92.6), 0.07, 0.012, iron)
+	_kcyl("Paper towel", W(700, 32, 104), 0.052, 0.23, mat(Color(0.94, 0.93, 0.90)))
+	var bin := _kcyl("Bin", W(565, 395, 18), 0.13, 0.36, iron)
+	bin.reparent(furn, true)  # it stands on the floor: under furn it gets a contact shadow like the furniture
+	_kcyl("Fruit bowl", W(708, 438, 81.5), 0.07, 0.05, ceramic, 0.11)
+	var fruit_cols := [Color(0.62, 0.16, 0.12), Color(0.85, 0.45, 0.12), Color(0.85, 0.70, 0.20)]
+	var fruit_pos := [[700.0, 432.0, 85.0], [716.0, 440.0, 85.5], [708.0, 445.0, 86.5]]
+	for i in 3:
+		var fr := MeshInstance3D.new()
+		fr.name = "Fruit " + str(i)
+		var sm := SphereMesh.new()
+		sm.radius = 0.034; sm.height = 0.068
+		fr.mesh = sm
+		fr.material_override = mat(fruit_cols[i])
+		decor.add_child(fr)
+		fr.global_position = W(fruit_pos[i][0], fruit_pos[i][1], fruit_pos[i][2])
+	# the towel hangs from a peg on the counter front (the front face is at
+	# y=72; the peg sticks out to 74.5, just above the towel's top edge at 78)
+	var peg := MeshInstance3D.new()
+	peg.name = "Towel hook"
+	var pgm := CylinderMesh.new()
+	pgm.top_radius = 0.008; pgm.bottom_radius = 0.008; pgm.height = 0.035
+	peg.mesh = pgm
+	peg.material_override = iron
+	peg.rotation.x = PI / 2.0
+	decor.add_child(peg)
+	peg.global_position = W(285, 73, 79)
+	box("Oven towel", W(285, 74, 66), Vector3(0.17, 0.24, 0.014), mat_named("tablecloth", Color(0.85, 0.50, 0.42)), decor, false)
 
 
 ## Tiles on the wall behind the worktops (a kitchen without a backsplash is a room with cupboards): small cream

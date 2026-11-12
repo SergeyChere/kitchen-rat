@@ -210,12 +210,16 @@ func build(list: Array) -> void:
 				for i in n:
 					var seg := {"x": x + w / n * i, "y": y, "w": w / n, "h": d}
 					place("furniture/counter_section", seg, "counter", 0.0, 0.0)
-			"fridge": place("furniture/fridge", f, "fridge", 0.0, null, "metal_matte")
+			"fridge":
+				var fn2 := place("furniture/fridge", f, "fridge", 0.0, null, "metal_matte")
+				_detail_for(t, f, fn2)
 			"island": place("furniture/kitchen_island", f, "island", 0.0, 180.0)
 			"box":
 				var ht := float(f.get("ht", 44))
 				place("furniture/cardboard_box_tall" if ht > 70.0 else "furniture/cardboard_box", f, "box", ht, null, "cardboard")
-			"crate": place("furniture/crate", f, "crate", float(f.get("ht", 40)), null, "wood_dark")
+			"crate":
+				var cr := place("furniture/crate", f, "crate", float(f.get("ht", 40)), null, "wood_dark")
+				_detail_for(t, f, cr)
 			"table":
 				var ht := float(f.get("ht", 79))
 				var model := "furniture/table_dining" if bool(f.get("dining", false)) else "furniture/table_kitchen"
@@ -226,6 +230,8 @@ func build(list: Array) -> void:
 					place("furniture/desk", f, "table", 0.0, 0.0)
 				else:
 					var n := place(model, f, "table", 0.0, 0.0)
+					if bool(f.get("dining", false)):
+						_detail_dining(f, n)
 					var cloth := n.find_child("tablecloth*", true, false) as Node3D if n else null
 					if cloth and int(f.get("cloth", 0)) == 0:
 						cloth.queue_free()
@@ -246,7 +252,8 @@ func build(list: Array) -> void:
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)
 			"coffeeTable":
-				place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
+				var ctn := place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
+				_detail_for(t, f, ctn)
 				hide("table", f)
 				# round 5: something to hide AMONG under the coffee table, not bare floor
 				# (at the zone's edge — the middle stays clear for her)
@@ -274,18 +281,22 @@ func build(list: Array) -> void:
 			"sofa", "armchair":
 				var face := str(f.get("face", "s"))
 				var r := 180.0 if face == "n" else (90.0 if face == "e" else (-90.0 if face == "w" else 0.0))
-				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
+				var sn := place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
+				_detail_for(t, f, sn)
 				hide("sofa", f, 12.0)
 				low_roof(f, 4.0)
 			"wall":
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)
 			"tvStand":
-				place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
+				var stand := place("furniture/tv_stand", f, "tv", 0.0, null, "wood_dark")
+				_detail_for(t, f, stand)
 				var tv := light(W(cx, y + d + 70, 90), Color(0.56, 0.7, 1.0), 1.6, 4.6, "tv")
 				g.tv_light = tv
 				tv.visible = not bool(g.night.get("tvOff", false))
-			"bookcase": place("furniture/bookcase", f, "bookcase", 0.0, null, "wood_dark")
+			"bookcase":
+				var bk := place("furniture/bookcase", f, "bookcase", 0.0, null, "wood_dark")
+				_detail_for(t, f, bk)
 			"fireplace":
 				place("furniture/fireplace", f, "fireplace")
 				var out := W(x + w + 30, cy, 40) if side(x, y, w, d) == "w" else W(cx, cy, 40)
@@ -306,17 +317,22 @@ func build(list: Array) -> void:
 				if pn:
 					g.plants.append([pn, pn.rotation, randf() * TAU])  # round 12: it sways
 			"washer":
-				place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				var wn := place("furniture/dryer" if bool(f.get("dryer", false)) else "furniture/washer", f, "washer", 0.0, null, "plastic")
+				_detail_for(t, f, wn)
 				if not _lamp_done:
 					_lamp_done = true
 					_washer_wall_lamp(x - 160.0)
 			"basket": place("furniture/laundry_basket", f, "basket", float(f.get("ht", 45)), null, "plastic")
 			"cans": place("furniture/cans_stack", f, "cans", float(f.get("ht", 30)))
-			"shelfUnit": place("furniture/shelf_unit", f, "shelf", 0.0, null, "wood")
+			"shelfUnit":
+				var su := place("furniture/shelf_unit", f, "shelf", 0.0, null, "wood")
+				_detail_for(t, f, su)
 			"boiler":
 				place("furniture/boiler", f, "boiler", 0.0, -90.0 if x > 480.0 else 90.0)
 				light(W(cx - 50, cy, 40), Color8(0xff, 0x8a, 0x3a), 1.4, 3.0)
-			"sideboard": place("furniture/sideboard", f, "sideboard", 0.0, null, "wood_dark")
+			"sideboard":
+				var sb := place("furniture/sideboard", f, "sideboard", 0.0, null, "wood_dark")
+				_detail_for(t, f, sb)
 			"cabinetTall":
 				# modelled long along its own Z, front toward +X: as is against the west wall
 				var n := b.spawn("furniture/cabinet_tall", W(cx, cy), 0.0 if x < 480.0 else 180.0, b.furn)
@@ -497,6 +513,48 @@ func dress(kind: String) -> void:
 				break
 			if _art_at(wall, float(along), arts[ai % arts.size()]):
 				ai += 1
+	# details (ported from round 17): wall outlets on the south wall, a light
+	# switch by the east wall — the door is always centred at y=300, so the
+	# switch at y=200 never lands on it
+	for ox in [300.0, 660.0]:
+		b.box("Outlet " + str(int(ox)), W(ox, 595, 30), Vector3(0.09, 0.13, 0.014), b.mat(Color(0.92, 0.90, 0.86)), b.furn, false)
+	b.box("Switch", W(953, 200, 115), Vector3(0.014, 0.13, 0.09), b.mat(Color(0.92, 0.90, 0.86)), b.furn, false)
+	if kind == "living":
+		# a radiator on the north wall's free stretch (x 110–280: the bookcase
+		# ends at 60, the TV stand starts at 330, night 19's partition at 296)
+		# and a slow ceiling fan. 0.45 m tall: a wall shelf hangs at 0.54 m
+		# and must never cut through it.
+		b.box("Radiator", W(195, 10, 24.5), Vector3(1.7, 0.45, 0.10), b.mat(Color(0.88, 0.86, 0.82)), b.furn, false)
+		b.box("Radiator top", W(195, 10, 48.5), Vector3(1.76, 0.03, 0.13), b.mat(Color(0.80, 0.78, 0.74)), b.furn, false)
+		var fan := Node3D.new()
+		fan.name = "Ceiling fan"
+		b.furn.add_child(fan)
+		fan.global_position = W(480, 300, 240)
+		var fm := b.mat(Color(0.25, 0.22, 0.20))
+		var rod := MeshInstance3D.new()
+		rod.name = "Fan rod"
+		var rm := CylinderMesh.new()
+		rm.top_radius = 0.014; rm.bottom_radius = 0.014; rm.height = 0.10
+		rod.mesh = rm; rod.material_override = fm; rod.position = Vector3(0, 0.05, 0)
+		fan.add_child(rod)
+		var hub := MeshInstance3D.new()
+		hub.name = "Fan hub"
+		var hm := CylinderMesh.new()
+		hm.top_radius = 0.055; hm.bottom_radius = 0.055; hm.height = 0.05
+		hub.mesh = hm; hub.material_override = fm
+		fan.add_child(hub)
+		for k in 4:
+			var piv := Node3D.new()
+			piv.name = "Blade pivot " + str(k)
+			piv.rotation.y = float(k) * PI / 2.0
+			fan.add_child(piv)
+			var bl := MeshInstance3D.new()
+			bl.name = "Fan blade " + str(k)
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.62, 0.012, 0.13)
+			bl.mesh = bm; bl.material_override = fm; bl.position = Vector3(0.38, 0, 0)
+			piv.add_child(bl)
+		g.spinners.append([fan, 2.4])
 	var extras := ["furniture/plant", "furniture/plant", "furniture/floor_lamp"]  # round 12 (asked): more houseplants — two per dressed room, not one
 	var ei := 0
 	for c in [[60, 60], [900, 60], [60, 540], [900, 540], [480, 560], [60, 300]]:
@@ -633,3 +691,194 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 		if model == "furniture/plant":
 			g.plants.append([n, n.rotation, randf() * TAU])  # round 12: it sways
 	return n != null
+
+
+# ---------- details, ported from round 17 (muse/demo-polish) onto main ----------
+## Small set dressing scattered over every placed piece, at Muse's discretion
+## (Sergii reviews in game and vetoes). Everything is non-solid decor parented
+## to b.furn; positions come from each model's measured world AABB, so a detail
+## lands on the piece whatever wall it stands against.
+## Port notes (details-ui): every detail node gets a unique name — Godot
+## renames duplicate children to @ClassName@N, which broke node counts in
+## probes and risks collisions. Names carry the piece tag (type + map position)
+## and an index inside rows.
+
+const DETAIL_INK := [Color(0.55, 0.25, 0.18), Color(0.32, 0.38, 0.22), Color(0.62, 0.48, 0.28), Color(0.36, 0.36, 0.44), Color(0.48, 0.28, 0.36), Color(0.55, 0.52, 0.42)]
+
+
+## A short tag unique to one placed piece: its type + map position.
+func _dtag(t: String, f: Dictionary) -> String:
+	return t + "_" + str(int(float(f.x))) + "_" + str(int(float(f.y)))
+
+
+func _aabb_of(n: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if LevelBuilder._soft(m.name):
+			continue
+		var bb: AABB = m.global_transform * m.get_aabb()
+		box = bb if first else box.merge(bb)
+		first = false
+	return box
+
+
+func _dcyl(nm: String, center: Vector3, r: float, h: float, m: Material, r_top := -1.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = nm
+	var cm := CylinderMesh.new()
+	cm.top_radius = r if r_top < 0.0 else r_top
+	cm.bottom_radius = r
+	cm.height = h
+	mi.mesh = cm
+	mi.material_override = m
+	b.furn.add_child(mi)
+	mi.global_position = center
+	return mi
+
+
+func _book_row(center: Vector3, along_x: bool, length: float, seedv: float, tag: String) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(seedv * 1000.0) + 7
+	var off := -length / 2.0
+	var bi := 0
+	while off < length / 2.0 - 0.04:
+		var bw := rng.randf_range(0.022, 0.040)
+		var bh := rng.randf_range(0.16, 0.24)
+		var col: Color = DETAIL_INK[rng.randi() % DETAIL_INK.size()] * rng.randf_range(0.8, 1.15)
+		var c := center + (Vector3(off + bw / 2.0, bh / 2.0, 0) if along_x else Vector3(0, bh / 2.0, off + bw / 2.0))
+		var bk := b.box("Book " + tag + " " + str(bi), c, Vector3(bw, bh, 0.13) if along_x else Vector3(0.13, bh, bw), b.mat(col), b.furn, false)
+		bk.rotation.y = rng.randf_range(-0.03, 0.03)
+		off += bw + rng.randf_range(0.0, 0.012)
+		bi += 1
+
+
+func _jar_row(center: Vector3, along_x: bool, count: int, seedv: float, tag: String) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(seedv * 777.0) + 3
+	var glass := b.mat(Color(0.82, 0.78, 0.66))
+	glass.roughness = 0.15
+	for i in count:
+		var k := (float(i) - float(count - 1) / 2.0) * 0.095
+		var c := center + (Vector3(k, 0.05, 0) if along_x else Vector3(0, 0.05, k))
+		_dcyl("Jar " + tag + " " + str(i), c, 0.034, 0.10, glass)
+		var lid := _dcyl("Jar lid " + tag + " " + str(i), c + Vector3(0, 0.058, 0), 0.036, 0.016, b.mat(DETAIL_INK[rng.randi() % DETAIL_INK.size()]))
+		lid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func _detail_for(t: String, f: Dictionary, n: Node3D) -> void:
+	if n == null:
+		return
+	var ab := _aabb_of(n)
+	if ab.size == Vector3.ZERO:
+		return
+	var c := ab.get_center()
+	var top := ab.end.y
+	var tag := _dtag(t, f)
+	var sd := side(float(f.x), float(f.y), float(f.get("w", 0)), float(f.get("h", 0)))
+	match t:
+		"sofa", "armchair":
+			var along_x := ab.size.x >= ab.size.z
+			var cnt := 3 if t == "sofa" else 1
+			var rng := RandomNumberGenerator.new()
+			rng.seed = int(c.x * 91.0 + c.z * 57.0)
+			for i in cnt:
+				var k := (float(i) + 0.5) / float(cnt) - 0.5
+				var pos := c + (Vector3(k * ab.size.x * 0.62, 0, -ab.size.z * 0.16) if along_x else Vector3(-ab.size.x * 0.16, 0, k * ab.size.z * 0.62))
+				pos.y = ab.position.y + ab.size.y * 0.52
+				var cu := b.box("Cushion " + tag + " " + str(i), pos, Vector3(0.34, 0.13, 0.30), b.mat(DETAIL_INK[rng.randi() % DETAIL_INK.size()]), b.furn, false)
+				cu.rotation.y = rng.randf_range(-0.15, 0.15)
+				cu.rotation.z = rng.randf_range(-0.08, 0.08)
+			if t == "sofa":
+				var tp := c + (Vector3(ab.size.x * 0.38, 0, 0) if along_x else Vector3(0, 0, ab.size.z * 0.38))
+				tp.y = ab.position.y + ab.size.y * 0.68
+				b.box("Throw " + tag, tp, Vector3(0.5, 0.05, ab.size.z * 0.8) if along_x else Vector3(ab.size.x * 0.8, 0.05, 0.5), b.mat_named("fabric", Color(0.75, 0.60, 0.45)), b.furn, false)
+		"bookcase":
+			var along_x := sd == "n" or sd == "s"
+			for lvl in [0.20, 0.47, 0.74]:
+				var ctr := c
+				ctr.y = ab.position.y + ab.size.y * lvl
+				if sd == "n": ctr.z = ab.end.z - 0.10
+				elif sd == "s": ctr.z = ab.position.z + 0.10
+				elif sd == "w": ctr.x = ab.end.x - 0.10
+				else: ctr.x = ab.position.x + 0.10
+				_book_row(ctr, along_x, (ab.size.x if along_x else ab.size.z) * 0.82, c.x + lvl * 10.0, tag + "_" + str(int(lvl * 100)))
+		"shelfUnit":
+			var along_x2 := sd == "n" or sd == "s"
+			for lvl in [0.30, 0.62]:
+				var ctr := c
+				ctr.y = ab.position.y + ab.size.y * lvl
+				if sd == "n": ctr.z = ab.end.z - 0.09
+				elif sd == "s": ctr.z = ab.position.z + 0.09
+				elif sd == "w": ctr.x = ab.end.x - 0.09
+				else: ctr.x = ab.position.x + 0.09
+				_jar_row(ctr, along_x2, 4, c.x + lvl * 10.0, tag + "_" + str(int(lvl * 100)))
+		"washer":
+			_dcyl("Detergent " + tag, c + Vector3(ab.size.x * 0.24, top + 0.08, 0), 0.045, 0.16, b.mat(Color(0.85, 0.45, 0.15)))
+			_dcyl("Detergent cap " + tag, c + Vector3(ab.size.x * 0.24, top + 0.175, 0), 0.02, 0.03, b.mat(Color(0.2, 0.2, 0.22)))
+			for i in 2:
+				b.box("Folded towel " + tag + " " + str(i), c + Vector3(-ab.size.x * 0.22, top + 0.026 + float(i) * 0.052, 0), Vector3(0.30, 0.05, 0.24), b.mat(Color(0.88, 0.85, 0.78) if i == 0 else Color(0.62, 0.68, 0.60)), b.furn, false)
+		"tvStand":
+			b.box("Remote " + tag, c + Vector3(-ab.size.x * 0.2, top + 0.012, 0), Vector3(0.16, 0.02, 0.05), b.mat(Color(0.08, 0.08, 0.09)), b.furn, false)
+			for i in 2:
+				var gc := b.box("Game case " + tag + " " + str(i), c + Vector3(ab.size.x * (0.12 + 0.03 * float(i)), top + 0.09, 0), Vector3(0.135, 0.18, 0.014), b.mat(DETAIL_INK[i % DETAIL_INK.size()]), b.furn, false)
+				gc.rotation.z = -0.10
+		"sideboard":
+			_dcyl("Vase " + tag, c + Vector3(-ab.size.x * 0.25, top + 0.11, 0), 0.045, 0.22, b.mat(Color(0.45, 0.52, 0.48)), 0.028)
+			var ball := MeshInstance3D.new()
+			ball.name = "Vase greens " + tag
+			var sm := SphereMesh.new()
+			sm.radius = 0.085; sm.height = 0.17
+			ball.mesh = sm
+			ball.material_override = b.mat(Color(0.25, 0.38, 0.18))
+			b.furn.add_child(ball)
+			ball.global_position = c + Vector3(-ab.size.x * 0.25, top + 0.28, 0)
+			for i in 2:
+				b.box("Book stack " + tag + " " + str(i), c + Vector3(ab.size.x * 0.22, top + 0.013 + float(i) * 0.027, 0), Vector3(0.24 - 0.03 * float(i), 0.026, 0.17), b.mat(DETAIL_INK[(i + 2) % DETAIL_INK.size()]), b.furn, false)
+		"fridge":
+			var dir := Vector3.ZERO
+			match sd:
+				"n": dir = Vector3(0, 0, 1)
+				"s": dir = Vector3(0, 0, -1)
+				"w": dir = Vector3(1, 0, 0)
+				_: dir = Vector3(-1, 0, 0)
+			var face := c + dir * (ab.size.z * 0.5 + 0.006 if dir.z != 0.0 else ab.size.x * 0.5 + 0.006)
+			var rng2 := RandomNumberGenerator.new()
+			rng2.seed = int(c.x * 31.0 + c.z * 17.0)
+			var nsz := Vector3(0.13, 0.17, 0.006) if dir.z != 0.0 else Vector3(0.006, 0.17, 0.13)
+			b.box("Fridge note " + tag, Vector3(face.x, ab.position.y + ab.size.y * 0.68, face.z), nsz, b.mat(Color(0.94, 0.92, 0.85)), b.furn, false)
+			for i in 5:
+				var mp := Vector3(face.x, ab.position.y + ab.size.y * rng2.randf_range(0.45, 0.8), face.z)
+				if dir.z != 0.0: mp.x += rng2.randf_range(-0.3, 0.3)
+				else: mp.z += rng2.randf_range(-0.3, 0.3)
+				b.box("Magnet " + tag + " " + str(i), mp, Vector3(0.028, 0.028, 0.008) if dir.z != 0.0 else Vector3(0.008, 0.028, 0.028), b.mat(DETAIL_INK[rng2.randi() % DETAIL_INK.size()]), b.furn, false)
+		"crate":
+			_jar_row(Vector3(c.x, top, c.z), true, 2, c.x, tag)
+		"coffeeTable":
+			for i in 2:
+				b.box("Book stack " + tag + " " + str(i), c + Vector3(-ab.size.x * 0.18, top + 0.013 + float(i) * 0.027, 0), Vector3(0.24 - 0.03 * float(i), 0.026, 0.17), b.mat(DETAIL_INK[(i + 1) % DETAIL_INK.size()]), b.furn, false)
+			_dcyl("Mug " + tag, c + Vector3(ab.size.x * 0.2, top + 0.04, ab.size.z * 0.15), 0.035, 0.08, b.mat(Color(0.75, 0.35, 0.25)))
+
+
+func _detail_dining(f: Dictionary, n: Node3D) -> void:
+	if n == null:
+		return
+	var ab := _aabb_of(n)
+	if ab.size == Vector3.ZERO:
+		return
+	var c := ab.get_center()
+	var top := ab.end.y
+	var tag := _dtag("dining", f)
+	var along_x := ab.size.x >= ab.size.z
+	var pm := b.mat_named("fabric", Color(0.55, 0.48, 0.40))
+	var pi := 0
+	for sx in [-0.30, 0.30]:
+		for sz in [-0.30, 0.30]:
+			var pos := c + (Vector3(sx * ab.size.x, 0, sz * ab.size.z) if along_x else Vector3(sz * ab.size.x, 0, sx * ab.size.z))
+			pos.y = top + 0.004
+			b.box("Placemat " + tag + " " + str(pi), pos, Vector3(0.40, 0.006, 0.28), pm, b.furn, false)
+			pi += 1
+	_dcyl("Centerpiece " + tag, c + Vector3(0, top + 0.07, 0), 0.05, 0.14, b.mat(Color(0.50, 0.42, 0.30)), 0.032)
+	_dcyl("Candle " + tag + " 0", c + Vector3(0.16, top + 0.05, 0.1), 0.018, 0.10, b.mat(Color(0.93, 0.90, 0.82)))
+	_dcyl("Candle " + tag + " 1", c + Vector3(-0.16, top + 0.035, -0.1), 0.018, 0.07, b.mat(Color(0.93, 0.90, 0.82)))

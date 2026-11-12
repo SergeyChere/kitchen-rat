@@ -35,6 +35,7 @@ var curtains: Array = []  # the window's curtain nodes — they sway
 var plants: Array = []  # round 12: houseplants — [node, base rotation, phase]; they sway too, gently
 var kettle_pos: Variant = null  # the kettle's spot; world_fx steams here
 var garland: Array = []  # [bulb material, phase] — the living-room garland (round 5)
+var spinners: Array = []  # details branch: ceiling fans — [node, rad/s], turned in _tick_props
 var _door_a := 0.0
 var noisy: Array = []
 var gnaws: Array = []
@@ -394,6 +395,37 @@ func _make_extras() -> void:
 		vm.position = Vector3.ZERO
 		vacuum.dock = Nights.pos(dock) + Vector3(-0.3, 0, 0)
 		vacuum.global_position = vacuum.dock
+		# details branch: a charging pad under it, so the "dock" is a thing you
+		# can see — a low dark disc with a small amber status light — not a bare
+		# floor spot. 10 mm tall: the vacuum's base overlaps it by that much,
+		# hidden inside the model's dark underside. No collider: the vacuum's
+		# pathing and the NavGrid never notice it.
+		var pad := MeshInstance3D.new()
+		pad.name = "Vacuum dock pad"
+		var pad_mesh := CylinderMesh.new()
+		pad_mesh.top_radius = 0.26
+		pad_mesh.bottom_radius = 0.26
+		pad_mesh.height = 0.01
+		pad.mesh = pad_mesh
+		var pad_mat := StandardMaterial3D.new()
+		pad_mat.albedo_color = Color(0.10, 0.10, 0.11)
+		pad_mat.roughness = 0.6
+		pad.material_override = pad_mat
+		pad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(pad)
+		pad.global_position = vacuum.dock + Vector3(0, 0.005, 0)
+		var pad_led := MeshInstance3D.new()
+		pad_led.name = "Vacuum dock light"
+		var led_mesh := BoxMesh.new()
+		led_mesh.size = Vector3(0.05, 0.006, 0.012)
+		pad_led.mesh = led_mesh
+		var led_mat := StandardMaterial3D.new()
+		led_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		led_mat.albedo_color = Color(1.0, 0.62, 0.2)
+		pad_led.material_override = led_mat
+		pad_led.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(pad_led)
+		pad_led.global_position = vacuum.dock + Vector3(0.20, 0.011, 0)
 		vacuum.grid = NavGrid.new(self, [], 0.04, 0.075, 0.05)
 		# it sits on its dock, charging; on its own nights it wakes up after a while (vacuumDelay, seconds of
 		# play), on the others an event starts it
@@ -1359,6 +1391,8 @@ func _tick_props(dt: float) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	for i in curtains.size():
 		(curtains[i] as Node3D).rotation.y = sin(t * 0.9 + float(i) * 2.1) * 0.045
+	for sp in spinners:
+		(sp[0] as Node3D).rotation.y += dt * float(sp[1])
 	for pl in plants:
 		# round 12: a houseplant breathes — a slow two-axis tilt around its base
 		# rotation, a couple of degrees at most, each on its own phase

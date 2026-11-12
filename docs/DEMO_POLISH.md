@@ -653,3 +653,40 @@ and the rat up close, the mouse hole and the door.
 **Not checked.** Pups and the owner up close; fur in motion; the
 cost of fur + depth of field on the user's laptop (both can be
 switched off: quality low, or the DOF checkbox).
+
+
+## Details branch — round-17 details ported onto main (2026-11-12)
+
+`muse/details-ui`, branched from `main` at f75b71f. The old
+`muse/demo-polish` was abandoned: main had moved on with the look pass
+(round 13 above), and only the details were worth keeping. The round-17
+details pass is ported onto current main — nothing else from the old
+branch: no run-up jump, no owner refractory, no tunnel ring-links, no
+cat drop-in, no textures-v2 plumbing.
+
+Ported: the detail system in `room_furniture.gd` (`_detail_for`,
+`_detail_dining`, book/jar rows, cushions, fridge magnets, dining
+dressing), the dress() extras (outlets, switch, radiator, ceiling fan
++ `g.spinners` in `game.gd`), and `_kitchen_details` in
+`level_builder.gd` (hanging pans, dish rack, spice jars, paper towel,
+bin, fruit bowl, oven towel).
+
+Refined while porting:
+- Every detail node gets a unique name (piece tag = type + map
+  position, plus an index inside rows). Godot renames duplicate
+  children to `@ClassName@N`, which broke node counts in probes and
+  risks collisions.
+- The living-room radiator moved from x=480 to x=195: at 480 it sat
+  inside the TV stand's volume (nights 2/3/10/17/20) — invisible and
+  intersecting. It is 0.45 m tall now, so a wall shelf (0.54 m) never
+  cuts through it.
+- The hanging pans got rails: two wall rails with standoff mounts —
+  pans no longer hang from thin air. The oven towel got a hook peg,
+  since main has no oven door to hang it on.
+- Sink zone: a soap dispenser and a sponge by the sink, clear of the
+  basin (x 463–503) and the dish rack. The vacuum's dock got a
+  charging pad with a small amber status light.
+- The fridge note/magnets, book/jar rows and AABB placement were
+  re-checked against main's furniture: night JSONs and the room
+  layouts are unchanged since the merge, so the measured positions
+  still land.
