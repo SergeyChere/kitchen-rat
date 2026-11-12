@@ -614,6 +614,92 @@ func build_contents() -> void:
 	_knockables()
 	_food()
 	_traps()
+	_ground_shadows()
+
+
+## Soft dark patches on the floor under every piece of furniture and along the foot of the walls (what a
+## renderer with ambient occlusion would give): without them the furniture floats on the floor and the room has
+## no corners. One flat quad per piece, the piece's footprint with a feathered edge; lighter and wider under
+## things on legs.
+const GROUND_SHADOW := """
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, shadows_disabled;
+uniform vec2 inner = vec2(0.5, 0.5);  // half footprint (m)
+uniform vec2 quad = vec2(1.0, 1.0);   // the quad's full size (m)
+uniform float feather = 0.16;
+uniform float strength = 0.4;
+void fragment() {
+	vec2 p = (UV - 0.5) * quad;
+	vec2 q = abs(p) - inner;
+	float d = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0);  // distance outside the footprint
+	float a = 1.0 - smoothstep(-feather * 0.35, feather, d);
+	ALBEDO = vec3(0.015, 0.02, 0.06);
+	ALPHA = a * a * strength;
+}
+"""
+var _gs_shader: Shader
+
+
+func _ground_shadow(at: Vector3, half: Vector2, yaw: float, feather: float, strength: float, parent: Node) -> void:
+	if _gs_shader == null:
+		_gs_shader = Shader.new()
+		_gs_shader.code = GROUND_SHADOW
+	var mi := MeshInstance3D.new()
+	mi.name = "Ground shadow"
+	var pm := PlaneMesh.new()
+	var full := (half + Vector2(feather, feather)) * 2.0
+	pm.size = full
+	mi.mesh = pm
+	var sm := ShaderMaterial.new()
+	sm.shader = _gs_shader
+	sm.set_shader_parameter("inner", half)
+	sm.set_shader_parameter("quad", full)
+	sm.set_shader_parameter("feather", feather)
+	sm.set_shader_parameter("strength", strength)
+	sm.render_priority = -1
+	mi.material_override = sm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	mi.global_position = at
+	mi.rotation.y = yaw
+
+
+func _ground_shadows() -> void:
+	if OS.get_environment("HIDE").contains("ao"):  # dev: compare
+		return
+	var grp := group("Ground shadows")
+	for c in furn.get_children():
+		var n := c as Node3D
+		if n == null or not n.visible:
+			continue
+		var nm := str(n.name).to_lower()
+		var skip := false
+		for k in ["rug", "carpet", "door", "window", "curtain", "mat_", "garland", "wall", "picture", "shadow"]:
+			if nm.contains(k):
+				skip = true
+		if skip:
+			continue
+		var box := aabb_of(n)
+		var wb := n.global_transform * box
+		if wb.position.y > 0.06 or wb.size.y < 0.04 or box.size.x <= 0.0:
+			continue  # hangs on a wall, or lies flat
+		var sc := n.global_transform.basis.get_scale()
+		var half := Vector2(box.size.x * sc.x, box.size.z * sc.z) * 0.5
+		if half.x > 2.6 or half.y > 2.6:
+			continue
+		var legs := false
+		for k in ["table", "chair", "stool", "desk", "bench", "crib", "cart", "ladder", "horse", "easel", "floor_lamp", "plant"]:
+			if nm.contains(k):
+				legs = true
+		var centre := n.global_transform * (box.position + box.size * 0.5)
+		_ground_shadow(Vector3(centre.x, 0.004, centre.z), half * (0.82 if legs else 1.0), n.global_rotation.y, 0.24 if legs else 0.15, 0.3 if legs else 0.5, grp)
+	# the foot of the four walls
+	var w := Nights.ROOM_W / 100.0
+	var d := Nights.ROOM_D / 100.0
+	var o := Nights.world(0, 0)
+	for wall in [[Vector3(o.x + w * 0.5, 0.003, o.z), Vector2(w * 0.5, 0.02)], [Vector3(o.x + w * 0.5, 0.003, o.z + d), Vector2(w * 0.5, 0.02)],
+			[Vector3(o.x, 0.003, o.z + d * 0.5), Vector2(0.02, d * 0.5)], [Vector3(o.x + w, 0.003, o.z + d * 0.5), Vector2(0.02, d * 0.5)]]:
+		_ground_shadow(wall[0], wall[1], 0.0, 0.38, 0.34, grp)
 
 
 func _lighting() -> void:
