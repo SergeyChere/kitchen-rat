@@ -599,3 +599,57 @@ Playtest reports, three of them:
 pass; nights 2, 3, 4, 8 boot clean; hides nights 2 and 4, cat and
 physics night 5 pass.
 
+
+## Round 13 — the look pass toward It Takes Two (2026-11-12)
+
+The target the user named is It Takes Two: not to match it, to move
+toward it. Everything here stays on the Compatibility renderer (the
+user's laptop does not start Forward+), and each item was pushed to
+`main` as its own small commit.
+
+1. **Kitchen.** The first room was the weakest: an ultramarine floor,
+   a worktop clipped to white, a washed-out tablecloth, a black
+   ceiling. Floor tiles are a muted slate with half-contrast detail,
+   walls a warm white (they read blue in the night ambient), the
+   island and cloth are textured, the ceiling glows faintly.
+2. **Smooth characters.** Models arrive flat-shaded (four vertices
+   per point). `LevelBuilder.smooth_mesh` averages normals per
+   position (keeps creases), stores the rest position in CUSTOM0
+   and is cached; `FLAT=1` shows the models as authored.
+3. **Fur.** Shell fur, 14 layers, on materials named Grey/White of
+   the rat, pups and cat: dense, jittered, combed back, lighter at
+   the roots. Off on quality low and with `NOFUR=1`. The shader has
+   its own `light()` — direct light at 0.74, and the glow along the
+   edge needs the light to actually reach it.
+4. **Ground shadows.** No SSAO in Compatibility, so every piece of
+   furniture standing on the floor and every wall gets a soft
+   painted contact shadow (`_ground_shadows`, `HIDE=ao` to compare).
+5. **Warm against cold.** Every room: a glowing gap under the door,
+   a warm wedge on the floor, a small spill light. Kitchens: a
+   plug-in night-light by the mouse hole. `HIDE=warm` to compare.
+   **Lesson:** Godot's omni lights follow an inverse-power law; a
+   lamp 10 cm from a wall with a falloff of 1.5 gives that wall
+   ~40× its energy. Both lamps now use a falloff of 0.6, a third of
+   the energy and sit further from the surface.
+6. **Depth of field.** `Dof` (scripts/dof.gd): a full-screen quad on
+   the camera reading the screen and depth textures, 12 taps, far
+   blur only. Setting "Depth of field (soft background)"; off on
+   quality low; `HIDE=dof` to compare.
+7. **A living rat.** A glint in each eye (a small white sphere on
+   the Head bone), light on the edge of the coat.
+8. **Main menu.** The night-1 kitchen is built behind the menu
+   (`Game.backdrop`): no HUD, no rules; she stands in the moon
+   patch near her door and sniffs the air now and then, a camera
+   drifts past at floor height. The menu sits on the left; Nights,
+   Achievements and Settings keep the room visible through a veil.
+   Dev: `--via_menu`, `--no_backdrop`,
+   `BACK="x,y,facex,facey,lift,side,r"`.
+
+**Checked.** Night 1 CI set after every item; night start through
+the menu (`--via_menu --test=bugs`); screenshots of the kitchen,
+living rooms (nights 2, 3), pantry (4), kitchen night 5, the cat
+and the rat up close, the mouse hole and the door.
+
+**Not checked.** Pups and the owner up close; fur in motion; the
+cost of fur + depth of field on the user's laptop (both can be
+switched off: quality low, or the DOF checkbox).
