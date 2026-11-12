@@ -80,7 +80,22 @@ func _init() -> void:
 
 
 ## Called by the camera every frame: `focus` is the distance to the rat; `on` hides it (first person, Low…).
+## A safety net for slow graphics cards: the blur reads the screen a dozen times per pixel. If the game stays
+## under 24 frames a second for five seconds while it is on, it switches itself off for the rest of the session
+## (the setting is left alone) and says so once.
+static var gave_up := false
+static var watch := true  # (off for screenshots: software rendering is always "slow")
+var _slow := 0.0
+
+
 func tick(focus: float, on: bool) -> void:
-	visible = on and Settings.dof and Settings.quality != "low" and not OS.get_environment("HIDE").contains("dof")
+	visible = on and not gave_up and Settings.dof and Settings.quality != "low" and not OS.get_environment("HIDE").contains("dof")
+	if visible and watch and Game.I and Game.I.state == "play" and DisplayServer.get_name() != "headless":
+		var fps := Engine.get_frames_per_second()
+		_slow = _slow + get_process_delta_time() if fps > 1.0 and fps < 24.0 else 0.0
+		if _slow > 5.0:
+			gave_up = true
+			visible = false
+			Game.I.toast("Depth of field turned off to keep the game smooth")
 	if visible:
 		mat.set_shader_parameter("focus", focus)

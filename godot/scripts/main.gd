@@ -29,6 +29,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
+	Dof.watch = not _args.has("shot")
 	if _args.has("quality"):  # dev: --quality=low|medium|high for screenshots (not saved)
 		Settings.quality = str(_args.quality)
 	if _args.has("night"):
@@ -49,8 +50,39 @@ func _exit_tree() -> void:
 	TextureLib.shutdown()
 
 
+var _fps: Label
+var _fps_t := 0.0
+
+## Frames per second in the top right corner (Settings → Show FPS).
+func _tick_fps(dt: float) -> void:
+	if not Settings.show_fps:
+		if _fps:
+			_fps.visible = false
+		return
+	if _fps == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 60
+		add_child(layer)
+		_fps = Label.new()
+		_fps.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		_fps.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		_fps.offset_right = -6
+		_fps.offset_top = 2
+		_fps.add_theme_font_size_override("font_size", 14)
+		_fps.add_theme_color_override("font_color", Color(0.75, 1.0, 0.75))
+		_fps.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		_fps.add_theme_constant_override("outline_size", 4)
+		layer.add_child(_fps)
+	_fps.visible = true
+	_fps_t -= dt
+	if _fps_t <= 0.0:
+		_fps_t = 0.5
+		_fps.text = "%d FPS" % int(Engine.get_frames_per_second())
+
+
 func _process(_dt: float) -> void:
 	_frames += 1
+	_tick_fps(_dt)
 	if _args.has("auto") and game and game.state == "intro" and game.grid != null:
 		game.begin()
 		if _args.has("at"):

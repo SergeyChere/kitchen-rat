@@ -164,6 +164,7 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 	_check(grid, "Fullscreen", Settings.fullscreen, func(v): Settings.fullscreen = v; Settings.save())
 	_check(grid, "VSync", Settings.vsync, func(v): Settings.vsync = v; Settings.save())
 	_check(grid, "Depth of field (soft background)", Settings.dof, func(v): Settings.dof = v; Settings.save())
+	_check(grid, "Show FPS", Settings.show_fps, func(v): Settings.show_fps = v; Settings.save())
 	_check(grid, "Hints", Settings.hints, func(v): Settings.hints = v)
 	_check(grid, "Calm mode (more time, quieter cat)", Settings.calm, func(v): Settings.calm = v)
 	_check(grid, "Colour-blind scents (poison purple)", Settings.colorblind, func(v): Settings.colorblind = v)
