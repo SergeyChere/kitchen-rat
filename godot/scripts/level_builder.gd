@@ -1818,7 +1818,9 @@ func _nest() -> void:
 	box("Side", W(5, 690, 50), Vector3(0.1, 1.0, 1.9), earth, nest)
 	box("Side", W(255, 690, 50), Vector3(0.1, 1.0, 1.9), earth, nest)
 	var roof := box("Roof", W(130, 690, 95), Vector3(2.6, 0.1, 1.9), earth, nest)
-	collide(spawn("rooms/nest", W(90, 725), 0.0, nest))
+	var heap := spawn("rooms/nest", W(90, 725), 0.0, nest)
+	collide(heap)
+	apply_texture(heap, "wood", Color.WHITE, 0.85)  # the twigs get a grain (the paper scraps stay plain)
 	# round 5: the nest's light had no source (a bare omni mid-air) and the burrow read flat.
 	# Now the light SPILLS THROUGH THE MOUSE HOLE from the kitchen: the lamp sits just inside
 	# the hole, a warm glow disc marks the hole itself, and bedding mounds + a cloth give the
@@ -1833,7 +1835,7 @@ func _nest() -> void:
 	var light := SpotLight3D.new()
 	light.name = "Hole light"
 	light.light_color = Color8(0xff, 0xd0, 0xa0)
-	light.light_energy = 1.5
+	light.light_energy = 1.0   # (1.5 + the fill turned the brown twigs orange and her coat white: a burrow is dim)
 	light.spot_range = 3.2
 	light.spot_angle = 62.0
 	light.spot_angle_attenuation = 0.6
@@ -1844,7 +1846,7 @@ func _nest() -> void:
 	var fillc := OmniLight3D.new()  # the bounce of that light off the floor: keeps the corners readable
 	fillc.name = "Burrow fill"
 	fillc.light_color = Color8(0xe8, 0xa8, 0x78)
-	fillc.light_energy = 0.7
+	fillc.light_energy = 0.45
 	fillc.omni_range = 2.6
 	fillc.omni_attenuation = 0.8
 	nest.add_child(fillc)
