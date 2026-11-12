@@ -17,6 +17,9 @@ var _led: OmniLight3D
 var _wait := -1.0        # seconds of play until it wakes up by itself (-1: it waits for an event)
 var _charge: OmniLight3D # the slow amber "charging" light while it sits on its dock
 var _said := false
+var _battery := 0.0      # seconds of work left before it heads home
+var _homing := false     # battery low: driving back to the dock
+var _hum: Node
 
 
 ## It starts the night on its dock, charging: there to be seen (and dreaded) before it moves.
@@ -43,8 +46,11 @@ func start() -> void:
 		_charge.queue_free()
 		_charge = null
 	path.clear()
+	_battery = float(G.night.get("vacuumWork", 80.0))
+	_homing = false
+	_said = false
 	Sfx.play("beep", global_position)
-	Sfx.loop("hum_loop", self)
+	_hum = Sfx.loop("hum_loop", self)
 	_led = OmniLight3D.new()
 	_led.light_color = Color(0.4, 1.0, 0.5)
 	_led.light_energy = 0.8
@@ -62,6 +68,26 @@ func stun() -> void:
 	Sfx.play("beep", global_position, 0.0, 0.8)
 	G.bubble_on("Error: obstacle", self, 0.3, 1.6)
 	G.tasks.set_flag("vacBlock")
+
+
+## Back on the dock with an empty battery: quiet again, the amber light breathing, until it has charged
+## (vacuumCharge seconds of play, 35 by default) — the floor is hers for that long.
+func _dock() -> void:
+	on = false
+	_homing = false
+	path.clear()
+	speed = 0.0
+	if rat.carrier == self:
+		rat.carrier = null
+	if _hum and is_instance_valid(_hum):
+		_hum.queue_free()
+	_hum = null
+	if _led:
+		_led.queue_free()
+		_led = null
+	Sfx.play("beep", global_position, -4.0, 0.8)
+	G.bubble_on("Charging…", self, 0.3, 1.8)
+	park(float(G.night.get("vacuumCharge", 35.0)))
 
 
 func _process(dt: float) -> void:
@@ -100,7 +126,22 @@ func _process(dt: float) -> void:
 		G.bubble_at("Wheee!", rp + Vector3.UP * 0.3, 1.2)
 	if rat.carrier == self and (not rat.sneaking or rat.jumping):
 		rat.carrier = null
-	if path.is_empty():
+	# the battery: after vacuumWork seconds (80 by default) it turns for home, docks and charges
+	_battery -= dt
+	if _battery <= 0.0 and not _homing:
+		_homing = true
+		path = grid.find_path(global_position, dock)
+		Sfx.play("beep", global_position, -4.0, 0.7)
+		G.bubble_on("Battery low", self, 0.3, 2.0)
+	if _homing:
+		if _led:
+			_led.light_color = Color(1.0, 0.62, 0.2)
+		if global_position.distance_to(dock) < 0.14 or path.is_empty():
+			if global_position.distance_to(dock) < 0.4:
+				_dock()
+				return
+			path = grid.find_path(global_position, dock)
+	elif path.is_empty():
 		var t: Vector3
 		if randf() < 0.4:
 			t = grid.free_point(rp + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5)))

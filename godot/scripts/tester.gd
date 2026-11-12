@@ -41,6 +41,29 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "vacuum":  # night 16 or 19: the robot's whole round — dock, work, battery low, home, charge, out again
+		var v := g.vacuum
+		_check("the vacuum waits on its dock, switched off", v != null and v.visible and not v.on and v.global_position.distance_to(v.dock) < 0.05)
+		g.night["vacuumWork"] = 3.0
+		g.night["vacuumCharge"] = 3.0
+		v.start()
+		await _wait(host, 2.0)
+		_check("it drives off", v.on and v.global_position.distance_to(v.dock) > 0.15, "%.2f m from the dock" % v.global_position.distance_to(v.dock))
+		var docked := false
+		for i in 900:
+			await host.get_tree().physics_frame
+			if not v.on:
+				docked = true
+				break
+		_check("battery low: it comes home and switches off", docked and v.global_position.distance_to(v.dock) < 0.05, "%.2f m from the dock" % v.global_position.distance_to(v.dock))
+		var again := false
+		for i in 600:
+			await host.get_tree().physics_frame
+			if v.on:
+				again = true
+				break
+		_check("charged: it goes out again", again)
+		return
 	if name == "climb":
 		var r := g.rat
 		await _wait(host, 0.5)
