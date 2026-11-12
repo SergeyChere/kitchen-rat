@@ -1,6 +1,7 @@
 class_name TextureLib
 extends RefCounted
 ## Round 6: where a material's texture comes from, in order:
+##   0. res://assets/painted/ — the watercolour pictures (round 14): painted by tools/paint_textures.py or by hand
 ##   1. user://textures/   — the CDN pack, downloaded once in the background (below)
 ##   2. res://assets/textures/ — a file committed to the repo or dropped in by hand
 ##   3. user://gen_textures/ — painted by TextureGen on an earlier launch
@@ -12,6 +13,7 @@ extends RefCounted
 ## no pack published yet — silently falls back to the painted textures. The game
 ## never waits for the network.
 
+const PAINTED_DIR := "res://assets/painted"  # hand-painted (watercolour) pictures: they win over everything
 const USER_DIR := "user://textures"
 const GEN_DIR := "user://gen_textures"
 
@@ -21,10 +23,20 @@ static var _http: HTTPRequest = null
 static var _thread: Thread = null
 
 
+## Is there a hand-painted picture of this name? (godot/assets/painted/<name>.png — see its README)
+static func painted(tex_name: String) -> bool:
+	return ResourceLoader.exists(PAINTED_DIR + "/" + tex_name + ".png")
+
+
 static func get_texture(tex_name: String, generate := true) -> Texture2D:
 	if _cache.has(tex_name):
 		return _cache[tex_name]
 	var t: Texture2D = null
+	if painted(tex_name):
+		t = load(PAINTED_DIR + "/" + tex_name + ".png") as Texture2D
+		if t != null:
+			_cache[tex_name] = t
+			return t
 	# the CDN pack may carry .jpg files (that's what the texture libraries ship) —
 	# the names are what matter, not the container
 	for ext in [".png", ".jpg"]:

@@ -16,7 +16,7 @@ var decor: Node3D
 var foods: Node3D
 var _toon := {}
 static var _outline: StandardMaterial3D
-const OUTLINE := 0.0055  # outline width (m): bold, cartoon
+const OUTLINE := 0.0034  # outline width (m): a pen line over the paint (round 14; it was 0.0055, bold cartoon)
 
 
 func _init(game: Game, n: Dictionary) -> void:
@@ -305,7 +305,7 @@ func toonify(n: Node) -> void:
 		if sk:
 			_catchlights(m, sk)
 		var sc := ref.global_transform.basis.get_scale().x
-		var line := OUTLINE * (0.62 if sk else 1.0)  # characters: a finer line (it is unbroken now that they are smooth)
+		var line := OUTLINE * (0.8 if sk else 1.0)  # characters: a finer line (it is unbroken now that they are smooth)
 		var grow := snappedf(line / maxf(sc, 0.0001), 0.0001) if absf(sc - 1.0) > 0.01 else line
 		for i in m.mesh.get_surface_count():
 			var mat := m.mesh.surface_get_material(i)
@@ -323,6 +323,19 @@ func toonify(n: Node) -> void:
 					t.rim = 0.12
 					if t.albedo_texture == null and t.albedo_color.v > 0.7 and not mat.resource_name.begins_with("Whisker"):
 						t.albedo_color = t.albedo_color.darkened(0.1)
+				# Round 14, watercolour: every plain painted thing (not the characters — their skin moves) gets the
+				# wash laid over its own colour: patches of brushwork and drying lines instead of a flat fill.
+				# Mapped in the model's own space, so the pattern travels with a thing that is pushed or carried.
+				if not m.skin and t is StandardMaterial3D and t.albedo_texture == null and not t.emission_enabled \
+						and t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and t.albedo_color.v > 0.1 \
+						and not OS.get_environment("HIDE").contains("wash"):
+					var w := TextureLib.get_detail("wash", 1.9)
+					if not w.is_empty():
+						t.albedo_texture = w[0]
+						t.albedo_color = TextureLib.detail_colour(t.albedo_color, float(w[1]))
+						t.uv1_triplanar = true
+						t.uv1_scale = Vector3.ONE * (sc / 0.9)
+						t.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
 				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
 					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
@@ -357,7 +370,7 @@ static func _cel(t: BaseMaterial3D) -> void:
 static func _outline_mat(grow: float) -> StandardMaterial3D:
 	var o := StandardMaterial3D.new()
 	o.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	o.albedo_color = Color(0.08, 0.07, 0.09)
+	o.albedo_color = Color(0.2, 0.115, 0.075)  # sepia ink, not black
 	o.cull_mode = BaseMaterial3D.CULL_FRONT
 	o.grow = true
 	o.grow_amount = grow
@@ -580,6 +593,8 @@ func mat_named(tex_name: String, color: Color, tiling := Vector2.ONE) -> Standar
 ## A <name>_normal.png (e.g. the normal map from a CC0 PBR set) is picked up
 ## automatically wherever TextureLib finds the colour map — CDN pack or repo file.
 static func _add_normal(m: StandardMaterial3D, tex_name: String) -> void:
+	if TextureLib.painted(tex_name):
+		return  # a painted surface is flat paper: no relief under the brushwork
 	var n := TextureLib.get_texture(tex_name + "_normal", false)
 	if n != null:
 		m.normal_enabled = true
@@ -654,7 +669,7 @@ func mat(color: Color, texture := "", tiling := Vector2.ONE) -> StandardMaterial
 	m.albedo_color = color
 	_cel(m)
 	if texture != "":
-		m.albedo_texture = load("res://assets/textures/" + texture + ".png")
+		m.albedo_texture = TextureLib.get_texture(texture, false) if TextureLib.painted(texture) else load("res://assets/textures/" + texture + ".png")
 		m.uv1_scale = Vector3(tiling.x, tiling.y, 1)
 		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	return m
@@ -1311,7 +1326,7 @@ func _room() -> void:
 	if not ResourceLoader.exists("res://assets/textures/" + floor_tex + ".png"): floor_tex = "floor_tile"
 	if not ResourceLoader.exists("res://assets/textures/" + wall_tex + ".png"): wall_tex = "wall_stripes"
 	var floor_mat := mat(Color.WHITE, floor_tex, Vector2(6, 3.75))
-	var tile := TextureLib.get_detail("ceramic_tile", 0.5) if str(pal.get("floor", "")) == "tile" else []
+	var tile := TextureLib.get_detail("ceramic_tile", 1.0 if TextureLib.painted("ceramic_tile") else 0.5) if str(pal.get("floor", "")) == "tile" else []
 	if not tile.is_empty():
 		# real tile instead of the placeholder pattern (the texture pack's, or the painted one): its joints and
 		# glaze as detail over the old floor's own tone, so the night stays as dark and as blue as before.
@@ -1324,11 +1339,6 @@ func _room() -> void:
 		floor_mat.uv1_scale = Vector3(6, 3.75, 1)
 		floor_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		_add_normal(floor_mat, "ceramic_tile")
-		if not OS.get_environment("HIDE").contains("gloss"):
-			# glazed tiles: the moon and the lamps leave a sheen on them, broken up by the grout lines
-			floor_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-			floor_mat.roughness = 0.46
-			floor_mat.metallic_specular = 0.2
 	var wall_mat := mat(Color.WHITE, wall_tex)
 	if str(pal.get("floor", "")) == "tile":
 		wall_mat.albedo_color = Color(1.0, 0.95, 0.84)  # kitchens: the blue wall under blue moonlight, same story
