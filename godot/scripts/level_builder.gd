@@ -119,15 +119,19 @@ static func _has_material(mesh: Mesh, mat_name: String) -> bool:
 ## Fur in shells: the coat is drawn again in thin layers pushed out along the (smooth) normals, each layer keeping
 ## only the dots where a strand is still that long. Strands sit in little cells of the rest pose (CUSTOM0, set by
 ## smooth_mesh), so they stay put while she moves. Dark at the roots, the coat's colour at the tips.
-const FUR_LAYERS := 7
+const FUR_LAYERS := 14
 const FUR := """
 shader_type spatial;
 render_mode diffuse_toon, specular_disabled, cull_back;
 uniform vec3 coat : source_color;
-uniform float h = 0.5;        // this layer: 0 at the skin … 1 at the tips
-uniform float len = 0.004;    // fur length (mesh units)
-uniform float density = 800.0; // strands per mesh unit
+uniform float h = 0.5;          // this layer: 0 at the skin … 1 at the tips
+uniform float len = 0.004;      // fur length (mesh units)
+uniform float density = 1600.0; // strands per mesh unit
+uniform vec3 comb = vec3(0.0, -0.35, -1.0); // which way the coat lies (mesh space): back toward the tail, a little down
+uniform float z_front = 1.0;    // rest-pose z of the nose and of the tail root: the fur is shorter on the face
+uniform float z_back = 0.0;
 varying vec3 rp;
+varying float tone;
 float hash3(vec3 p) {
 	p = fract(p * 0.3183099 + vec3(0.1, 0.17, 0.13));
 	p *= 17.0;
@@ -135,17 +139,25 @@ float hash3(vec3 p) {
 }
 void vertex() {
 	rp = CUSTOM0.xyz;
-	VERTEX += NORMAL * len * h;
+	float along = clamp((rp.z - z_back) / max(z_front - z_back, 0.0001), 0.0, 1.0); // 0 rump … 1 nose
+	float l = len * mix(1.0, 0.4, smoothstep(0.62, 0.9, along));
+	vec3 n = normalize(NORMAL);
+	vec3 lay = comb - n * dot(comb, n);          // the combing direction, along the skin
+	// each layer goes out a little and back a lot more the higher it is: the strands curve over and lie down
+	VERTEX += (n * (h * 0.55) + lay * (h * h * 0.9)) * l;
+	tone = h;
 }
 void fragment() {
 	vec3 p = rp * density;
 	vec3 c = floor(p);
-	float r = hash3(c);                      // how long this strand is
-	float d = length(fract(p) - 0.5) * 2.0;  // distance from the strand's axis
-	if (r * 0.75 + 0.25 < h || d > mix(1.05, 0.35, h)) {
+	float r = hash3(c);                               // how long this strand is
+	vec3 jit = vec3(hash3(c + 3.1), hash3(c + 5.7), hash3(c + 9.3)) - 0.5;
+	float d = length(fract(p) - 0.5 - jit * 0.5) * 2.0; // distance from the strand's (jittered) axis
+	// thick and overlapping at the root (no bare skin between strands), a fine point at the tip
+	if (r * 0.6 + 0.4 < tone || d > mix(1.5, 0.3, tone)) {
 		discard;
 	}
-	ALBEDO = coat * mix(0.84, 1.05, h) * (0.96 + 0.08 * hash3(c + 7.0));
+	ALBEDO = coat * mix(0.9, 1.04, tone) * (0.97 + 0.06 * hash3(c + 7.0));
 	ROUGHNESS = 0.6;
 }
 """
@@ -153,7 +165,8 @@ static var _fur_shader: Shader
 
 
 ## Returns the first pass of the chain: `after` (the outline) → shell 1 → … → shell N.
-static func _fur(after: Material, coat: Color, length: float, scale: float) -> Material:
+## `z_front` / `z_back`: the mesh's rest-pose extent along its length (the face gets shorter fur).
+static func _fur(after: Material, coat: Color, length: float, scale: float, z_front := 1.0, z_back := 0.0) -> Material:
 	if _fur_shader == null:
 		_fur_shader = Shader.new()
 		_fur_shader.code = FUR
@@ -165,7 +178,9 @@ static func _fur(after: Material, coat: Color, length: float, scale: float) -> M
 		sm.set_shader_parameter("coat", coat)
 		sm.set_shader_parameter("h", float(i + 1) / FUR_LAYERS)
 		sm.set_shader_parameter("len", length)
-		sm.set_shader_parameter("density", scale / 0.0011)  # a strand every ~1.1 mm of the world
+		sm.set_shader_parameter("density", scale / 0.0006)  # a strand every ~0.6 mm of the world
+		sm.set_shader_parameter("z_front", z_front)
+		sm.set_shader_parameter("z_back", z_back)
 		if prev:
 			prev.next_pass = sm
 		else:
@@ -203,11 +218,12 @@ func toonify(n: Node) -> void:
 					var furry := 0.0  # fur length in metres: the rat's and the cat's coats
 					if sk and mat.resource_name in ["Grey", "White"] and Settings.quality != "low" and not OS.has_environment("NOFUR"):
 						if sk.find_bone("Tail1") >= 0:
-							furry = 0.0045
+							furry = 0.006
 						elif _has_material(m.mesh, "CatIris"):
-							furry = 0.009
+							furry = 0.011
 					if furry > 0.0:
-						t.next_pass = _fur(t.next_pass as Material, t.albedo_color, furry / maxf(sc, 0.0001), sc)
+						var box := m.mesh.get_aabb()
+						t.next_pass = _fur(t.next_pass as Material, t.albedo_color, furry / maxf(sc, 0.0001), sc, box.end.z, box.position.z)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
 
