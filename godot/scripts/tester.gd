@@ -769,7 +769,9 @@ func _bugs(host: Node) -> void:
 		if (k as Knockable).kind == "cup":
 			cup = k
 			break
-	_check("there is a mug to knock", cup != null)
+	# (only the nights that put one out: the pantry, the kids' room and the others have none, and failed here)
+	if JSON.stringify(g.night).contains("\"cup\""):
+		_check("there is a mug to knock", cup != null)
 	# round 7: the door leaf hangs on its hinge at door height (round 5's pivot math
 	# re-applied the leaf's own 1.06 m offset inside the pivot — it drifted up)
 	if g.door_pivot != null and g.door_pivot.get_child_count() > 0:
@@ -789,8 +791,8 @@ func _bugs(host: Node) -> void:
 	var r := g.rat
 	var cheese: Food = null
 	for f in g.find_children("*", "Food", true, false):
-		if (f as Food).is_cheese() and not (f as Food).poison:
-			cheese = f
+		if (f as Food).is_cheese() and not (f as Food).poison and not (f as Food).hidden and (f as Food).is_visible_in_tree():
+			cheese = f  # (not one still hidden in a cache: night 4's are, and she cannot pick those up yet)
 			break
 	if cheese:
 		r.teleport(cheese.global_position + Vector3(0.0, 0.02, -0.05), 0.0)

@@ -1265,24 +1265,33 @@ func _newspapers() -> void:
 
 ## Children's drawings taped to the wall at a child's height.
 func _kid_wall() -> void:
-	for wall in ["s", "w", "e", "n"]:
-		var ok := true
-		for along in [345.0, 495.0, 645.0]:
+	# any wall with two or three free spots in a row (round 17: it wanted three fixed spots on one wall, the
+	# kids' room never had them, and the drawings never appeared)
+	for wall in ["n", "w", "e", "s"]:  # the walls the camera faces first
+		var spots: Array = []
+		var length := 960.0 if wall in ["n", "s"] else 600.0
+		var along := 120.0
+		while along < length - 120.0 and spots.size() < 3:
 			var c := _wall_pt(wall, along, 3.0, 105.0)
-			if _busy(c, 20.0) or not _free_box(_wall_pt(wall, along, 5.0, 105.0), Vector3(36, 30, 6) if wall in ["n", "s"] else Vector3(6, 30, 36)):
-				ok = false
-		if not ok:
+			if not _busy(c, 20.0) and _free_box(_wall_pt(wall, along, 5.0, 105.0), Vector3(36, 30, 6) if wall in ["n", "s"] else Vector3(6, 30, 36)):
+				spots.append(along)
+				along += 70.0
+			else:
+				along += 25.0
+		if spots.size() < 2:
 			continue
 		var crayons := [Color(0.86, 0.26, 0.24), Color(0.95, 0.78, 0.2), Color(0.3, 0.6, 0.34), Color(0.26, 0.44, 0.8), Color(0.86, 0.46, 0.66)]
 		var k := 0
-		for along in [345.0, 495.0, 645.0]:
-			var sheet := b._bit(_life, _wall_pt(wall, along, 0.6, 105.0 + _lrng.randf_range(-8.0, 8.0)), Vector3(0.3, 0.22, 0.004), _c(Color(0.94, 0.92, 0.86)), _lrng.randf_range(-6.0, 6.0), _wall_rot(wall))
+		for at in spots:
+			var sheet := b._bit(_life, _wall_pt(wall, at, 0.6, 105.0 + _lrng.randf_range(-8.0, 8.0)), Vector3(0.3, 0.22, 0.004), _c(Color(0.94, 0.92, 0.86)), _lrng.randf_range(-6.0, 6.0), _wall_rot(wall))
 			for i in 4:
 				_inset(sheet, Vector3(_lrng.randf_range(-0.1, 0.1), _lrng.randf_range(-0.07, 0.07), 0.003), Vector3(_lrng.randf_range(0.04, 0.1), _lrng.randf_range(0.03, 0.08), 0.003), _c(crayons[(k + i) % crayons.size()]))
 			for sx in [-0.13, 0.13]:
 				_inset(sheet, Vector3(sx, 0.1, 0.004), Vector3(0.03, 0.016, 0.003), _c(Color(0.8, 0.76, 0.6)))
 			k += 2
+		print("kid drawings: wall %s at %s" % [wall, str(spots)])
 		return
+	print("kid drawings: no free wall")
 
 
 ## A washing line across the corner above the washers, with the wash on it.

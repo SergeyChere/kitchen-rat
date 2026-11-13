@@ -270,12 +270,20 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 	var lid_mat := mat(coat * 0.8)  # (the fur around it takes less direct light than a bare ball)
 	var blink := Blink.new()
 	blink.name = "Blink"
+	# the people's "Eyes" surface also has a pile of degenerate faces down at their feet (in the stock models):
+	# counted in, every eyelid came out the size of the whole body — the sleeping kid lay under a dark dome
+	# and a blink flashed a huge ball. Only the vertices up at the top of the surface are the eyes.
+	var ytop := -INF
+	for v in vs:
+		ytop = maxf(ytop, v.y)
+	var reach := m.mesh.get_aabb().get_longest_axis_size() * 0.1
+	var eye := func(v: Vector3) -> bool: return v.y > ytop - reach
 	for side in [-1.0, 1.0]:
 		var c := Vector3.ZERO
 		var nrm := Vector3.ZERO
 		var cnt := 0
 		for i in vs.size():
-			if vs[i].x * side > 0.0:
+			if vs[i].x * side > 0.0 and eye.call(vs[i]):
 				c += vs[i]
 				nrm += ns[i]
 				cnt += 1
@@ -285,7 +293,7 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 		nrm = Vector3(side, 0.0, 0.45).normalized()  # outward and a little forward (the eye is a whole ball: its normals average to nothing)
 		var r := 0.0
 		for i in vs.size():
-			if vs[i].x * side > 0.0:
+			if vs[i].x * side > 0.0 and eye.call(vs[i]):
 				r = maxf(r, vs[i].distance_to(c))
 		var dot := MeshInstance3D.new()
 		dot.name = "Glint"
