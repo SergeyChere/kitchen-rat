@@ -145,7 +145,12 @@ func _process(_dt: float) -> void:
 		if _args.has("hold"):  # dev: keep an action pressed (sniff…)
 			Input.action_press(str(_args.hold))
 		if _args.get("screen", "") == "pause": game._set_paused(true)
-		elif _args.get("screen", "") == "won": game.state = "play"; game._end(true, "", "")
+		elif _args.get("screen", "") == "won":
+			game.state = "play"
+			if OS.has_environment("DECOR"):  # dev: finds brought home tonight, to try the decorating step
+				game.decor_new = Array(OS.get_environment("DECOR").split(","))
+			game.fed = int(game.night.goal)
+			game._end(true, "", "")
 		elif _args.get("screen", "") == "lost": game._end(false, "You got caught", "The pups got 3 of 12 and are waiting for Mom.")
 		if _args.has("test"):
 			_tester = Tester.new(game, _args.test)
@@ -411,7 +416,8 @@ func show_nights() -> void:
 		elif not open:
 			txt += "🔒 Finish night %d to unlock" % i
 		elif not best.is_empty():
-			txt += "✓ Tasks %d / %d · %s" % [int(best.get("goals", 0)), int(best.get("of", 0)), str(best.get("clock", ""))]
+			var r := int(best.get("rating", 0))
+			txt += ("★".repeat(r) + "☆".repeat(3 - r) + "  " if r > 0 else "✓ ") + "Tasks %d / %d" % [int(best.get("goals", 0)), int(best.get("of", 0))]
 		else:
 			txt += "Bring %d food" % int(d.get("goal", 10))
 		b.text = txt

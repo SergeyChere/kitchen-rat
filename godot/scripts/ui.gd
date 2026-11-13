@@ -203,7 +203,7 @@ static func settings_panel(parent: Node, on_back: Callable) -> Control:
 			Progress.reset()
 			reset.remove_meta("armed")
 			reset.text = "Reset progress"
-			msg.text = "Progress reset. Every night except the first is locked again."
+			msg.text = "Progress reset: the nights, the stars, the nest decorations and the achievements start over."
 		else:
 			reset.set_meta("armed", Time.get_ticks_msec())
 			reset.text = "Click again to erase progress")

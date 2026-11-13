@@ -48,6 +48,10 @@ var prompt := ""
 var noisy_near := ""  # the noisy thing right by her paws (the HUD noise chip turns orange)
 var fx: WorldFx
 var nest_pups: Array = []
+var decor_parent: Node3D  # the burrow, where NestDecor hangs the finds
+var decor_new: Array = []  # finds brought home tonight, still to be given a spot
+var spotted := 0  # how many times someone came after her tonight
+var _was_chase := false
 var cut_bars := false
 var fade := 0.0  # 0…1 black
 var _fade_to := 0.0
@@ -553,6 +557,8 @@ func deliver() -> void:
 	var cheese := false
 	var weight := rat.carry_weight()
 	for f in rat.carried:
+		if f.is_find:
+			decor_new.append(f.type)
 		if f.poison: poison += 1
 		value += f.value()
 		if f.is_cheese() and not f.poison: cheese = true
@@ -796,6 +802,9 @@ func _process(dt: float) -> void:
 	tasks.tick()
 	_tick_wanted(dt)
 	var chase := cat.mode == CatAI.Mode.CHASE or owner_ai.mode == OwnerAI.Mode.CHASE or (dog != null and dog.mode == DogAI.Mode.CHASE)
+	if chase and not _was_chase:
+		spotted += 1  # round 17: the night's rating counts how often someone came after her
+	_was_chase = chase
 	Sfx.music_layers(stars / 4.0, chase)
 	if _free_end() and fed >= int(night.goal) and not _goal_offered and not (tasks.has_tasks() and tasks.chain_done()):
 		_goal_offered = true
@@ -896,12 +905,14 @@ func _pick_up(rp: Vector3) -> void:
 		if absf(d.y) > 0.12 or Vector2(d.x, d.z).length() > 0.17:
 			continue
 		if f.is_find:
-			Sfx.play("cheese")
-			toast(f.label if f.label != "" else "A find for the nest!")
-			tasks.set_flag(f.type)
-			tasks.flag("collected")
-			foods.remove_at(i)
-			f.queue_free()
+			# round 17: a find is carried home and decorates the burrow (NestDecor), not just counted on the spot
+			if not f.has_meta("taken"):
+				f.set_meta("taken", true)
+				Sfx.play("cheese")
+				toast((f.label if f.label != "" else "A find for the nest!") + " Take it home to decorate the nest.")
+				tasks.set_flag(f.type)
+				tasks.flag("collected")
+			rat.carry(f)
 			continue
 		if rat.carry_weight() + f.weight() > rat.capacity:
 			continue
@@ -2041,7 +2052,10 @@ func _tick_outro(dt: float) -> void:
 		if _cut_t > 4.6:
 			_cut_phase = ""
 			cut_bars = false
-			_show_result(true)
+			if not decor_new.is_empty() and not NestDecor.free_slots().is_empty() and decor_parent:
+				_decorate(func(): _show_result(true))
+			else:
+				_show_result(true)
 
 
 func _set_paused(on: bool) -> void:
@@ -2177,6 +2191,116 @@ func goal_rows(won: bool) -> Array:
 	return rows
 
 
+## Round 17 (asked: rate the night in stars — the food, the decorations, how often she was seen…). Out of 100:
+## food up to 40 (the goal is 30, half as much again 40), finds brought home up to 20 (full marks on a night with
+## none to find), never chased 25 (once 15, twice 8), no life lost 15 (one 7). 1 star for winning, 2 from 65, 3 from 85.
+## Round 17: after a won night, each find she brought home is given a spot in the burrow — the camera looks round
+## the burrow, the free spots glow with their numbers, and the player picks one (or lets her choose).
+func _decorate(then: Callable) -> void:
+	_cut_camera()
+	_cut_cam.fov = 70.0
+	_cut_cam.global_position = Nights.world(135, 622, 70)
+	_cut_cam.look_at(Nights.world(130, 770, 14), Vector3.UP)
+	var marks := {}
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.85, 0.45, 0.8)
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for i in NestDecor.free_slots():
+		var p: Vector3 = NestDecor.SLOTS[i].at
+		var m := Node3D.new()
+		decor_parent.add_child(m)
+		m.global_position = Nights.world(p.x, p.y, p.z + 2.0)
+		var dot := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.014
+		sm.height = 0.028
+		dot.mesh = sm
+		dot.material_override = glow
+		m.add_child(dot)
+		var l := Label3D.new()
+		l.text = str(i + 1)
+		l.font_size = 36
+		l.pixel_size = 0.0012
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.no_depth_test = true
+		l.modulate = Color(1.0, 0.9, 0.6)
+		l.outline_size = 10
+		l.position = Vector3(0, 0.035, 0)
+		m.add_child(l)
+		marks[i] = m
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = UI.theme()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(root)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.offset_bottom = -24
+	root.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	var queue := decor_new.duplicate()
+	var ask := func(_self: Callable) -> void:
+		for c in box.get_children():
+			c.queue_free()
+		var free := NestDecor.free_slots()
+		if queue.is_empty() or free.is_empty():
+			for m in marks.values():
+				if is_instance_valid(m): m.queue_free()
+			root.queue_free()
+			_cut_cam.fov = 55.0
+			then.call()
+			return
+		var kind := str(queue.pop_front())
+		box.add_child(UI.label("Where shall the %s go?" % NestDecor.label(kind), 22, UI.ACCENT, true))
+		var grid := GridContainer.new()
+		grid.columns = 4
+		grid.add_theme_constant_override("h_separation", 6)
+		grid.add_theme_constant_override("v_separation", 6)
+		box.add_child(grid)
+		var put := func(slot: int) -> void:
+			NestDecor.place(_builder, decor_parent, slot, kind)
+			Progress.decor[str(slot)] = kind
+			Progress.save()
+			if marks.has(slot) and is_instance_valid(marks[slot]):
+				marks[slot].queue_free()
+			Sfx.play("deliver")
+			_self.call(_self)
+		for i in free:
+			var bt := UI.button("%d · %s" % [i + 1, NestDecor.SLOTS[i].name], put.bind(i), 196.0)
+			bt.custom_minimum_size.y = 36
+			bt.add_theme_font_size_override("font_size", 13)
+			grid.add_child(bt)
+		box.add_child(UI.button("Let her choose", func(): put.call(free.pick_random()), 196.0))
+	ask.call(ask)
+
+
+func night_rating(won: bool) -> Array:
+	if not won:
+		return [0, []]
+	var goal := int(night.goal)
+	var k := 1.0 if goal <= 0 else float(fed) / goal
+	var food := 30.0 * clampf(k, 0.0, 1.0) + 10.0 * clampf((k - 1.0) / 0.5, 0.0, 1.0)
+	var finds := 0
+	for f in foods:
+		if is_instance_valid(f) and f.is_find:
+			finds += 1
+	var can := mini(2, finds + decor_new.size())
+	var deco := 20.0 if can == 0 else 20.0 * minf(decor_new.size(), can) / can
+	var seen := 25.0 if spotted == 0 else (15.0 if spotted == 1 else (8.0 if spotted == 2 else 0.0))
+	var lost := 3 - maxi(lives, 0)
+	var life := 15.0 if lost == 0 else (7.0 if lost == 1 else 0.0)
+	var total := food + deco + seen + life
+	var st := 3 if total >= 85.0 else (2 if total >= 65.0 else 1)
+	var lines := [["Food", "%d / %d" % [fed, goal] if goal > 0 else "—", food, 40], ["Nest decorations", str(decor_new.size()), deco, 20],
+		["Times chased", str(spotted), seen, 25], ["Lives lost", str(lost), life, 15]]
+	return [st, lines]
+
+
 func _show_result(won: bool) -> void:
 	state = "won" if won else "lost"
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -2185,14 +2309,22 @@ func _show_result(won: bool) -> void:
 	for r in rows:
 		if r[1]: got += 1
 	var last := int(night.number) >= Nights.last_playable()
+	var rating := night_rating(won)
 	if won:
-		Progress.record(night, night_time, hud.clock_text(), got, rows.size(), max_stars)
+		Progress.record(night, night_time, hud.clock_text(), got, rows.size(), max_stars, int(rating[0]))
 		Achievements.night_won(self)
 	else:
 		Progress.losses[night_id] = int(Progress.losses.get(night_id, 0)) + 1
+		for kind in decor_new:  # what she got home is kept even on a lost night: she puts it somewhere herself
+			var free := NestDecor.free_slots()
+			if not free.is_empty():
+				Progress.decor[str(free.pick_random())] = kind
+		if not decor_new.is_empty():
+			Progress.save()
 	var sc := UI.screen(hud, 0.7, false, 620.0)
 	_panel = sc[0]
 	var box: VBoxContainer = sc[1]
+	box.add_theme_constant_override("separation", 5)  # (round 17: the rating made it taller than a 720p screen)
 	var title := end_title
 	if won:
 		title = "The End" if bool(night.get("finale", false)) else "Night %d complete" % int(night.number)
@@ -2201,15 +2333,30 @@ func _show_result(won: bool) -> void:
 	if won and bool(night.get("finale", false)):
 		text = "The family slipped out under the front door before dawn. Somewhere out there, four grown-up rats are bringing food home to their mom for the first time. Thank you for playing!"
 	box.add_child(UI.label(text, 16, UI.TEXT, true))
+	if won:
+		box.add_child(UI.label("★".repeat(int(rating[0])) + "☆".repeat(3 - int(rating[0])), 36, UI.ACCENT, true))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 22)
+		grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		for ln in rating[1]:
+			for cell in [[str(ln[0]), UI.DIM], [str(ln[1]), UI.TEXT],
+					["%d / %d" % [roundi(float(ln[2])), int(ln[3])], UI.GOOD if float(ln[2]) >= float(ln[3]) - 0.5 else UI.TEXT]]:
+				var l := UI.label(cell[0], 15, cell[1])
+				l.autowrap_mode = TextServer.AUTOWRAP_OFF
+				grid.add_child(l)
+		box.add_child(grid)
 	if won and Nights.demo() and last:
 		box.add_child(UI.label("That’s the end of the demo. Wishlist Kitchen Rat on Steam to play all twenty nights.", 17, UI.ACCENT, true))
 	for r in rows:
-		box.add_child(UI.label(("✔  " if r[1] else "✖  ") + str(r[0]), 16, UI.GOOD if r[1] else UI.DIM))
+		box.add_child(UI.label(("✔  " if r[1] else "✖  ") + str(r[0]), 15, UI.GOOD if r[1] else UI.DIM))
 	var stats := HBoxContainer.new()
 	stats.alignment = BoxContainer.ALIGNMENT_CENTER
 	stats.add_theme_constant_override("separation", 28)
 	box.add_child(stats)
-	var st := [[hud.clock_text(), "Finished at" if won else "Time"], ["%d / %d" % [mini(fed, int(night.goal)), int(night.goal)], "Food"], [str(3 - maxi(lives, 0)), "Lives lost"]]
+	var st := [[hud.clock_text(), "Finished at" if won else "Time"]]
+	if not won:  # (a won night shows these in its rating above)
+		st += [["%d / %d" % [mini(fed, int(night.goal)), int(night.goal)], "Food"], [str(3 - maxi(lives, 0)), "Lives lost"]]
 	if bool(night.get("wanted", false)):
 		st.append([_star_text(max_stars), "Top wanted"])
 	for s2 in st:

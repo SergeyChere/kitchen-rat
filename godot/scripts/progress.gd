@@ -7,6 +7,7 @@ const FILE := "user://progress.cfg"
 static var unlocked := 1  # nights 1…unlocked are open
 static var best := {}  # id → {time, clock, goals, of, stars}
 static var seen_prologue := false
+static var decor := {}  # round 17: the burrow's decorations, slot (as a string) → kind (NestDecor)
 static var _loaded := false
 static var losses := {}  # id → losses in a row this session
 
@@ -20,6 +21,7 @@ static func load_all() -> void:
 		unlocked = int(c.get_value("progress", "unlocked", 1))
 		best = c.get_value("progress", "best", {})
 		seen_prologue = bool(c.get_value("progress", "seen_prologue", false))
+		decor = c.get_value("progress", "decor", {})
 
 
 static func save() -> void:
@@ -28,6 +30,7 @@ static func save() -> void:
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "best", best)
 	c.set_value("progress", "seen_prologue", seen_prologue)
+	c.set_value("progress", "decor", decor)
 	c.save(FILE)
 
 
@@ -36,13 +39,14 @@ static func is_open(number: int) -> bool:
 
 
 ## A night was won: open the next one and keep the best result.
-static func record(night: Dictionary, seconds: float, clock: String, goals: int, of: int, stars: int) -> void:
+static func record(night: Dictionary, seconds: float, clock: String, goals: int, of: int, stars: int, rating := 0) -> void:
 	losses.erase(str(night.id))
 	unlocked = maxi(unlocked, int(night.number) + 1)
 	var id := str(night.id)
 	var prev: Dictionary = best.get(id, {})
-	var rec := {"time": int(seconds), "clock": clock, "goals": goals, "of": of, "stars": stars}
+	var rec := {"time": int(seconds), "clock": clock, "goals": goals, "of": of, "stars": stars, "rating": rating}
 	if not prev.is_empty():
+		rec.rating = maxi(rating, int(prev.get("rating", 0)))
 		rec.goals = maxi(goals, int(prev.get("goals", 0)))
 		rec.stars = mini(stars, int(prev.get("stars", 5)))
 		if int(prev.get("time", 99999)) <= int(seconds):
@@ -52,8 +56,12 @@ static func record(night: Dictionary, seconds: float, clock: String, goals: int,
 	save()
 
 
+## Everything from the start: the nights, the best results, the prologue, the burrow's decorations and the
+## achievements.
 static func reset() -> void:
 	unlocked = 1
 	best = {}
 	seen_prologue = false
+	decor = {}
 	save()
+	Achievements.reset()

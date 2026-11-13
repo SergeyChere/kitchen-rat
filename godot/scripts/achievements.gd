@@ -43,6 +43,12 @@ static func _save() -> void:
 	c.save(Progress.FILE)
 
 
+static func reset() -> void:
+	unlocked = {}
+	counters = {}
+	_save()
+
+
 static func title(id: String) -> String:
 	for a in LIST:
 		if a[0] == id:

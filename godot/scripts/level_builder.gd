@@ -2674,3 +2674,5 @@ func _nest() -> void:
 			g.nest_pups.append(pup)
 	add_zone(NestZone, "Nest", W(130, 692), Vector3(2.4, 0.9, 1.75))
 	g.hole = W(180, 585)
+	NestDecor.build_all(self, nest)
+	g.decor_parent = nest
