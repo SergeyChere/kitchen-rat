@@ -505,6 +505,17 @@ func _focus() -> void:
 		c.global_position = c.global_position.lerp(at, 0.05) if c.global_position.y > 1.0 else at
 		c.look_at(t.global_position + Vector3.UP * d * 0.15)
 		return
+	if f.size() > 2 and f[2] == "face":  # a portrait: straight at the head, a little to one side
+		var sk := t.find_child("Skeleton3D", true, false) as Skeleton3D
+		if sk:
+			var b := sk.find_bone("Head")
+			if b < 0:
+				b = sk.find_bone("Bone.003")
+			if b >= 0:
+				var h := sk.global_transform * sk.get_bone_global_pose(b).origin
+				c.global_position = h + (fwd + side * 0.35).normalized() * d * 0.32 + Vector3.UP * d * 0.03
+				c.look_at(h)
+				return
 	var low := f.size() > 2 and f[2] == "low"  # at floor level, from the side
 	var to := t.global_position + (side if low else (fwd * 0.8 + side * 0.6).normalized()) * d + Vector3.UP * (0.03 if low else d * 0.45)
 	c.global_position = to
