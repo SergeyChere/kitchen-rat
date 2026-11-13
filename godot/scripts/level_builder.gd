@@ -372,6 +372,11 @@ func toonify(n: Node) -> void:
 							furry = 0.008
 						elif _has_material(m.mesh, "CatIris"):
 							furry = 0.011
+					elif sk and mat.resource_name in ["Main", "Main_Light"] and _has_material(m.mesh, "Eyes_Pupil") \
+							and Settings.quality != "low" and not OS.has_environment("NOFUR"):
+						furry = 0.012  # round 15: the dog has a coat too
+					if sk and furry == 0.0 and Settings.quality != "low" and t.albedo_color.v > 0.12:
+						t.next_pass = _wash_pass(t.next_pass as Material, sc)
 					if furry > 0.0:
 						var box := m.mesh.get_aabb()
 						var rat_coat := furry < 0.01  # the rats: a grey coat a shade darker than the model's brown
@@ -379,6 +384,57 @@ func toonify(n: Node) -> void:
 								0.75 if rat_coat else 0.0, 0.7 if rat_coat else 0.9)
 				_toon[key] = t
 			m.set_surface_override_material(i, _toon[key])
+
+
+## Round 15: brushwork on the characters. Their bodies move, so a pattern laid in world or model space would swim
+## over them; this pass reads the REST position smooth_mesh() stored in CUSTOM0 and multiplies the wash over the
+## lit surface — a shirt or a trouser leg is a painted patch that bends with the body.
+const SKIN_WASH := """
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, shadows_disabled, cull_back;
+uniform sampler2D wash : source_color, filter_linear_mipmap, repeat_enable;
+uniform float density = 2.0;   // tiles per unit of the model's own space
+uniform float mean = 0.48;     // the picture's average value (linear)
+uniform float strength = 1.0;
+uniform float lift = 0.0004;
+varying vec3 rp;
+varying vec3 rn;
+void vertex() {
+	rp = CUSTOM0.xyz * density;
+	rn = abs(NORMAL);
+	VERTEX += NORMAL * lift;
+}
+void fragment() {
+	vec3 w = rn / max(rn.x + rn.y + rn.z, 0.001);
+	float v = texture(wash, rp.zy).r * w.x + texture(wash, rp.xz).r * w.y + texture(wash, rp.xy).r * w.z;
+	// (not blend_mul: on this renderer a multiply pass came out black. A veil instead: thin dark paint where the
+	// wash is heavy, a breath of paper where it is thin.)
+	float d = v / mean - 1.0;
+	ALBEDO = d < 0.0 ? vec3(0.05, 0.04, 0.09) : vec3(1.0, 0.96, 0.88);
+	ALPHA = clamp(d < 0.0 ? -d * 1.5 : d * 0.3, 0.0, 0.5) * strength;
+}
+"""
+static var _skin_wash: Shader
+
+
+## The wash pass for one character material; `after` (the outline) is drawn after it.
+static func _wash_pass(after: Material, sc: float) -> Material:
+	var w := TextureLib.get_detail("wash", 1.9)
+	if w.is_empty() or OS.get_environment("HIDE").contains("wash"):
+		return after
+	if _skin_wash == null:
+		_skin_wash = Shader.new()
+		_skin_wash.code = SKIN_WASH
+	var sm := ShaderMaterial.new()
+	sm.shader = _skin_wash
+	sm.set_shader_parameter("wash", w[0])
+	sm.set_shader_parameter("mean", 1.0 / float(w[1]))  # get_detail returns the gain: 1 / the linear mean
+	if OS.has_environment("WASHK"):
+		sm.set_shader_parameter("strength", float(OS.get_environment("WASHK")))
+	sm.set_shader_parameter("density", sc / 0.45)
+	sm.set_shader_parameter("lift", 0.0005 / maxf(sc, 0.0001))
+	sm.next_pass = after
+	return sm
 
 
 ## The game's look: bright cel shading (not realistic). Two clean steps of light and shadow, no glossy highlights,

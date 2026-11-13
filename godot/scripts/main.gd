@@ -115,6 +115,11 @@ func _process(_dt: float) -> void:
 		c.look_at(Nights.world(float(v[3]), float(v[4]), float(v[5])))
 		c.fov = 70.0
 		c.current = true
+	if _args.has("visit") and game and game.grid != null and game.state == "play" and not has_meta("visited") and _frames > 20:
+		set_meta("visited", true)  # dev: the owner walks in now (for a portrait of him)
+		if game.owner_ai and not game.owner_ai.in_room():
+			game.owner_ai._start_visit()
+			game.owner_ai._t = 0.05
 	if _args.has("focus") and game and game.grid != null and game.state != "intro":
 		_focus()
 	if _args.has("shot") and _frames == int(_args.get("frames", "90")):
