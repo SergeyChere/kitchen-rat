@@ -769,6 +769,7 @@ func build_contents() -> void:
 	_knockables()
 	_food()
 	_traps()
+	RoomFurniture.new(self).life(str(night.get("decor", "kitchen")))
 	_ground_shadows()
 	_practicals()
 
@@ -960,6 +961,8 @@ func _lighting() -> void:
 		"living", "dining":
 			atint = Color(1.06, 0.97, 0.86)
 			ascale = 0.78  # warm-keyed rooms: the fill drops so the fire/lamps own them
+			if kind == "dining":
+				ascale = 1.2  # round 15: near-black purple walls — it was the darkest room in the house
 		"pantry":
 			atint = Color(0.9, 0.99, 1.07)
 			ascale = 1.3  # round 14: dark wood walls and a dark floor: it needs more fill than the pale kitchen

@@ -240,7 +240,13 @@ func build(list: Array) -> void:
 							clothmat.uv1_scale = Vector3(4, 4, 4)
 						clothmat.roughness = 0.96
 						clothmat.metallic_specular = 0.08
-						for mi in cloth.find_children("*", "MeshInstance3D", true, false):
+						clothmat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+						# (the model's "tablecloth" node IS the mesh: looking only among its children found nothing,
+						# and the cloth stayed glaring white)
+						var meshes := cloth.find_children("*", "MeshInstance3D", true, false)
+						if cloth is MeshInstance3D:
+							meshes.append(cloth)
+						for mi in meshes:
 							(mi as MeshInstance3D).material_override = clothmat
 					if bool(f.get("dining", false)):
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
@@ -633,3 +639,557 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 		if model == "furniture/plant":
 			g.plants.append([n, n.rotation, randf() * TAU])  # round 12: it sways
 	return n != null
+
+
+## ---------------------------------------------------------------------------------------------------------
+## Round 15 (asked: "make the other rooms lived-in too"). Small things people leave about, hung on the night's own
+## furniture list so every layout gets its share: magazines and a remote on the coffee table, a throw over the
+## sofa's arm, a photo on the side table, candlesticks and a clock on the mantelpiece, firewood, a globe on the
+## bookcase; a runner and a vase on the dining table, plates and candles on the sideboard, a suitcase on the tall
+## cabinet; detergent and folded towels on the washers, laundry spilling out of the basket, a washing line across
+## the corner, paint cans, boots, a pegboard of tools. All scenery: nothing is a task or a noise, nothing goes
+## where the night keeps food, traps or things to knock over (_busy), nothing looks like something to pick up.
+var _life: Node3D
+var _lrng := RandomNumberGenerator.new()
+var _pm := {}
+
+
+func _c(color: Color) -> StandardMaterial3D:
+	var k := color.to_html()
+	if not _pm.has(k):
+		_pm[k] = b._paint(color)
+	return _pm[k]
+
+
+## A spot on top of a piece of furniture (cm), or null when the night needs that spot or nothing stands there.
+func _on(x: float, y: float, r_cm := 9.0):
+	var p := b.on_top(x, y)
+	if p.y < 0.1 or _busy(p, r_cm):
+		return null
+	return p
+
+
+## A free patch of floor (cm)?
+func _clear_spot(x: float, y: float, r_cm: float) -> bool:
+	if x < 30.0 or x > 930.0 or y < 30.0 or y > 570.0:
+		return false
+	var p := W(x, y)
+	return not _busy(p, r_cm) and _free_box(p + Vector3.UP * 0.2, Vector3(r_cm * 2.0, 32, r_cm * 2.0))
+
+
+func _ball(at: Vector3, r: float, m: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = r
+	sm.height = r * 2.0
+	sm.radial_segments = 12
+	sm.rings = 6
+	mi.mesh = sm
+	mi.material_override = m
+	_life.add_child(mi)
+	mi.global_position = at
+	return mi
+
+
+## A block inside another one's frame (a picture in its frame, a face on a clock).
+func _inset(parent: Node3D, local: Vector3, size: Vector3, m: Material) -> void:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = m
+	parent.add_child(mi)
+	mi.position = local
+
+
+func _solid(at: Vector3, radius: float, height: float) -> void:
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var sh := CylinderShape3D.new()
+	sh.radius = radius
+	sh.height = height
+	cs.shape = sh
+	body.add_child(cs)
+	_life.add_child(body)
+	body.global_position = at + Vector3.UP * height * 0.5
+
+
+func life(kind: String) -> void:
+	if kind == "kitchen" or bool(g.night.get("kitchenUpper", false)) or OS.get_environment("HIDE").contains("life"):
+		return
+	_life = b.group("Room life")
+	_lrng.seed = hash(kind) + int(g.night.number) / 100
+	for wall in ["n", "s", "w", "e"]:
+		_inner[wall] = _probe_inner(wall)
+	var kids := int(g.night.number) == 13
+	var seen := {}
+	var sofa = null
+	var table = null
+	for f in g.night.get("furn", []):
+		if f.get("w") == null or f.get("h") == null:
+			continue
+		var x := float(f.x)
+		var y := float(f.y)
+		var w := float(f.w)
+		var h := float(f.h)
+		var cx := x + w / 2.0
+		var cy := y + h / 2.0
+		var t := str(f.t)
+		var nth: int = seen.get(t, 0)
+		seen[t] = nth + 1
+		match t:
+			"coffeeTable":
+				table = f
+				_magazines(cx - w * 0.22, cy - 4.0)
+				_remote(cx + w * 0.2, cy + h * 0.12)
+			"sofa":
+				sofa = f
+				_throw(x + 26.0, cy, h)
+			"armchair":
+				if not _yarn_basket(x + w + 24.0, cy + 12.0):
+					_yarn_basket(x - 24.0, cy + 12.0)
+			"sideTable":
+				_photo(cx, cy, side(x, y, w, h))
+			"fireplace":
+				_mantel(f)
+			"tvStand":
+				_console(x + 36.0, cy)
+				_cases(x + w - 30.0, cy)
+			"bookcase":
+				_globe(cx, cy)
+			"table":
+				if kind == "pantry":
+					_towels(cx - w * 0.22, cy)
+				else:
+					_runner(f, not kids)
+			"sideboard":
+				_candle(cx - w * 0.36, cy)
+				_candle(cx - w * 0.36 + 13.0, cy + 3.0)
+				_plates(cx + w * 0.3, cy)
+				_photo(cx, cy - 6.0, side(x, y, w, h))
+			"cabinetTall":
+				_suitcase(cx, cy, w > h)
+			"washer":
+				if nth == 0:
+					_detergent(cx, cy)
+				else:
+					_towels(cx, cy)
+			"basket":
+				_laundry(cx, cy)
+			"boiler":
+				if not _paint_cans(x - 36.0, cy + 18.0):
+					_paint_cans(x - 36.0, y - 30.0)
+			"bench":
+				_toolbox(x + 34.0, cy)
+			"box", "crate":
+				if nth == 0:
+					_tarp(cx, cy)
+			"barCart":
+				_bottles(cx, cy)
+	match kind:
+		"living":
+			if kids:
+				_kid_wall()
+			else:
+				_slippers(sofa, table)
+				_newspapers()
+		"pantry":
+			_washing_line()
+			_boots()
+			_pegboard()
+	for mi in _life.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func _magazines(x: float, y: float) -> void:
+	var p = _on(x, y, 16.0)
+	if p == null:
+		return
+	var cols := [Color(0.78, 0.26, 0.22), Color(0.2, 0.5, 0.56), Color(0.93, 0.89, 0.78)]
+	for i in 3:
+		b._bit(_life, (p as Vector3) + Vector3(_lrng.randf_range(-0.012, 0.012), 0.007 + i * 0.013, _lrng.randf_range(-0.012, 0.012)),
+				Vector3(0.21, 0.012, 0.28), _c(cols[i]), 0.0, _lrng.randf_range(-28.0, 28.0))
+
+
+func _remote(x: float, y: float) -> void:
+	var p = _on(x, y, 8.0)
+	if p == null:
+		return
+	var yaw := _lrng.randf_range(-40.0, 40.0)
+	var r := b._bit(_life, (p as Vector3) + Vector3.UP * 0.009, Vector3(0.045, 0.018, 0.15), _c(Color(0.16, 0.16, 0.19)), 0.0, yaw)
+	_inset(r, Vector3(0, 0.01, -0.05), Vector3(0.014, 0.004, 0.014), _c(Color(0.85, 0.2, 0.18)))
+
+
+## A woollen throw over one arm of the sofa: across the top, hanging down in front and behind.
+func _throw(x: float, cy: float, depth: float) -> void:
+	var p := b.on_top(x, cy)
+	if p.y < 0.25:
+		return
+	var d := depth / 100.0 + 0.05
+	var wool := _c(Color(0.86, 0.66, 0.24))
+	var stripe := _c(Color(0.62, 0.3, 0.2))
+	b._bit(_life, p + Vector3.UP * 0.012, Vector3(0.4, 0.022, d), wool)
+	for s in [-1.0, 1.0]:
+		b._bit(_life, p + Vector3(0, -0.11, s * d * 0.5), Vector3(0.4, 0.26, 0.022), wool)
+		b._bit(_life, p + Vector3(0, -0.2, s * (d * 0.5 + 0.002)), Vector3(0.4, 0.035, 0.024), stripe)
+	for sx in [-0.12, 0.12]:
+		b._bit(_life, p + Vector3(sx, 0.014, 0), Vector3(0.035, 0.024, d + 0.002), stripe)
+
+
+func _yarn_basket(x: float, y: float) -> bool:
+	if not _clear_spot(x, y, 16.0):
+		return false
+	var p := W(x, y)
+	b._round(_life, p + Vector3.UP * 0.07, 0.115, 0.14, _c(Color(0.7, 0.52, 0.3)))
+	b._round(_life, p + Vector3.UP * 0.142, 0.122, 0.014, _c(Color(0.56, 0.4, 0.22)))
+	var cols := [Color(0.8, 0.26, 0.3), Color(0.25, 0.48, 0.72), Color(0.93, 0.88, 0.76)]
+	for i in 3:
+		var a := i * TAU / 3.0 + 0.4
+		_ball(p + Vector3(cos(a) * 0.045, 0.16, sin(a) * 0.045), 0.048, _c(cols[i]))
+	_solid(p, 0.12, 0.15)
+	return true
+
+
+## A framed photograph, leaning back a little, facing into the room.
+func _photo(x: float, y: float, wall: String) -> void:
+	var p = _on(x, y, 8.0)
+	if p == null:
+		return
+	var yaw := side_rot(wall) + _lrng.randf_range(-14.0, 14.0)
+	var fr := b._bit(_life, (p as Vector3) + Vector3.UP * 0.073, Vector3(0.115, 0.145, 0.014), _c(Color(0.5, 0.32, 0.18)))
+	fr.rotation_degrees = Vector3(-11.0, yaw, 0.0)
+	_inset(fr, Vector3(0, 0, 0.0055), Vector3(0.085, 0.115, 0.006), _c(Color(0.9, 0.86, 0.74)))
+	_inset(fr, Vector3(0, -0.02, 0.0075), Vector3(0.085, 0.05, 0.004), _c(Color(0.42, 0.6, 0.44)))
+
+
+func _candle(x: float, y: float) -> void:
+	var p = _on(x, y, 6.0)
+	if p == null:
+		return
+	var q: Vector3 = p
+	var brass := _c(Color(0.78, 0.6, 0.24))
+	b._round(_life, q + Vector3.UP * 0.006, 0.032, 0.012, brass)
+	b._round(_life, q + Vector3.UP * 0.06, 0.009, 0.1, brass)
+	b._round(_life, q + Vector3.UP * 0.113, 0.018, 0.008, brass)
+	b._round(_life, q + Vector3.UP * 0.16, 0.012, 0.09, _c(Color(0.94, 0.9, 0.8)))
+
+
+func _mantel(f: Dictionary) -> void:
+	var x := float(f.x)
+	var y := float(f.y)
+	var w := float(f.w)
+	var h := float(f.h)
+	var wall := side(x, y, w, h)
+	var along_y := wall in ["w", "e"]  # the mantel runs along y on a side wall
+	var cx := x + w / 2.0
+	var cy := y + h / 2.0
+	var half := (h if along_y else w) * 0.33
+	for s in [-1.0, 1.0]:
+		_candle(cx + (0.0 if along_y else s * half), cy + (s * half if along_y else 0.0))
+	var p = _on(cx, cy, 8.0)
+	if p != null:
+		var clock := b._bit(_life, (p as Vector3) + Vector3.UP * 0.075, Vector3(0.17, 0.15, 0.075), _c(Color(0.42, 0.25, 0.14)), 0.0, side_rot(wall))
+		_inset(clock, Vector3(0, 0.01, 0.038), Vector3(0.1, 0.1, 0.004), _c(Color(0.95, 0.92, 0.82)))
+		_inset(clock, Vector3(0.012, 0.022, 0.041), Vector3(0.006, 0.045, 0.003), _c(Color(0.15, 0.13, 0.13)))
+		_inset(clock, Vector3(-0.012, 0.004, 0.041), Vector3(0.035, 0.006, 0.003), _c(Color(0.15, 0.13, 0.13)))
+	# a few logs beside it
+	for c in [[x + w + 34.0, y + h + 6.0], [x + w + 34.0, y - 6.0], [x + 24.0, y + h + 30.0], [x + 24.0, y - 30.0]]:
+		if _clear_spot(c[0], c[1], 22.0):
+			var lp := W(c[0], c[1])
+			var bark := _c(Color(0.46, 0.3, 0.18))
+			for k in 3:
+				var at := lp + (Vector3(0, 0.05, -0.05 + k * 0.1) if k < 2 else Vector3(0, 0.135, 0))
+				var lg := b._round(_life, at, 0.05, 0.34, bark)
+				lg.rotation_degrees = Vector3(0, _lrng.randf_range(-8.0, 8.0), 90.0)
+				_inset(lg, Vector3(0, 0.171, 0), Vector3(0.07, 0.002, 0.07), _c(Color(0.85, 0.72, 0.5)))
+			_solid(lp, 0.16, 0.18)
+			break
+
+
+func _console(x: float, y: float) -> void:
+	var p = _on(x, y, 10.0)
+	if p == null:
+		return
+	var c := b._bit(_life, (p as Vector3) + Vector3.UP * 0.026, Vector3(0.27, 0.05, 0.18), _c(Color(0.2, 0.2, 0.24)))
+	_inset(c, Vector3(0.1, 0.005, 0.091), Vector3(0.016, 0.008, 0.004), _c(Color(0.3, 0.9, 0.45)))
+
+
+func _cases(x: float, y: float) -> void:
+	var p = _on(x, y, 10.0)
+	if p == null:
+		return
+	var cols := [Color(0.24, 0.42, 0.8), Color(0.82, 0.3, 0.24), Color(0.3, 0.6, 0.36), Color(0.9, 0.75, 0.25), Color(0.5, 0.36, 0.6)]
+	for i in 5:
+		b._bit(_life, (p as Vector3) + Vector3(0, 0.008 + i * 0.015, 0), Vector3(0.14, 0.014, 0.19), _c(cols[i]), 0.0, _lrng.randf_range(-9.0, 9.0))
+
+
+func _globe(x: float, y: float) -> void:
+	var p = _on(x, y, 10.0)
+	if p == null:
+		return
+	var q: Vector3 = p
+	var wood := _c(Color(0.5, 0.32, 0.18))
+	b._round(_life, q + Vector3.UP * 0.008, 0.065, 0.016, wood)
+	b._round(_life, q + Vector3.UP * 0.05, 0.009, 0.07, wood)
+	_ball(q + Vector3.UP * 0.17, 0.095, _c(Color(0.24, 0.5, 0.62)))
+	var land := b._bit(_life, q + Vector3(0.04, 0.2, 0.06), Vector3(0.07, 0.06, 0.06), _c(Color(0.46, 0.62, 0.36)), 20.0, 30.0)
+	land.scale = Vector3(1, 1, 0.7)
+
+
+## A runner down the middle of a table and, on a dining table, a vase of flowers.
+func _runner(f: Dictionary, vase: bool) -> void:
+	var w := float(f.w)
+	var h := float(f.h)
+	var cx := float(f.x) + w / 2.0
+	var cy := float(f.y) + h / 2.0
+	var p := b.on_top(cx, cy)
+	if p.y < 0.3 or p.y > 1.1:
+		return
+	p.y += 0.012  # over the tablecloth, which lies a little above the table's collision top
+	var long_x := w >= h
+	var len := (w if long_x else h) / 100.0 * 0.86
+	var size := Vector3(len, 0.006, 0.3) if long_x else Vector3(0.3, 0.006, len)
+	b._bit(_life, p + Vector3.UP * 0.004, size, _c(Color(0.5, 0.62, 0.48)))
+	for s in [-1.0, 1.0]:
+		var off := Vector3(0, 0.005, s * 0.12) if long_x else Vector3(s * 0.12, 0.005, 0)
+		b._bit(_life, p + off, Vector3(len, 0.006, 0.02) if long_x else Vector3(0.02, 0.006, len), _c(Color(0.93, 0.89, 0.78)))
+	if not vase:
+		return
+	if _busy(p, 16.0):  # the middle is taken (food): a third of the way along instead
+		var found := false
+		for s in [-1.0, 1.0]:
+			var q := p + (Vector3(s * len * 0.3, 0, 0) if long_x else Vector3(0, 0, s * len * 0.3))
+			if not _busy(q, 12.0):
+				p = q
+				found = true
+				break
+		if not found:
+			return
+	b._round(_life, p + Vector3.UP * 0.085, 0.05, 0.16, _c(Color(0.3, 0.48, 0.7)))
+	b._round(_life, p + Vector3.UP * 0.17, 0.036, 0.02, _c(Color(0.26, 0.42, 0.62)))
+	var petals := [Color(0.9, 0.3, 0.3), Color(0.96, 0.8, 0.26), Color(0.95, 0.92, 0.86), Color(0.86, 0.46, 0.66), Color(0.9, 0.3, 0.3)]
+	for i in 5:
+		var a := i * TAU / 5.0
+		var lean := Vector3(cos(a), 0, sin(a)) * 0.07
+		var stem := b._round(_life, p + Vector3.UP * 0.25 + lean * 0.5, 0.005, 0.18, _c(Color(0.3, 0.5, 0.26)))
+		stem.look_at(stem.global_position + Vector3.UP + lean * 5.5, Vector3.RIGHT)
+		stem.rotate_object_local(Vector3.RIGHT, -PI / 2.0)
+		_ball(p + Vector3.UP * 0.345 + lean * 1.05, 0.032, _c(petals[i]))
+	_solid(p, 0.055, 0.2)
+
+
+func _towels(x: float, y: float) -> void:
+	var p = _on(x, y, 14.0)
+	if p == null:
+		return
+	var cols := [Color(0.93, 0.9, 0.82), Color(0.36, 0.56, 0.78), Color(0.93, 0.9, 0.82), Color(0.84, 0.44, 0.36)]
+	for i in 4:
+		b._bit(_life, (p as Vector3) + Vector3(0, 0.02 + i * 0.038, 0), Vector3(0.3 - i * 0.01, 0.036, 0.2), _c(cols[i]), 0.0, _lrng.randf_range(-5.0, 5.0))
+
+
+func _plates(x: float, y: float) -> void:
+	var p = _on(x, y, 10.0)
+	if p == null:
+		return
+	for i in 5:
+		b._round(_life, (p as Vector3) + Vector3(0, 0.007 + i * 0.013, 0), 0.1 - (i % 2) * 0.004, 0.012, _c(Color(0.94, 0.92, 0.86) if i % 2 == 0 else Color(0.78, 0.84, 0.92)))
+
+
+func _suitcase(x: float, y: float, long_x: bool) -> void:
+	var p = _on(x, y, 10.0)
+	if p == null:
+		return
+	var yaw := 0.0 if long_x else 90.0
+	var s := b._bit(_life, (p as Vector3) + Vector3.UP * 0.085, Vector3(0.44, 0.17, 0.3), _c(Color(0.56, 0.36, 0.2)), 0.0, yaw)
+	for sx in [-0.13, 0.13]:
+		_inset(s, Vector3(sx, 0, 0), Vector3(0.035, 0.176, 0.306), _c(Color(0.34, 0.2, 0.12)))
+	_inset(s, Vector3(0, 0.02, 0.158), Vector3(0.1, 0.02, 0.016), _c(Color(0.24, 0.16, 0.1)))
+
+
+func _detergent(x: float, y: float) -> void:
+	var p = _on(x - 12.0, y, 8.0)
+	if p != null:
+		var box := b._bit(_life, (p as Vector3) + Vector3.UP * 0.11, Vector3(0.16, 0.22, 0.09), _c(Color(0.92, 0.52, 0.16)), 0.0, _lrng.randf_range(-12.0, 12.0))
+		_inset(box, Vector3(0, 0.01, 0.046), Vector3(0.11, 0.1, 0.004), _c(Color(0.24, 0.42, 0.8)))
+		_inset(box, Vector3(0, 0.01, 0.048), Vector3(0.06, 0.05, 0.004), _c(Color(0.95, 0.93, 0.86)))
+	var q = _on(x + 14.0, y + 4.0, 6.0)
+	if q != null:
+		b._round(_life, (q as Vector3) + Vector3.UP * 0.09, 0.04, 0.18, _c(Color(0.3, 0.56, 0.8)))
+		b._round(_life, (q as Vector3) + Vector3.UP * 0.195, 0.02, 0.03, _c(Color(0.94, 0.92, 0.88)))
+
+
+func _laundry(x: float, y: float) -> void:
+	var p := b.on_top(x, y)
+	if p.y < 0.12:
+		return
+	var cols := [Color(0.93, 0.9, 0.84), Color(0.8, 0.28, 0.26), Color(0.3, 0.5, 0.76), Color(0.94, 0.8, 0.3)]
+	for i in 4:
+		var cl := b._bit(_life, p + Vector3(_lrng.randf_range(-0.07, 0.07), 0.02 + i * 0.022, _lrng.randf_range(-0.06, 0.06)), Vector3(0.2, 0.045, 0.16), _c(cols[i]))
+		cl.rotation_degrees = Vector3(_lrng.randf_range(-14.0, 14.0), _lrng.randf_range(0.0, 180.0), _lrng.randf_range(-14.0, 14.0))
+	b._bit(_life, p + Vector3(0.0, -0.05, 0.225), Vector3(0.055, 0.17, 0.014), _c(Color(0.3, 0.5, 0.76)), 6.0)
+
+
+func _paint_cans(x: float, y: float) -> bool:
+	if not _clear_spot(x, y, 22.0):
+		return false
+	var p := W(x, y)
+	var lids := [Color(0.82, 0.3, 0.24), Color(0.3, 0.56, 0.8), Color(0.94, 0.8, 0.3)]
+	var spots := [Vector3(-0.085, 0.0, 0.0), Vector3(0.085, 0.0, 0.02), Vector3(0.0, 0.16, 0.01)]
+	for i in 3:
+		var at: Vector3 = p + spots[i]
+		b._round(_life, at + Vector3.UP * 0.075, 0.078, 0.15, _c(Color(0.86, 0.86, 0.84)))
+		b._round(_life, at + Vector3.UP * 0.155, 0.08, 0.012, _c(lids[i]))
+		b._bit(_life, at + Vector3(0.03, 0.115, 0.074), Vector3(0.03, 0.07, 0.006), _c(lids[i]), 0.0, 22.0)
+	_solid(p, 0.17, 0.3)
+	return true
+
+
+func _toolbox(x: float, y: float) -> void:
+	var p = _on(x, y, 16.0)
+	if p == null:
+		return
+	var tb := b._bit(_life, (p as Vector3) + Vector3.UP * 0.07, Vector3(0.36, 0.14, 0.17), _c(Color(0.8, 0.24, 0.2)), 0.0, _lrng.randf_range(-10.0, 10.0))
+	_inset(tb, Vector3(0, 0.05, 0), Vector3(0.366, 0.02, 0.176), _c(Color(0.56, 0.16, 0.14)))
+	_inset(tb, Vector3(0, 0.1, 0), Vector3(0.16, 0.014, 0.02), _c(Color(0.2, 0.2, 0.23)))
+	for sx in [-0.075, 0.075]:
+		_inset(tb, Vector3(sx, 0.085, 0), Vector3(0.014, 0.03, 0.02), _c(Color(0.2, 0.2, 0.23)))
+
+
+func _tarp(x: float, y: float) -> void:
+	var p = _on(x, y, 14.0)
+	if p == null:
+		return
+	b._bit(_life, (p as Vector3) + Vector3.UP * 0.028, Vector3(0.4, 0.055, 0.3), _c(Color(0.42, 0.52, 0.42)), 0.0, _lrng.randf_range(-12.0, 12.0))
+	b._bit(_life, (p as Vector3) + Vector3.UP * 0.075, Vector3(0.36, 0.04, 0.26), _c(Color(0.5, 0.6, 0.5)), 0.0, _lrng.randf_range(-12.0, 12.0))
+
+
+func _bottles(x: float, y: float) -> void:
+	for i in 3:
+		var p = _on(x - 14.0 + i * 14.0, y + (i % 2) * 6.0 - 3.0, 5.0)
+		if p != null:
+			b.spawn("props/bottle", p, _lrng.randf_range(0.0, 360.0), _life)
+
+
+## Slippers left between the sofa and the coffee table.
+func _slippers(sofa, table) -> void:
+	if sofa == null or table == null:
+		return
+	var sx := float(sofa.x) + float(sofa.w) * 0.72
+	var gap_y := (float(table.y) + float(table.h) + float(sofa.y)) / 2.0
+	if float(table.y) > float(sofa.y):
+		gap_y = (float(sofa.y) + float(sofa.h) + float(table.y)) / 2.0
+	if not _clear_spot(sx, gap_y, 14.0):
+		return
+	var p := W(sx, gap_y)
+	for s in [-1.0, 1.0]:
+		var yaw: float = 8.0 * s + _lrng.randf_range(-10.0, 10.0)
+		var sl := b._bit(_life, p + Vector3(s * 0.065, 0.016, s * 0.02), Vector3(0.085, 0.03, 0.21), _c(Color(0.72, 0.26, 0.24)), 0.0, yaw)
+		_inset(sl, Vector3(0, 0.022, -0.045), Vector3(0.09, 0.03, 0.11), _c(Color(0.9, 0.84, 0.7)))
+
+
+func _newspapers() -> void:
+	for c in [[130.0, 450.0], [700.0, 480.0], [250.0, 90.0], [620.0, 540.0], [800.0, 120.0]]:
+		if _clear_spot(c[0], c[1], 24.0):
+			var p := W(c[0], c[1])
+			var yaw := _lrng.randf_range(0.0, 90.0)
+			var st := b._bit(_life, p + Vector3.UP * 0.05, Vector3(0.3, 0.1, 0.4), _c(Color(0.9, 0.87, 0.78)), 0.0, yaw)
+			_inset(st, Vector3(0, 0, 0), Vector3(0.306, 0.104, 0.016), _c(Color(0.5, 0.36, 0.22)))
+			_inset(st, Vector3(0, 0, 0), Vector3(0.016, 0.104, 0.406), _c(Color(0.5, 0.36, 0.22)))
+			_inset(st, Vector3(0.04, 0.052, 0.06), Vector3(0.16, 0.003, 0.05), _c(Color(0.3, 0.3, 0.34)))
+			return
+
+
+## Children's drawings taped to the wall at a child's height.
+func _kid_wall() -> void:
+	for wall in ["s", "w", "e", "n"]:
+		var ok := true
+		for along in [345.0, 495.0, 645.0]:
+			var c := _wall_pt(wall, along, 3.0, 105.0)
+			if _busy(c, 20.0) or not _free_box(_wall_pt(wall, along, 5.0, 105.0), Vector3(36, 30, 6) if wall in ["n", "s"] else Vector3(6, 30, 36)):
+				ok = false
+		if not ok:
+			continue
+		var crayons := [Color(0.86, 0.26, 0.24), Color(0.95, 0.78, 0.2), Color(0.3, 0.6, 0.34), Color(0.26, 0.44, 0.8), Color(0.86, 0.46, 0.66)]
+		var k := 0
+		for along in [345.0, 495.0, 645.0]:
+			var sheet := b._bit(_life, _wall_pt(wall, along, 0.6, 105.0 + _lrng.randf_range(-8.0, 8.0)), Vector3(0.3, 0.22, 0.004), _c(Color(0.94, 0.92, 0.86)), _lrng.randf_range(-6.0, 6.0), _wall_rot(wall))
+			for i in 4:
+				_inset(sheet, Vector3(_lrng.randf_range(-0.1, 0.1), _lrng.randf_range(-0.07, 0.07), 0.003), Vector3(_lrng.randf_range(0.04, 0.1), _lrng.randf_range(0.03, 0.08), 0.003), _c(crayons[(k + i) % crayons.size()]))
+			for sx in [-0.13, 0.13]:
+				_inset(sheet, Vector3(sx, 0.1, 0.004), Vector3(0.03, 0.016, 0.003), _c(Color(0.8, 0.76, 0.6)))
+			k += 2
+		return
+
+
+## A washing line across the corner above the washers, with the wash on it.
+func _washing_line() -> void:
+	var wx := -1.0
+	for f in g.night.get("furn", []):
+		if str(f.t) == "washer":
+			wx = float(f.x)
+			break
+	if wx < 0.0:
+		return
+	var east := wx > 480.0
+	var a := W(700.0 if east else 260.0, 5.0, 172.0)
+	var c := W(955.0 if east else 5.0, 215.0, 172.0)
+	var dir := c - a
+	var yaw := rad_to_deg(atan2(-dir.z, dir.x))
+	b._bit(_life, (a + c) / 2.0, Vector3(dir.length(), 0.008, 0.008), _c(Color(0.9, 0.88, 0.8)), 0.0, yaw)
+	var items := [[0.14, Vector3(0.07, 0.2, 0.01), Color(0.9, 0.3, 0.3)], [0.24, Vector3(0.07, 0.2, 0.01), Color(0.9, 0.3, 0.3)],
+			[0.42, Vector3(0.34, 0.3, 0.012), Color(0.93, 0.9, 0.82)], [0.64, Vector3(0.26, 0.26, 0.012), Color(0.3, 0.52, 0.78)],
+			[0.84, Vector3(0.22, 0.32, 0.012), Color(0.94, 0.8, 0.32)]]
+	for it in items:
+		var size: Vector3 = it[1]
+		var at: Vector3 = a + dir * float(it[0]) - Vector3.UP * (size.y / 2.0)
+		var cloth := b._bit(_life, at, size, _c(it[2]), _lrng.randf_range(-4.0, 4.0), yaw)
+		if size.x > 0.3:  # the towel has a stripe
+			_inset(cloth, Vector3(0, -0.08, 0), Vector3(size.x + 0.002, 0.04, 0.014), _c(Color(0.3, 0.52, 0.78)))
+		elif size.x > 0.24:  # the shirt has sleeves
+			for sx in [-1.0, 1.0]:
+				_inset(cloth, Vector3(sx * 0.17, 0.08, 0), Vector3(0.1, 0.09, 0.012), _c(it[2]))
+		for sx in [-1.0, 1.0]:  # pegs
+			_inset(cloth, Vector3(sx * size.x * 0.32, size.y / 2.0, 0), Vector3(0.012, 0.035, 0.018), _c(Color(0.72, 0.56, 0.34)))
+
+
+func _boots() -> void:
+	for c in [[810.0, 410.0], [800.0, 190.0], [560.0, 560.0], [330.0, 560.0], [420.0, 60.0]]:
+		if _clear_spot(c[0], c[1], 18.0):
+			var p := W(c[0], c[1])
+			var rubber := _c(Color(0.26, 0.42, 0.3))
+			for s in [-1.0, 1.0]:
+				var q := p + Vector3(s * 0.07, 0, 0)
+				b._round(_life, q + Vector3.UP * 0.15, 0.048, 0.24, rubber)
+				b._bit(_life, q + Vector3(0, 0.035, 0.05), Vector3(0.095, 0.07, 0.2), rubber)
+				b._round(_life, q + Vector3.UP * 0.273, 0.052, 0.012, _c(Color(0.9, 0.8, 0.4)))
+			_solid(p, 0.13, 0.26)
+			return
+
+
+## A board of tools on a free piece of wall.
+func _pegboard() -> void:
+	for wall in ["s", "w", "e", "n"]:
+		for along in [495.0, 345.0, 645.0]:
+			var c := _wall_pt(wall, along, 3.0, 150.0)
+			if _busy(c, 30.0) or not _free_box(_wall_pt(wall, along, 6.0, 150.0), Vector3(70, 52, 8) if wall in ["n", "s"] else Vector3(8, 52, 70)):
+				continue
+			var board := b._bit(_life, _wall_pt(wall, along, 1.0, 150.0), Vector3(0.66, 0.48, 0.016), _c(Color(0.62, 0.48, 0.32)), 0.0, _wall_rot(wall))
+			var steel := _c(Color(0.66, 0.68, 0.72))
+			var grip := _c(Color(0.8, 0.26, 0.2))
+			var wood := _c(Color(0.5, 0.32, 0.18))
+			# hammer
+			_inset(board, Vector3(-0.24, -0.02, 0.014), Vector3(0.022, 0.24, 0.016), wood)
+			_inset(board, Vector3(-0.24, 0.11, 0.016), Vector3(0.1, 0.035, 0.03), steel)
+			# saw
+			_inset(board, Vector3(-0.05, 0.02, 0.012), Vector3(0.06, 0.26, 0.006), steel)
+			_inset(board, Vector3(-0.05, 0.16, 0.014), Vector3(0.09, 0.06, 0.018), wood)
+			# screwdrivers
+			for i in 3:
+				_inset(board, Vector3(0.1 + i * 0.05, 0.1, 0.014), Vector3(0.02, 0.07, 0.02), grip if i != 1 else _c(Color(0.94, 0.8, 0.3)))
+				_inset(board, Vector3(0.1 + i * 0.05, 0.02, 0.012), Vector3(0.007, 0.1, 0.007), steel)
+			# wrench and a roll of tape
+			_inset(board, Vector3(0.27, 0.02, 0.012), Vector3(0.024, 0.22, 0.008), steel)
+			_inset(board, Vector3(0.27, 0.14, 0.012), Vector3(0.05, 0.04, 0.008), steel)
+			var tape := b._round(_life, _wall_pt(wall, along + 14.0, 3.0, 133.0), 0.045, 0.03, _c(Color(0.3, 0.3, 0.34)))
+			tape.rotation_degrees = Vector3(90.0, _wall_rot(wall), 0.0)
+			return
