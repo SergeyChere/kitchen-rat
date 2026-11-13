@@ -729,3 +729,29 @@ basement, the nest and the cat.
 **Not checked.** Nights 5–20 in the new look beyond the four rooms
 above; frame rate with the paper pass on the user's laptop (it is
 off on quality low).
+
+## Round 15 — lived-in rooms, painted people (2026-11-12, evening)
+
+1. **Room life** (`RoomFurniture.life`, `HIDE=life`): small scenery
+   hung on each night's own furniture list — living room (magazines,
+   remote, throw, yarn basket, photo, globe, firewood, console,
+   slippers, newspapers), dining room (table runner, candlesticks,
+   plates, suitcase, bottles), pantry / laundry (washing line,
+   detergent, towels, laundry, paint cans, boots, toolbox, tarp).
+   Nothing goes where a night keeps food, traps or knockables.
+2. **Dining cloth.** Round 11's wine cloth never applied (the
+   "tablecloth" node is the mesh itself); fixed. Dining room fill
+   light ×1.2.
+3. **People.** `SKIN_WASH`: an alpha veil of brushwork in rest space
+   (CUSTOM0) on every non-furry character material. Do not use
+   blend_mul here: it rendered black on Compatibility.
+4. **Dog.** Painted fur on Main / Main_Light.
+
+**Checked.** CI set on night 1, `owner` on night 6, `stuck` on nights
+2, 4, 8, 9, 13, 14, 17; portraits of the owner, kid and dog.
+
+**Open.** `stuck` failed once on night 19 and once on night 20 (rat
+stuck one time in 90 s) and passed on every rerun, with and without
+the new props; cause not found. Guests and the exterminator were not
+looked at up close. The kids' drawings on the wall of night 13 did not
+appear (no free wall found).
