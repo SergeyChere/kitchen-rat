@@ -1021,7 +1021,7 @@ func _lighting() -> void:
 				ascale = 1.2  # round 15: near-black purple walls — it was the darkest room in the house
 		"pantry":
 			atint = Color(0.9, 0.99, 1.07)
-			ascale = 1.3  # round 14: dark wood walls and a dark floor: it needs more fill than the pale kitchen
+			ascale = 1.6  # round 14 (1.3), round 15 (1.6): dark wood walls and a dark floor need far more fill than the pale kitchen
 		"kids":
 			atint = Color(1.03, 0.98, 1.02)
 	# soft and fairly bright, like the prototype (its hemisphere light 0x7d8fc4 × 0.75, no tone mapping)

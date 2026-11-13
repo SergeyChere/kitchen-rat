@@ -187,7 +187,12 @@ func tick(dt: float, trail: Array, idle_t: float) -> void:
 			var hid := rat.hidden()
 			var tp := rat.global_position
 			var gap := 0.22 + index * 0.16
-			if hid:
+			if hid and rat.global_position.z > G.hole.z - 0.05:
+				# in the burrow there is room: they lie round her instead of piling up under her (four grown pups
+				# in one spot read as one rat with five tails)
+				var a := 0.9 + index * 1.45
+				tp = rat.global_position + Vector3(cos(a), 0, sin(a)) * (0.17 + (index % 2) * 0.05)
+			elif hid:
 				tp = rat.global_position + Vector3((index - 0.5) * 0.08, 0, 0.06)
 			elif not trail.is_empty():
 				var acc := 0.0
@@ -197,6 +202,10 @@ func tick(dt: float, trail: Array, idle_t: float) -> void:
 					acc += (trail[k] as Vector3).distance_to(trail[k - 1])
 					k -= 1
 					tp = trail[k]
+				if acc < gap * 0.5:  # she has hardly moved yet: a place behind her, not on top of her
+					var back := -rat.global_basis.z
+					back.y = 0.0
+					tp = rat.global_position + back.normalized() * gap + rat.global_basis.x * ((index % 2) - 0.5) * 0.1
 			tp.y = 0.0
 			var dd := Vector2(tp.x - global_position.x, tp.z - global_position.z).length()
 			if dd > (0.02 if hid else 0.06):
