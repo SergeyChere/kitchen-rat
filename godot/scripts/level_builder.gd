@@ -232,7 +232,7 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 	var si := -1
 	for i in m.mesh.get_surface_count():
 		var mm := m.mesh.surface_get_material(i)
-		if mm and mm.resource_name == "Eye":
+		if mm and mm.resource_name in ["Eye", "Eyes", "Eyes_White"]:  # rat and pups · people · the dog
 			si = i
 	if si < 0:
 		return
@@ -260,7 +260,7 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 	white.albedo_color = Color(1, 1, 1)
 	# eyelids in the colour of the coat around the eyes (see Blink)
 	var coat := Color(0.6, 0.56, 0.54)
-	for want in ["White", "Grey"]:
+	for want in ["White", "Grey", "Skin", "Main"]:
 		for i in m.mesh.get_surface_count():
 			var cm := m.mesh.surface_get_material(i) as BaseMaterial3D
 			if cm and cm.resource_name == want:

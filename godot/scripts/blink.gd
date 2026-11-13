@@ -23,7 +23,7 @@ func _process(dt: float) -> void:
 	if not _looked:  # the model's animation player: a few levels up from the skeleton, never past the model
 		_looked = true
 		var n := get_parent()
-		for i in 4:
+		for i in 6:  # (the dog's model nests its skeleton one level deeper than the rats')
 			if n == null or _ap != null:
 				break
 			_ap = n.find_child("AnimationPlayer", true, false) as AnimationPlayer
