@@ -755,3 +755,39 @@ stuck one time in 90 s) and passed on every rerun, with and without
 the new props; cause not found. Guests and the exterminator were not
 looked at up close. The kids' drawings on the wall of night 13 did not
 appear (no free wall found).
+
+## Round 16 — the user's bug list (2026-11-13)
+
+He measured 16–60 fps (16 on average) on his laptop and sent a list.
+
+1. **Speed.** Opening Settings in a night switched shadows on for every
+   lamp in the room (each shadowed lamp renders the room six more times).
+   Lights keep the shadow choice they were built with; lamp shadows only
+   on high, the moon's from medium. No MSAA below high; low renders 3D at
+   3/4 size. Fur 7 shells on medium, 12 on high. Under 24 fps for six
+   seconds the graphics step down one level for the session.
+   Night 1 (software GL): 2445 → 918 draw calls, 361k → 77k triangles.
+   `--perf` prints the frame's cost.
+2. **Cat bed** has its real shape as a collider on layer 8 (only the rat
+   collides with it; the navmesh and the cat ignore it).
+3. **Bread box** on the fridge (the hidden cheese moved with it).
+4. **Plates** built: foot, well, raised rim (`LevelBuilder.plate`).
+5. **Floor lamp** built (`LevelBuilder.floor_lamp`): a data light standing
+   in the room is a lamp with the light inside its shade.
+6. **Mouse hole.** The "stripes" were the burrow's roof and sides poking
+   through the kitchen wall. A wooden arch, a doormat and a picture above.
+7. **Fire** in the fireplace: logs, embers, five shader flames, sparks.
+8. **Gaps** behind the fridge, washers, boiler and tall cabinets
+   (HideSpot "behind", ~17 cm clear). The kitchen fridge stands off the
+   east wall too, so the gap behind it can be walked into. `--test=gaps`.
+9. **Menu** after his mock-up: bold gold title, wide rounded buttons,
+   Play in gold. The font weight had never applied (OpenType tag).
+10. **Prologue**: six animated shots (storm, the crack, the floor, the
+    nest, four pups, hungry). "Story" in the menu replays it.
+    `--prologue`, `STORY_AT=27`.
+11. Also: people and the dog blink (and the sleeping dog shuts its eyes);
+    pups no longer pile up inside her at the start of a night; the pantry
+    rooms are brighter.
+
+**Not checked.** The frame rate on his laptop after these changes; the
+whole prologue played through in real time with sound (only frames).
