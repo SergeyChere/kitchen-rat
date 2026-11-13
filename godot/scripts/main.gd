@@ -32,6 +32,8 @@ func _ready() -> void:
 	Dof.watch = not _args.has("shot")
 	if _args.has("quality"):  # dev: --quality=low|medium|high for screenshots (not saved)
 		Settings.quality = str(_args.quality)
+	if _args.has("prologue"):  # dev: play the prologue (night 1's intro) even if it was seen
+		Game.force_prologue = true
 	if _args.has("night"):
 		if _args.has("via_menu"):  # dev: go through the menu (and its live backdrop) first, like a player does
 			show_menu()
@@ -277,6 +279,7 @@ func show_menu() -> void:
 		play_text = "Continue · Night %d" % next
 	box.add_child(UI.button(play_text, start_number.bind(next)))
 	box.add_child(UI.button("Nights", show_nights))
+	box.add_child(UI.button("Story", func(): Game.force_prologue = true; enter_night("kitchen")))
 	box.add_child(UI.button("Achievements", show_achievements))
 	box.add_child(UI.button("Settings", func(): menu.hide(); UI.settings_panel(self, func(): if is_instance_valid(menu): menu.show())))
 	box.add_child(UI.button("Quit", get_tree().quit))

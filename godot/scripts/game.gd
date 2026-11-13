@@ -70,6 +70,7 @@ var grace_t := 0.0
 var in_hum := 0
 var state := "intro"  # intro, play, pause, won, lost, backdrop
 var backdrop := false  # the night-1 kitchen living behind the main menu: no HUD, no rules, a slow camera
+static var force_prologue := false  # the menu's "Story" button (and the dev switch --prologue): play the prologue again
 var end_title := ""
 var end_text := ""
 
@@ -1685,7 +1686,8 @@ func _start_intro() -> void:
 	fade = 1.0
 	_fade_to = 0.0
 	Sfx.music_night(night.get("music", {}))
-	if bool(night.get("prologue", false)) and not Progress.seen_prologue:
+	if bool(night.get("prologue", false)) and (force_prologue or not Progress.seen_prologue):
+		force_prologue = false
 		Progress.seen_prologue = true
 		Progress.save()
 		_prologue()
@@ -1719,32 +1721,170 @@ func _talkers() -> Array:
 	return out
 
 
+## The prologue (round 16, asked: "add an animation of the rat's backstory"), played in the house itself, six
+## shots with camera moves, like the first pages of a picture book:
+##   1 a stormy night: the dark kitchen, lightning in the window, rain
+##   2 a crack in the wall: she squeezes through, soaked, and looks round
+##   3 the kitchen floor: she crosses it to a hole in the skirting board…
+##   4 …behind it a warm, dry hollow: she makes a nest of paper and straw and curls up
+##   5 morning: four pups, one after another
+##   6 a few days later: their eyes are open, they are hungry, she looks at the hole. The title.
+## Space / Esc / Enter skip it (as before). Each shot: [start, end, camera from, camera to, look from, look to];
+## a look of null follows her.
+var _shots: Array = []
+var _rain_loop: Node
+var _flash := 0.0
+var _pup_base: Array = []
+var _pup_home: Array = []  # where the nest pups lie in the game (the story moves them)
+
+
 func _prologue() -> void:
 	_cut_phase = "prologue"
 	_cut_t = 0.0
 	for p in nest_pups: p.visible = false
 	for p in pups: p.visible = false
-	rat.global_position = Nights.world(180, 612, 1)
-	rat.anim.play("walk")
-	_walk = [Nights.world(170, 660, 1), Nights.world(150, 700, 1)]
+	hud.visible = true
+	rat.scripted = true
+	rat.frozen = true
+	rat.global_position = Nights.world(330, 606, 0)
+	rat.rotation.y = Nights.yaw_to(Vector3.BACK)
+	rat.anim.play("idle")
 	Sfx.music_menu()
-	_cues = [
-		[0.2, func(): Sfx.play("thunder"); banner("A stormy night", "A mother rat slips into the house through a gap in the wall…", 3.4)],
-		[3.9, func(): banner("", "She finds a warm spot behind the kitchen wall and builds a nest.", 3.0)],
-		[7.2, func(): _fade_to = 1.0],
-		[7.8, func(): _fade_to = 0.0; rat.anim.play("sleep"); for p in nest_pups: p.visible = true
-			],
-		[7.9, func(): banner("By morning, there were four.", "", 3.0); Sfx.play("squeak", null, -6.0, 1.7)],
-		[9.2, func(): Sfx.play("squeak", null, -8.0, 1.8)],
-		[11.2, func(): _fade_to = 1.0],
-		[11.8, func(): _fade_to = 0.0; banner("A few days later", "Their eyes are open. And they are very hungry.", 3.2)],
-		[15.2, func(): Sfx.music_night(night.get("music", {})); _night_intro()],
+	_rain_loop = Sfx.loop("rain_loop")
+	_pup_base.clear()
+	_pup_home.clear()
+	for p in nest_pups:
+		_pup_base.append((p as Node3D).scale)
+		_pup_home.append((p as Node3D).global_transform)
+	var W := Nights.world
+	# in the story they lie round her on the bedding in front of the nest, not among its big twigs
+	var spots := [[112, 712, 60.0, "sleep"], [126, 727, -20.0, "sleep"], [141, 734, 100.0, "sleep"], [104, 697, 150.0, "sleep"]]
+	for i in mini(nest_pups.size(), spots.size()):
+		var o: Vector3 = W.call(spots[i][0], spots[i][1], 40)
+		var hit := ray(o, o + Vector3.DOWN * 0.8)
+		var p3: Node3D = nest_pups[i]
+		p3.global_position = (hit.position if not hit.is_empty() else W.call(spots[i][0], spots[i][1], 2)) + Vector3.UP * 0.004
+		p3.rotation.y = deg_to_rad(float(spots[i][2]))
+		ClipPlayer.new(p3).play(str(spots[i][3]), 0.0)
+	_shots = [
+		[0.0, 5.0, W.call(470, 430, 175), W.call(500, 250, 160), W.call(500, 0, 150), W.call(520, 0, 140)],
+		[5.0, 11.0, W.call(285, 470, 9), W.call(300, 500, 7), W.call(330, 600, 6), null],
+		[11.0, 17.5, W.call(380, 470, 26), W.call(250, 500, 18), null, null],
+		[17.5, 24.0, W.call(230, 650, 30), W.call(215, 720, 26), null, W.call(120, 715, 3)],
+		[24.0, 30.0, W.call(215, 680, 18), W.call(205, 692, 14), W.call(132, 712, 2), W.call(132, 712, 2)],
+		[30.0, 38.0, W.call(215, 678, 18), W.call(205, 690, 13), W.call(128, 715, 2), null],
 	]
+	_cues = [
+		[0.3, func(): banner("A stormy night", "", 3.6); _bolt()],
+		[2.6, _bolt],
+		[4.4, func(): _fade_to = 1.0],
+		[5.0, func(): _fade_to = 0.0; banner("", "A mother rat squeezes in through a crack in the wall, soaked and alone.", 4.6)],
+		[5.6, func(): _walk = [W.call(330, 560, 0), W.call(320, 520, 0)]],
+		[8.3, func(): rat.anim.play("sniff"); Sfx.play("squeak", null, -10.0, 1.0)],
+		[9.4, _bolt],
+		[10.6, func(): _walk = [W.call(250, 540, 0), W.call(190, 580, 0), W.call(180, 605, 0)]],
+		[11.6, func(): banner("", "The kitchen is huge, and dark. But under the wall there is a hole…", 4.4)],
+		[16.8, func(): _walk = [W.call(175, 640, 0), W.call(160, 680, 0)]],
+		[17.5, func(): banner("", "…and behind it a warm, dry hollow. She brings paper and straw and makes a nest.", 4.8); _rain_off()],
+		[19.6, func(): _walk = [W.call(130, 700, 0), W.call(115, 690, 0), W.call(135, 680, 0), W.call(152, 704, 0)]],
+		[22.4, func(): rat.anim.play("sleep")],
+		[23.4, func(): _fade_to = 1.0],
+		[24.0, func(): _fade_to = 0.0; banner("By morning, there were four.", "", 4.0)],
+		[24.8, _pop.bind(0)], [25.6, _pop.bind(1)], [26.4, _pop.bind(2)], [27.2, _pop.bind(3)],
+		[29.4, func(): _fade_to = 1.0],
+		[30.0, func(): _fade_to = 0.0; banner("A few days later", "Their eyes are open. And they are very hungry.", 4.0); rat.anim.play("idle"); _pups_wake()],
+		[31.2, func(): _pup_says(0, "Mom?")],
+		[32.0, func(): _pup_says(2, "Hungry!")],
+		[32.8, func(): _pup_says(3, "Cheese?")],
+		[33.4, func(): _walk = [W.call(162, 694, 0)]],
+		[34.4, func(): rat.rotation.y = Nights.yaw_to(Vector3(0.3, 0, -1)); rat.anim.play("sniff")],
+		[34.6, func(): banner("Kitchen Rat", "One mother. Twenty nights. Four hungry mouths.", 3.0)],
+		[37.4, func(): _fade_to = 1.0],
+		[38.0, func(): _fade_to = 0.0; _story_restore(); Sfx.music_night(night.get("music", {})); _night_intro()],
+	]
+
+
+func _bolt() -> void:
+	_flash = 1.0
+	Sfx.play("thunder", null, -4.0)
+
+
+func _rain_off() -> void:
+	if is_instance_valid(_rain_loop):
+		_rain_loop.queue_free()
+	_rain_loop = null
+
+
+func _pop(i: int) -> void:
+	if i >= nest_pups.size():
+		return
+	var p: Node3D = nest_pups[i]
+	p.visible = true
+	var base: Vector3 = _pup_base[i] if i < _pup_base.size() else Vector3.ONE
+	p.scale = base * 0.05
+	create_tween().tween_property(p, "scale", base, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Sfx.play("squeak", null, -8.0, randf_range(1.6, 1.9))
+
+
+func _pups_wake() -> void:
+	var clips := ["idle", "sniff", "squeak", "idle"]
+	for i in nest_pups.size():
+		ClipPlayer.new(nest_pups[i]).play(clips[i % clips.size()], 0.3)
+		(nest_pups[i] as Node3D).rotation.y = Nights.yaw_to(rat.global_position - (nest_pups[i] as Node3D).global_position)
+
+
+func _pup_says(i: int, text: String) -> void:
+	if i < nest_pups.size():
+		bubble_on(text, nest_pups[i], 0.12, 1.8)
+		Sfx.play("squeak", null, -6.0, randf_range(1.4, 1.7))
+
+
+## The prologue's camera: within the current shot it moves from → to, eased, and looks at its target (or her).
+func _story_cam(dt: float) -> void:
+	if OS.has_environment("STORY_AT") and _cut_t < 0.2:  # dev: STORY_AT=27 starts the prologue at 27 s
+		_cut_t = float(OS.get_environment("STORY_AT"))
+		var last := rat.global_position
+		while not _cues.is_empty() and _cut_t >= float(_cues[0][0]):
+			var c: Array = _cues.pop_front()
+			(c[1] as Callable).call()
+			if not _walk.is_empty():
+				last = _walk.back()
+				_walk.clear()
+		rat.global_position = last
+	for sh in _shots:
+		if _cut_t >= float(sh[0]) and _cut_t < float(sh[1]):
+			var k := smoothstep(0.0, 1.0, (_cut_t - float(sh[0])) / (float(sh[1]) - float(sh[0])))
+			_cut_cam.global_position = (sh[2] as Vector3).lerp(sh[3], k)
+			var look: Vector3 = rat.global_position + Vector3.UP * 0.05
+			if sh[4] != null:
+				look = (sh[4] as Vector3).lerp(sh[5] if sh[5] != null else sh[4], k)
+			elif sh[5] != null:
+				look = look.lerp(sh[5], k)
+			_cut_cam.look_at(look)
+			break
+	_flash = maxf(0.0, _flash - dt * 2.6)
+	if env:
+		env.ambient_light_energy = _ambient + _flash * _flash * 4.5
 
 
 func _skip_intro() -> void:
 	if _cut_phase == "leave":
 		return
+	_rain_off()
+	if env:
+		env.ambient_light_energy = _ambient
+	_story_restore()
+
+
+## Puts the nest pups back where the game has them (the story moved and shrank them).
+func _story_restore() -> void:
+	for i in mini(nest_pups.size(), _pup_base.size()):
+		(nest_pups[i] as Node3D).scale = _pup_base[i]
+	var home_clips := ["sleep", "sleep", "idle", "sniff"]  # (as LevelBuilder._nest sets them)
+	for i in mini(nest_pups.size(), _pup_home.size()):
+		(nest_pups[i] as Node3D).global_transform = _pup_home[i]
+		ClipPlayer.new(nest_pups[i]).play(home_clips[i % 4], 0.0)
+	_pup_home.clear()
 	_cut_phase = "leave"
 	_cut_t = 0.0
 	_fade_to = 1.0
@@ -1785,8 +1925,8 @@ func _tick_intro(dt: float) -> void:
 	var nest_c := Nights.world(140, 705, 2)
 	match _cut_phase:
 		"prologue":
-			if _cut_t < 7.2: _walk_rat(dt, 0.3)
-			_orbit(dt, nest_c, 0.8 + _cut_t * 0.05, 0.95, 0.45)
+			_walk_rat(dt, 0.32)
+			_story_cam(dt)
 		"nest":
 			_orbit(dt, nest_c, 0.5 + _cut_t * 0.09, lerpf(0.95, 0.7, clampf(_cut_t / 5.0, 0.0, 1.0)), lerpf(0.5, 0.32, clampf(_cut_t / 5.0, 0.0, 1.0)))
 		"walk":
