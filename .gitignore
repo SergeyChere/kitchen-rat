@@ -17,3 +17,45 @@ art/previews/_tmp/
 sounds_incoming/*
 !sounds_incoming/README.md
 art/library/**/_thumbs/
+
+# Godot: editor cache and generated files, wherever a project is opened
+.godot/
+**/.godot/
+.import/
+*.translation
+mono_crash.*.json
+.mono/
+data_*/
+export/
+build/
+
+# Godot import sidecars and UIDs: new ones made locally are ignored. The ones already in
+# the repo stay tracked on purpose — they carry settings the game needs (mipmaps on the
+# painted textures, looping music). For a NEW asset whose import settings matter, add its
+# sidecar by hand: git add -f path/to/file.png.import
+*.import
+*.uid
+
+# Blender backups and temp files
+*.blend1
+*.blend2
+*.blend@
+*.tmp
+*~
+
+# Editors and IDEs
+.vscode/
+.idea/
+.vs/
+*.code-workspace
+
+# Python environments
+.venv/
+venv/
+
+# OS junk (Windows / macOS)
+desktop.ini
+$RECYCLE.BIN/
+ehthumbs.db
+._*
+*.log
