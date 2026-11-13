@@ -1115,6 +1115,13 @@ func _lighting() -> void:
 		root.add_child(pl)
 		pl.global_position = W(float(l.x), float(l.y), float(l.get("h", 60)))
 		g.flickers.append([pl, pl.light_energy, "steady"])
+		if float(l.get("h", 60)) > 40.0:
+			# round 16 (asked: "the floor lamp in the kitchen corner looks silly"): a light standing in the room
+			# was a candle on a bare stick; now it is a real floor lamp, the light inside its shade
+			floor_lamp(W(float(l.x), float(l.y)), true)
+			pl.global_position = W(float(l.x), float(l.y), 140)
+			pl.light_energy *= 0.8
+			continue
 		# round 4: every light gets a visible source — a little candle lantern at the light's own
 		# spot (dark base, warm glowing core), so no light in the room comes from nowhere
 		var base := MeshInstance3D.new()
@@ -1612,6 +1619,15 @@ func _hide(kind: String, x: float, y: float, w: float, d: float, rot := 0.0) -> 
 
 
 var _worktop := 0.92  # height of the kitchen worktop (m), measured from the first counter section
+var _fridge: Node3D   # the kitchen fridge (the bread box lives on it)
+
+
+## On top of the fridge (cm across its front-to-back depth from the wall), or null without a fridge.
+func _on_fridge(x: float, y: float):
+	if _fridge == null or not is_instance_valid(_fridge):
+		return null
+	var p := W(x, y)
+	return Vector3(p.x, world_aabb(_fridge).end.y, p.z)
 
 
 func _furniture() -> void:
@@ -1634,6 +1650,7 @@ func _furniture() -> void:
 	for j in 4:
 		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
 	var fridge := furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
+	_fridge = fridge
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
 	apply_texture(furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90), "wood", Color.WHITE, 0.72)
 	apply_texture(furn_piece("furniture/cardboard_box", 608, 284, 0.0, "box", 44, 44, 44), "cardboard")
@@ -1821,9 +1838,7 @@ func _kitchen_life(fridge: Node3D) -> void:
 		var block := box("Knife block", kb + Vector3(0, 0.1, 0), Vector3(0.1, 0.2, 0.13), wood, grp)
 		for k in 4:
 			_bit(grp, kb + Vector3(-0.03 + (k % 2) * 0.06, 0.225, -0.03 + (k / 2) * 0.05), Vector3(0.02, 0.06, 0.03), dark)
-		# the bread box and three bottles (oil, vinegar, sauce)
-		var bread := spawn("props/bread_box", Vector3(W(775, 18).x, top, W(775, 18).z), 0.0, decor)
-		collide(bread)
+		# three bottles (oil, vinegar, sauce)
 		for k in 3:
 			var bot := spawn("props/bottle", Vector3(W(600 + k * 11, 9 + (k % 2) * 3).x, top, W(600, 9 + (k % 2) * 3).z), rng.randf_range(0.0, 360.0), decor)
 			collide(bot)
@@ -2007,7 +2022,11 @@ func _decor() -> void:
 				fit(spawn("props/foil", c, 0.0, decor), float(p.w), float(p.h))
 				(add_zone(NoisyZone, "Foil", c, Vector3(float(p.w) / 100.0, 0.2, float(p.h) / 100.0)) as NoisyZone).configure("foil")
 			"breadbox":
-				collide(spawn("props/bread_box", on_top(float(p.x) + float(p.w) / 2.0, float(p.y) + float(p.h) / 2.0), 0.0, decor))
+				# round 16 (asked): on top of the fridge — it used to land on top of the wall cabinets
+				var at = _on_fridge(872, 30)
+				if at == null:
+					at = on_top(float(p.x) + float(p.w) / 2.0, float(p.y) + float(p.h) / 2.0)
+				collide(spawn("props/bread_box", at, 0.0, decor))
 			"noisy":
 				_noisy(p)
 			"hum":
@@ -2019,11 +2038,26 @@ func _decor() -> void:
 				_sticky(p, str(p.t))
 	for f in night.get("furn", []):
 		if bool(f.get("plate", false)):
-			collide(spawn("food/plate", on_top(680, 432), 0.0, decor))
+			plate(on_top(680, 432), true)
 	var ex: Array = night.get("exit", [])
 	if ex.size() >= 2:
 		_exit(Nights.pos(ex))
-	spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)  # no collision: the cat lies in it
+	var cbed := spawn("props/cat_bed", Nights.pos(night.get("catBed")), 0.0, decor)
+	# round 16 (asked: "the rat must not walk through the cat bed"): its real shape, rim and hollow, on a layer
+	# only the rat collides with — the navigation mesh (layer 1) must keep the bed open, the cat walks into it
+	if cbed:
+		for mi in cbed.find_children("*", "MeshInstance3D", true, false):
+			var mm := mi as MeshInstance3D
+			if mm.mesh == null:
+				continue
+			var body := StaticBody3D.new()
+			body.collision_layer = 8
+			body.collision_mask = 0
+			body.set_meta("surface", "cat_bed")
+			var cs := CollisionShape3D.new()
+			cs.shape = mm.mesh.create_trimesh_shape()
+			body.add_child(cs)
+			mm.add_child(body)
 	if (night.get("bowl", []) as Array).size() >= 2:
 		var bowl := spawn("props/cat_bowl", Nights.pos(night.bowl), 0.0, decor)
 		collide(bowl)
@@ -2204,15 +2238,149 @@ const FIND_LABELS := {
 }
 
 
+## A floor lamp (round 16, asked: "the floor lamp in the corner looks silly — make a normal one"): a weighted
+## brass foot, a slim pole with a joint, a pleated drum shade of cream linen. `lit`: the shade glows from inside.
+func floor_lamp(at: Vector3, lit := false) -> Node3D:
+	var root_n := Node3D.new()
+	root_n.name = "Floor lamp"
+	(furn if furn else root).add_child(root_n)
+	root_n.global_position = at
+	var brass := _paint(Color(0.66, 0.5, 0.24))
+	var dark := _paint(Color(0.24, 0.2, 0.17))
+	var linen := _paint(Color(0.94, 0.86, 0.68))
+	if lit:
+		linen.emission_enabled = true
+		linen.emission = Color(1.0, 0.78, 0.46)
+		linen.emission_energy_multiplier = 0.9
+	var parts := [  # radius top, radius bottom, height, y of centre, material
+		[0.13, 0.15, 0.03, 0.015, dark],
+		[0.05, 0.08, 0.025, 0.042, brass],
+		[0.011, 0.011, 1.2, 0.65, brass],
+		[0.02, 0.02, 0.04, 0.8, dark],
+		[0.03, 0.012, 0.05, 1.27, brass],
+		[0.15, 0.2, 0.27, 1.42, linen],
+	]
+	for pr in parts:
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = pr[0]
+		cm.bottom_radius = pr[1]
+		cm.height = pr[2]
+		cm.radial_segments = 20 if pr[0] > 0.05 else 10
+		cm.rings = 1
+		mi.mesh = cm
+		mi.material_override = pr[4]
+		root_n.add_child(mi)
+		mi.position = Vector3.UP * pr[3]
+	# pleats: thin darker ribs down the shade, and a trim at its top and bottom
+	var rib := _paint(Color(0.82, 0.72, 0.54))
+	for k in 16:
+		var a := k * TAU / 16.0
+		var r := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.008, 0.27, 0.004)
+		r.mesh = bm
+		r.material_override = rib
+		root_n.add_child(r)
+		r.position = Vector3(sin(a) * 0.176, 1.42, cos(a) * 0.176)
+		r.rotation = Vector3(0, a, 0)
+		r.rotate_object_local(Vector3.RIGHT, -atan2(0.05, 0.27))
+	for t in [[0.2, 1.285], [0.15, 1.555]]:
+		var ti := MeshInstance3D.new()
+		var tm := TorusMesh.new()
+		tm.inner_radius = t[0] - 0.006
+		tm.outer_radius = t[0] + 0.006
+		tm.rings = 24
+		tm.ring_segments = 6
+		ti.mesh = tm
+		ti.material_override = brass
+		root_n.add_child(ti)
+		ti.position = Vector3.UP * t[1]
+	for mi in root_n.get_children():
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	var cy := CylinderShape3D.new()
+	cy.radius = 0.15
+	cy.height = 0.05
+	cs.shape = cy
+	body.add_child(cs)
+	var cs2 := CollisionShape3D.new()
+	var cy2 := CylinderShape3D.new()
+	cy2.radius = 0.02
+	cy2.height = 1.3
+	cs2.shape = cy2
+	cs2.position = Vector3.UP * 0.65
+	body.add_child(cs2)
+	root_n.add_child(body)
+	body.position = Vector3.UP * 0.025
+	return root_n
+
+
+## A plate (round 16, asked: "plates look silly, as if flush with the table"). The model was a flat disc 1 cm
+## thick; this one has a foot, a well and a raised rim, so it stands on the table and holds what is on it.
+func plate(at: Vector3, solid := false) -> Node3D:
+	var root_n := Node3D.new()
+	root_n.name = "Plate"
+	decor.add_child(root_n)
+	root_n.global_position = at
+	var china := _paint(Color(0.95, 0.94, 0.9))
+	var band := _paint(Color(0.36, 0.52, 0.76))
+	var parts := [[0.06, 0.007, 0.0035, china], [0.1, 0.006, 0.009, china]]
+	for pr in parts:
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = pr[0]
+		cm.bottom_radius = pr[0] * 0.92
+		cm.height = pr[1]
+		cm.radial_segments = 24
+		cm.rings = 1
+		mi.mesh = cm
+		mi.material_override = pr[3]
+		root_n.add_child(mi)
+		mi.position = Vector3.UP * pr[2]
+	for r in [[0.104, 0.122, china, 0.016], [0.112, 0.119, band, 0.0215]]:
+		var ti := MeshInstance3D.new()
+		var tm := TorusMesh.new()
+		tm.inner_radius = r[0]
+		tm.outer_radius = r[1]
+		tm.rings = 28
+		tm.ring_segments = 8
+		ti.mesh = tm
+		ti.material_override = r[2]
+		ti.scale = Vector3(1.0, 0.55, 1.0)
+		root_n.add_child(ti)
+		ti.position = Vector3.UP * r[3]
+	for mi in root_n.get_children():
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if solid:
+		var body := StaticBody3D.new()
+		body.collision_layer = 1
+		body.collision_mask = 0
+		var cs := CollisionShape3D.new()
+		var cy := CylinderShape3D.new()
+		cy.radius = 0.12
+		cy.height = 0.024
+		cs.shape = cy
+		body.add_child(cs)
+		root_n.add_child(body)
+		body.position = Vector3.UP * 0.012
+	return root_n
+
+
 func _food() -> void:
 	var fd: Dictionary = night.get("food", {})
 	for s in fd.get("spots", []):
 		var at := W(float(s.x), float(s.y)) if bool(s.get("floor", false)) else on_top(float(s.x), float(s.y))
+		if str(s.get("tag", "")) == "bread" and _on_fridge(925, 34) != null:
+			at = _on_fridge(925, 34)  # the cheese hidden by the bread box goes where the bread box is
 		if bool(s.get("plate", false)):
 			# round 12 (asked): some food is SERVED — a plate under it, and the food
 			# sits in the plate rather than on the bare surface beneath
-			spawn("food/plate", at, randf() * 360.0, decor)
-			at += Vector3.UP * 0.02
+			plate(at)
+			at += Vector3.UP * 0.014
 		var f := g.spawn_food(str(s.type), at, str(s.get("tag", "")), false)
 		if f:
 			f.hidden = bool(s.get("hidden", false))

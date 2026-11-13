@@ -196,7 +196,7 @@
    },
    {
     "text": "Sniff out the cheese hidden by the bread box",
-    "hint": "It's hidden: you won't see it until you sniff. Go close to the bread box on the counter and hold E, then climb up (the stool helps) and take it.",
+    "hint": "It's hidden: you won't see it until you sniff. Go close to the bread box on top of the fridge and hold E, then climb up over the wall cabinets and take it.",
     "type": "pick",
     "arg": "bread",
     "n": 0,

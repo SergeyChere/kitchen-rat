@@ -98,7 +98,7 @@ var _hopping := false  # in the air after her own hop (only then she reaches for
 
 func _ready() -> void:
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 1 | 8  # 8: things only she bumps into (the cat bed: the cat and the navmesh go through it)
 	floor_max_angle = deg_to_rad(50.0)
 	floor_snap_length = 0.12  # demo polish: was 0.05, she un-stuck and micro-fell stepping off shelves
 	_make_dust()

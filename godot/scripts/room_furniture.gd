@@ -299,7 +299,7 @@ func build(list: Array) -> void:
 				_fire(W(cx, cy, 16), w)
 			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
-				b.collide(b.spawn("furniture/floor_lamp", W(cx, cy), 0.0, b.furn))
+				b.floor_lamp(W(cx, cy), true)
 				# round 8 (asked): in the living room the floor lamp sits by the garland
 				# and out-shouts it — dimmed there, untouched elsewhere
 				if str(g.night.get("decor", "")) == "living":
@@ -633,6 +633,9 @@ func _floor_item(model: String, x: float, y: float) -> bool:
 	var p := W(x, y)
 	if _busy(p, 30.0) or not _free_box(p + Vector3.UP * 0.6, Vector3(44, 110, 44)):
 		return false
+	if model == "furniture/floor_lamp":
+		b.floor_lamp(p)
+		return true
 	var n := b.spawn(model, p, randf() * 360.0, b.furn)
 	if n:
 		b.collide(n)
