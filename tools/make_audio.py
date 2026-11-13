@@ -534,7 +534,8 @@ def midi(n):
 
 def music_key(d):
     prog = ''.join('%+d%s' % (o, q) for o, q in d['prog'])
-    return 'r%d%s%d_%s' % (d['root'], 'm' if d['minor'] else 'M', d['bpm'], prog.replace('+', 'p').replace('-', 'n'))
+    # lower case only: major chords are 'j', minor 'm' (an 'M'/'m' pair collided on Windows, whose file names ignore case)
+    return ('r%d%s%d_%s' % (d['root'], 'm' if d['minor'] else 'M', d['bpm'], prog.replace('+', 'p').replace('-', 'n'))).replace('M', 'j')
 
 
 def render_music(d, menu=False):

@@ -244,7 +244,8 @@ static func music_key(d: Dictionary) -> String:
 	for c in d.get("prog", []):
 		var o := int(c[0])
 		prog += ("p" if o >= 0 else "n") + str(absi(o)) + str(c[1])
-	return "r%d%s%d_%s" % [int(d.root), "m" if bool(d.minor) else "M", int(d.bpm), prog]
+	# lower case only: major is "j", minor "m" (an "M"/"m" pair of files collided on Windows, which ignores case)
+	return ("r%d%s%d_%s" % [int(d.root), "m" if bool(d.minor) else "M", int(d.bpm), prog]).replace("M", "j")
 
 
 func _ogg(path: String) -> AudioStream:
