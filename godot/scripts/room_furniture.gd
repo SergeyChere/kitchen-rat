@@ -125,44 +125,150 @@ func _washer_wall_lamp(lx: float) -> void:
 ## Round 8 (asked): a MOVING fire in the fireplace — the flickering light alone
 ## read as a lamp behind glass. CPU flame particles: they rise, shrink and die,
 ## orange to ember-red, additively blended over the logs.
-func _fire(at: Vector3, w_cm: float) -> void:
+## A fire in the grate (round 16, asked: "add a moving fire to the fireplace"): three crossed logs on a bed of
+## glowing embers, five tongues of flame that lick and flicker (each its own phase and height), and sparks.
+const FLAME := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, shadows_disabled, cull_disabled;
+uniform float seed = 0.0;
+uniform float hot = 1.0;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void vertex() {
+	// stands upright and turns to face the camera (a billboard around the vertical)
+	vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), INV_VIEW_MATRIX[2].xyz));
+	vec3 fwd = normalize(cross(side, vec3(0.0, 1.0, 0.0)));
+	mat4 bb = mat4(vec4(side * length(MODEL_MATRIX[0].xyz), 0.0), vec4(0.0, length(MODEL_MATRIX[1].xyz), 0.0, 0.0),
+			vec4(fwd * length(MODEL_MATRIX[2].xyz), 0.0), MODEL_MATRIX[3]);
+	MODELVIEW_MATRIX = VIEW_MATRIX * bb;
+}
+void fragment() {
+	vec2 uv = vec2(UV.x, 1.0 - UV.y);  // 0 at the base, 1 at the tip
+	float t = TIME * 1.7 + seed * 7.3;
+	float n = noise(vec2(uv.x * 3.0 + seed * 5.0, uv.y * 3.5 - t * 2.3));
+	float n2 = noise(vec2(uv.x * 7.0 - seed * 3.0, uv.y * 8.0 - t * 3.4));
+	float x = uv.x - 0.5 + (n - 0.5) * 0.42 * uv.y + (n2 - 0.5) * 0.1;
+	float w = 0.5 * pow(clamp(uv.y, 0.0, 1.0), 0.28) * (1.0 - uv.y * 0.92);
+	float d = abs(x) / max(w, 0.001);
+	float tip = uv.y + (n - 0.5) * 0.3 + (n2 - 0.5) * 0.12;
+	float body = smoothstep(1.0, 0.5, d) * smoothstep(0.98, 0.62, tip);
+	float core = smoothstep(0.6, 0.05, d) * smoothstep(0.58, 0.12, tip);
+	vec3 col = mix(vec3(0.9, 0.24, 0.04), vec3(1.0, 0.55, 0.1), smoothstep(0.0, 0.7, body));
+	col = mix(col, vec3(1.0, 0.92, 0.62), core);
+	ALBEDO = col * body * hot * 1.35;
+}
+"""
+static var _flame_shader: Shader
+
+
+func _fire(at: Vector3, len_cm: float, wall := "n") -> void:
+	var grp := Node3D.new()
+	grp.name = "Fireplace fire"
+	b.furn.add_child(grp)
+	grp.global_position = at
+	# local +z points out of the fireplace into the room
+	grp.rotation.y = {"w": PI / 2.0, "e": -PI / 2.0, "s": PI}.get(wall, 0.0)
+	var span := clampf(len_cm / 100.0 * 0.45, 0.28, 0.6)
+	# embers: a low glowing mound
+	var em := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.5
+	sm.height = 1.0
+	sm.radial_segments = 16
+	sm.rings = 6
+	em.mesh = sm
+	var emat := StandardMaterial3D.new()
+	emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	emat.albedo_color = Color(1.0, 0.42, 0.1)
+	em.material_override = emat
+	grp.add_child(em)
+	em.scale = Vector3(span, 0.035, 0.2)
+	em.position = Vector3(0, -0.02, 0)
+	# logs: two side by side and one across them, bark outside, charred ends
+	var bark := b._paint(Color(0.3, 0.18, 0.11))
+	var char_m := b._paint(Color(0.12, 0.08, 0.07))
+	var logs := [[Vector3(0, 0.01, -0.045), Vector3(0, 0, 90), span * 0.9], [Vector3(0.02, 0.01, 0.05), Vector3(0, 8, 90), span * 0.85],
+			[Vector3(-0.03, 0.06, 0.0), Vector3(0, 70, 90), span * 0.6]]
+	for lg in logs:
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.035
+		cm.bottom_radius = 0.038
+		cm.height = lg[2]
+		cm.radial_segments = 10
+		cm.rings = 1
+		mi.mesh = cm
+		mi.material_override = bark
+		grp.add_child(mi)
+		mi.position = lg[0]
+		mi.rotation_degrees = lg[1]
+		for e in [-1.0, 1.0]:
+			var cap := MeshInstance3D.new()
+			var ccm := CylinderMesh.new()
+			ccm.top_radius = 0.036
+			ccm.bottom_radius = 0.036
+			ccm.height = 0.012
+			ccm.radial_segments = 10
+			cap.mesh = ccm
+			cap.material_override = char_m
+			mi.add_child(cap)
+			cap.position = Vector3(0, e * float(lg[2]) * 0.5, 0)
+	# flames
+	if _flame_shader == null:
+		_flame_shader = Shader.new()
+		_flame_shader.code = FLAME
+	var flames := [[-0.42, 0.75, 0.13], [-0.18, 1.0, 0.71], [0.05, 1.18, 0.37], [0.26, 0.95, 0.93], [0.45, 0.7, 0.52]]
+	for fl in flames:
+		var mi := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(0.24, 0.32)
+		mi.mesh = q
+		var m := ShaderMaterial.new()
+		m.shader = _flame_shader
+		m.set_shader_parameter("seed", fl[2])
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		grp.add_child(mi)
+		var hgt: float = fl[1]
+		mi.scale = Vector3(0.9 + hgt * 0.2, hgt, 1.0)
+		mi.position = Vector3(float(fl[0]) * span * 0.85, 0.02 + 0.15 * hgt, 0.045 + (float(fl[2]) - 0.5) * 0.03)
+	for mi in grp.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# sparks rising out of it now and then
 	var e := CPUParticles3D.new()
-	e.name = "Fireplace fire"
-	e.amount = 26
-	e.lifetime = 0.75
+	e.name = "Sparks"
+	e.amount = 10
+	e.lifetime = 1.3
 	e.local_coords = false
 	e.direction = Vector3.UP
-	e.spread = 13.0
-	e.gravity = Vector3(0, 0.32, 0)
-	e.initial_velocity_min = 0.22
-	e.initial_velocity_max = 0.42
-	e.damping_min = 0.3
-	e.damping_max = 0.6
-	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	e.emission_sphere_radius = 0.15
-	e.scale_amount_min = 0.7
-	e.scale_amount_max = 1.25
-	var sc := Curve.new()
-	sc.add_point(Vector2(0, 0.35)); sc.add_point(Vector2(0.3, 1.0)); sc.add_point(Vector2(1, 0.1))
-	e.scale_amount_curve = sc
+	e.spread = 18.0
+	e.gravity = Vector3(0, 0.15, 0)
+	e.initial_velocity_min = 0.25
+	e.initial_velocity_max = 0.5
+	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	e.emission_box_extents = Vector3(span * 0.4, 0.02, 0.05)
 	var gr := Gradient.new()
-	gr.set_color(0, Color(1.0, 0.6, 0.14, 0.8))
-	gr.set_color(1, Color(0.9, 0.2, 0.03, 0.0))
+	gr.set_color(0, Color(1.0, 0.85, 0.4, 1.0))
+	gr.set_color(1, Color(1.0, 0.3, 0.05, 0.0))
 	e.color_ramp = gr
-	var q := QuadMesh.new()
-	q.size = Vector2(0.11, 0.11)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = _soft_disc()
-	q.material = m
-	e.mesh = q
-	b.furn.add_child(e)
-	e.global_position = at
-	e.scale = Vector3(maxf(w_cm, 60.0) / 90.0, 0.55, 0.75)
+	var q2 := QuadMesh.new()
+	q2.size = Vector2(0.012, 0.012)
+	var m2 := StandardMaterial3D.new()
+	m2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m2.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m2.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m2.vertex_color_use_as_albedo = true
+	m2.albedo_texture = _soft_disc()
+	q2.material = m2
+	e.mesh = q2
+	grp.add_child(e)
+	e.position = Vector3(0, 0.1, 0)
 
 
 func _soft_disc() -> Texture2D:
@@ -296,7 +402,15 @@ func build(list: Array) -> void:
 				place("furniture/fireplace", f, "fireplace")
 				var out := W(x + w + 30, cy, 40) if side(x, y, w, d) == "w" else W(cx, cy, 40)
 				light(out, Color8(0xff, 0x8a, 0x3a), 2.2, 4.2)
-				_fire(W(cx, cy, 16), w)
+				var fside := side(x, y, w, d)
+				# at the front of the firebox, not in the middle of the model's footprint (it was inside the brickwork)
+				var fat := W(cx, cy, 6)
+				match fside:
+					"w": fat = W(x + w - 8.0, cy, 6)
+					"e": fat = W(x + 8.0, cy, 6)
+					"n": fat = W(cx, y + d - 8.0, 6)
+					"s": fat = W(cx, y + 8.0, 6)
+				_fire(fat, d if fside in ["w", "e"] else w, fside)
 			"sideTable": place("furniture/side_table", f, "side", float(f.get("ht", 60)), null, "wood_dark")
 			"lamp":
 				b.floor_lamp(W(cx, cy), true)
