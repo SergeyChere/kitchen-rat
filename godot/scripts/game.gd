@@ -1039,6 +1039,8 @@ func _tick_food_visibility(rp: Vector3) -> void:
 	for f in foods:
 		if f.carried:
 			continue
+		if _warming:
+			continue
 		var d := f.global_position.distance_to(rp)
 		var shown := f.is_find or f.reveal_t > 0.0 or f.has_meta("found")
 		if open:
@@ -1698,6 +1700,7 @@ func _start_intro() -> void:
 	fade = 1.0
 	_fade_to = 0.0
 	Sfx.music_night(night.get("music", {}))
+	_warm_up()
 	if bool(night.get("prologue", false)) and (force_prologue or not Progress.seen_prologue):
 		force_prologue = false
 		Progress.seen_prologue = true
@@ -1705,6 +1708,52 @@ func _start_intro() -> void:
 		_prologue()
 		return
 	_night_intro()
+
+
+## Round 17 (asked: "the game hangs hard — I run and it keeps freezing for a moment"): this renderer builds each
+## shader the first time something drawn with it comes into view, and the sounds were read from disk the first
+## time each one played — so running into a new corner, a piece of food popping into sight or a new noise could
+## stall a frame for a tenth of a second. While the nest scene plays, a small hidden camera looks round the room
+## from a few spots with every piece of food and every trap shown, and every sound is loaded.
+var _warming := false
+
+
+func _warm_up() -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_environment("NOWARM"):
+		return
+	Sfx.preload_all()
+	var vp := SubViewport.new()
+	vp.size = Vector2i(320, 180)
+	vp.world_3d = get_viewport().world_3d
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(vp)
+	var c := Camera3D.new()
+	c.fov = 100.0
+	vp.add_child(c)
+	c.current = true
+	_warming = true
+	var shown: Array[Node3D] = []
+	for n in foods:
+		if is_instance_valid(n) and not n.visible:
+			n.visible = true
+			shown.append(n)
+	for t in traps:
+		if is_instance_valid(t) and not t.visible:
+			t.visible = true
+			shown.append(t)
+	var spots := [Nights.world(240, 300, 25), Nights.world(720, 300, 25), Nights.world(480, 300, 130)]
+	for p in spots:
+		for k in 6:
+			c.global_position = p
+			c.rotation = Vector3(-0.35 if p.y > 1.0 else 0.1, TAU * k / 6.0, 0.0)
+			await get_tree().process_frame
+			if not is_instance_valid(vp):
+				return
+	_warming = false
+	for n in shown:
+		if is_instance_valid(n) and n is Trap:
+			n.visible = not (n as Trap).hidden  # food sorts itself out every frame of play; traps stay hidden until found
+	vp.queue_free()
 
 
 func _night_intro() -> void:

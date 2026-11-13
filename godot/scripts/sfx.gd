@@ -127,6 +127,27 @@ static func apply_volumes() -> void:
 
 # ---------- effects ----------
 
+## Every effect and recording read in one go (Game._warm_up, behind the nest scene), not from disk at the
+## moment it first plays.
+static func preload_all() -> void:
+	if I == null or I._preloaded:
+		return
+	I._preloaded = true
+	for f in ResourceLoader.list_directory(SND):
+		if f.ends_with(".wav"):
+			I._stream(f.get_basename())
+	var names := {}
+	for f in ResourceLoader.list_directory(REAL):
+		var base := f.get_basename()
+		if f.ends_with(".ogg") and base.rfind("_") > 0:
+			names[base.substr(0, base.rfind("_"))] = true
+	for n in names:
+		I._real(n)
+
+
+var _preloaded := false
+
+
 func _stream(name: String) -> AudioStream:
 	if _cache.has(name):
 		return _cache[name]

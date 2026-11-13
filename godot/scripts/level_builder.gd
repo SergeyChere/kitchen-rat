@@ -1806,6 +1806,43 @@ func _furniture() -> void:
 		_kitchen_upper()
 	_backsplash()
 	_kitchen_life(fridge)
+	_nest_corner()
+
+
+## Round 17 (asked: "the corner by the burrow is very empty"): the kitchen's south-west corner, round our hole,
+## gets the clutter a real kitchen keeps there — a tall pantry cupboard on the west wall, a big potted plant in
+## the corner, the mop and bucket, a crate of empty bottles. The hole itself (x 150…210) stays clear, and a
+## piece is left out wherever the night puts food, a find or something to knock over.
+func _nest_corner() -> void:
+	if OS.get_environment("HIDE").contains("life"):
+		return
+	var taken: Array = []
+	for s in night.get("food", {}).get("spots", []):
+		taken.append(Vector2(float(s.x), float(s.y)))
+	for key in ["knock", "knockables", "secrets", "props", "noisy"]:
+		for k in night.get(key, []):
+			if k is Dictionary and k.has("x"):
+				taken.append(Vector2(float(k.x), float(k.y)))
+	var free := func(x: float, y: float, r: float) -> bool:
+		for t in taken:
+			if (t as Vector2).distance_to(Vector2(x, y)) < r:
+				return false
+		return true
+	if free.call(30, 455, 60):
+		furn_piece("furniture/cabinet_tall", 30, 455, 90.0, "cabinet", 60, 45)
+	if free.call(42, 562, 40):
+		collide(spawn("furniture/plant", W(42, 562), 0.0, decor))
+	if free.call(112, 566, 35):
+		collide(spawn("props/bucket_mop", W(112, 566), 25.0, decor))
+	if free.call(285, 560, 40):
+		var crate := spawn("furniture/crate", W(285, 560), -8.0, decor)
+		if crate:
+			collide(crate)
+			var top := world_aabb(crate).end.y
+			for i in 4:
+				var bt := spawn("props/bottle", W(272 + (i % 2) * 22, 548 + (i / 2) * 22, top * 100.0 - 18.0), 0.0, decor)
+				if bt:
+					bt.scale *= 0.8
 
 
 ## A plain painted material for the small things below: the wash over its colour, the pen line round it.

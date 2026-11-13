@@ -75,11 +75,62 @@ func build_sky(game: Game, seed_value: int, shaft_mats: Array = []) -> void:
 	_tree.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	# the rooms have no ceiling: a crown higher than the walls would show over the wall top from inside
 	_tree.scale = Vector3.ONE * minf(1.0, 2.42 / maxf(_tree.mesh.get_aabb().end.y, 0.1))
-	_tree.position = Vector3(0.15, 0.0, -0.75)
+	# round 17 (asked: "the tree looks as if it stands inside the room"): it stood 75 cm out and its crown reached
+	# through the wall. Now it stands well out in the garden and no leaf comes nearer the wall than 40 cm.
+	var ab := _tree.mesh.get_aabb()
+	_tree.position = Vector3(-0.25, 0.0, minf(-1.9, -0.4 - ab.end.z * _tree.scale.z))
 	add_child(_tree)
+	_garden(rng)
 
 
 const TREE_SHADER := preload("res://shaders/tree_sway.gdshader")
+
+
+## Depth behind the tree, so the window opens onto a garden at night: a hedge along the garden, and far
+## off, the dark round crowns of other trees and a neighbour's roof with one warm window lit.
+func _garden(rng: RandomNumberGenerator) -> void:
+	var hedge := _unshaded(Color(0.05, 0.08, 0.1))
+	for i in 9:
+		var h := _ball(rng.randf_range(0.35, 0.5), hedge, 0.7)
+		h.position = Vector3(-2.4 + i * 0.6 + rng.randf_range(-0.1, 0.1), rng.randf_range(0.35, 0.55), -3.4 + rng.randf_range(-0.15, 0.15))
+		add_child(h)
+	var far := _unshaded(Color(0.07, 0.1, 0.16))
+	for i in 6:
+		var c := Node3D.new()
+		c.position = Vector3(-4.0 + i * 1.6 + rng.randf_range(-0.4, 0.4), 0.0, -7.0 + rng.randf_range(-0.8, 0.8))
+		add_child(c)
+		for k in 3:
+			var b := _ball(rng.randf_range(0.6, 0.9), far, 0.85)
+			b.position = Vector3(rng.randf_range(-0.5, 0.5), rng.randf_range(1.6, 2.4), rng.randf_range(-0.3, 0.3))
+			c.add_child(b)
+	# the neighbour's house: a dark block with a pitched roof and one lit window
+	var wall := _unshaded(Color(0.09, 0.11, 0.17))
+	var house := MeshInstance3D.new()
+	var hb := BoxMesh.new()
+	hb.size = Vector3(2.6, 2.2, 1.0)
+	house.mesh = hb
+	house.material_override = wall
+	house.position = Vector3(2.2, 1.1, -9.0)
+	add_child(house)
+	var roof := MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = Vector3(3.0, 1.1, 1.2)
+	roof.mesh = pm
+	roof.material_override = _unshaded(Color(0.07, 0.08, 0.13))
+	roof.position = Vector3(2.2, 2.75, -9.0)
+	add_child(roof)
+	var lit := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.45, 0.55)
+	lit.mesh = qm
+	lit.material_override = _unshaded(Color(1.0, 0.78, 0.42))
+	lit.position = Vector3(1.7, 1.4, -8.49)
+	add_child(lit)
+	for o in [house, roof, lit]:
+		(o as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for n in get_children():
+		if n is GeometryInstance3D and n != _tree and n.get_parent() == self and n.position.z < -3.0:
+			(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 var _tree: MeshInstance3D

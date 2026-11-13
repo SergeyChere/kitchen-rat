@@ -86,6 +86,9 @@ func _tick_fps(dt: float) -> void:
 ## level for the rest of the session (high → medium → low) and say so once. The saved setting is left alone.
 var _slow := 0.0
 
+var _avg_ms := 0.0
+
+
 func _tick_perf(dt: float) -> void:
 	if game == null or game.state != "play" or _args.has("shot") or DisplayServer.get_name() == "headless" or Settings.quality == "low":
 		_slow = 0.0
@@ -112,6 +115,15 @@ func _process(_dt: float) -> void:
 				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
 				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME) / 1000])
+	if _args.has("perf") and game and game.state == "play":  # dev: log the hitches (a frame 3× the usual one)
+		var ms := get_process_delta_time() * 1000.0
+		_avg_ms = lerpf(_avg_ms, ms, 0.05) if _avg_ms > 0.0 else ms
+		if ms > _avg_ms * 3.0 and ms > 30.0:
+			print("HITCH %.0f ms (usual %.0f) at %.1f s · process %.1f ms · physics %.1f ms" % [ms, _avg_ms, Time.get_ticks_msec() / 1000.0,
+					Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0])
+		if _frames % 120 == 0:
+			print("COST process %.1f ms · physics %.1f ms · nodes %d" % [Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+					Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
 	_frames += 1
 	_tick_fps(_dt)
 	_tick_perf(get_process_delta_time() / maxf(Engine.time_scale, 0.01))
