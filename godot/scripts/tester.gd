@@ -1027,7 +1027,10 @@ func _juice(host: Node) -> void:
 	g.cam.snap(r.rotation.y)
 	Input.action_press("forward"); Input.action_press("run")
 	var fov1 := fov0
-	for i in 42:
+	# by time, not by frames: headless on CI the frames fly by in a few milliseconds each, and 42 of them were
+	# sometimes too short a run for the view to widen past the mark (60.0 -> 62.0 failed the build)
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 900:
 		await host.get_tree().process_frame
 		fov1 = maxf(fov1, g.cam.cam.fov)
 	Input.action_release("forward"); Input.action_release("run")
