@@ -41,6 +41,24 @@ func _run(host: Node) -> void:
 			print("t %.0f vac %s on %s vis %s path %d stun %.1f rat %s" % [g.night_time, str(v.global_position), v.on, v.visible, v.path.size(), v._stun, str(g.rat.global_position)])
 		host.get_tree().quit()
 		return
+	if name == "gaps":  # round 16: the gaps behind the fridge / washers / cabinets — she fits and is hidden there
+		var n := 0
+		for z in g.zones:
+			if z is HideSpot and (z as HideSpot).id == "behind":
+				n += 1
+				var c: Vector3 = (z as Node3D).global_position
+				var hz := z as HideSpot
+				g.rat.teleport(Vector3(c.x, 0.02, c.z), PI / 2.0 if hz.size.x > hz.size.z else 0.0)  # facing along the gap
+				await _wait(host, 0.6)
+				var p := g.rat.global_position
+				_check("she fits in the gap at %s" % str(Vector2(snappedf(c.x, 0.01), snappedf(c.z, 0.01))), Vector2(p.x - c.x, p.z - c.z).length() < 0.06 and p.y < 0.1,
+						"now at %s" % str(p))
+				var inz := []
+				for z2 in g.zones:
+					if z2.contains(p): inz.append(str(z2.name) + "/" + z2.get_class())
+				_check("  ...and is hidden there", g.rat.hidden(), "y %.3f spot %s zones %s zy %.3f" % [p.y, g.rat.hide_spot.id if g.rat.hide_spot else "none", str(inz), c.y])
+		_check("there is at least one gap", n > 0, "%d gaps" % n)
+		return
 	if name == "vacuum":  # night 16 or 19: the robot's whole round — dock, work, battery low, home, charge, out again
 		var v := g.vacuum
 		_check("the vacuum waits on its dock, switched off", v != null and v.visible and not v.on and v.global_position.distance_to(v.dock) < 0.05)
@@ -289,10 +307,20 @@ func _run(host: Node) -> void:
 		g.cam.snap(r.rotation.y)
 		await _wait(host, 0.3)
 		Input.action_press("forward")
-		await _wait(host, 5.5)
+		await _wait(host, 3.0)
+		Input.action_release("forward")
+		await _wait(host, 0.4)
+		_check("walked over the window shelf onto the cabinets past it", r.surface_id == "cabinet" and r.global_position.x > Nights.world(640, 0).x, "surface " + r.surface_id + " at " + str(r.global_position))
+		# round 16: the fridge stands out from the wall now (a gap behind it to hide in): over the cabinets' front
+		# half onto it
+		r.teleport(Nights.world(700, 29, 216), Nights.yaw_to(Vector3.RIGHT))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.3)
+		Input.action_press("forward")
+		await _wait(host, 2.5)
 		Input.action_release("forward")
 		await _wait(host, 0.5)
-		_check("walked over the window shelf and the cabinets onto the fridge", r.surface_id == "fridge", "surface " + r.surface_id + " at " + str(r.global_position))
+		_check("…and from the cabinets onto the fridge", r.surface_id == "fridge", "surface " + r.surface_id + " at " + str(r.global_position))
 		# on the cabinet tops facing the wall: no jump onto the top of the wall (outside the room)
 		r.teleport(Nights.world(200, 20, 216), Nights.yaw_to(Vector3.FORWARD))
 		await _wait(host, 0.4)

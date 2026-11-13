@@ -46,7 +46,10 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 	var x := float(f.x); var y := float(f.y)
 	var w := float(f.get("w", 0)); var d := float(f.get("h", 0))
 	var r: float = rot if rot != null else side_rot(side(x, y, w, d))
-	var n := b.spawn(model, W(x + w / 2.0, y + d / 2.0), r, b.furn)
+	var at := W(x + w / 2.0, y + d / 2.0)
+	if surface in ["washer", "boiler"]:
+		at += _gap_behind(x, y, w, d)
+	var n := b.spawn(model, at, r, b.furn)
 	if n == null:
 		return null
 	if absf(absf(r) - 90.0) < 1.0:
@@ -62,6 +65,50 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 		var tint := LevelBuilder.hex(int(f.get("color", 0xffffff))) if f.has("color") else Color.WHITE
 		b.apply_texture(n, tex, tint)
 	return n
+
+
+## Round 16 (asked: "move the fridge, the washing machines and so on away from the wall, so the rat can hide
+## behind them"): a big piece standing against a wall is pulled out until there is a 15 cm gap behind it — room
+## for her, not for the cat — and the gap is a hiding place. Returns the shift (world metres).
+const GAP := 24.0   # cm from the room's edge: the walls take the first 7, so this leaves her ~17 cm
+const WALL := 7.0
+
+func _gap_behind(x: float, y: float, w: float, d: float) -> Vector3:
+	var shift := Vector3.ZERO
+	var gx := x + w / 2.0
+	var gy := y + d / 2.0
+	var gw := w
+	var gd := d
+	match side(x, y, w, d) if side(x, y, w, d) != "" else _nearest_wall(x, y, w, d):
+		"n":
+			shift.z = maxf(GAP - y, 0.0) / 100.0
+			gy = (GAP + WALL) / 2.0
+			gd = GAP - WALL - 2.0
+		"s":
+			shift.z = -maxf(GAP - (600.0 - y - d), 0.0) / 100.0
+			gy = 600.0 - (GAP + WALL) / 2.0
+			gd = GAP - WALL - 2.0
+		"w":
+			shift.x = maxf(GAP - x, 0.0) / 100.0
+			gx = (GAP + WALL) / 2.0
+			gw = GAP - WALL - 2.0
+		"e":
+			shift.x = -maxf(GAP - (960.0 - x - w), 0.0) / 100.0
+			gx = 960.0 - (GAP + WALL) / 2.0
+			gw = GAP - WALL - 2.0
+		_:
+			return Vector3.ZERO
+	b._hide("behind", gx, gy, gw, gd)
+	return shift
+
+
+func _nearest_wall(x: float, y: float, w: float, d: float) -> String:
+	var dist := {"n": y, "s": 600.0 - y - d, "w": x, "e": 960.0 - x - w}
+	var best := "n"
+	for k in dist:
+		if dist[k] < dist[best]:
+			best = k
+	return best if dist[best] < 40.0 else ""
 
 
 func _fit_height(n: Node3D, h_cm: float) -> void:
@@ -439,7 +486,7 @@ func build(list: Array) -> void:
 			"sideboard": place("furniture/sideboard", f, "sideboard", 0.0, null, "wood_dark")
 			"cabinetTall":
 				# modelled long along its own Z, front toward +X: as is against the west wall
-				var n := b.spawn("furniture/cabinet_tall", W(cx, cy), 0.0 if x < 480.0 else 180.0, b.furn)
+				var n := b.spawn("furniture/cabinet_tall", W(cx, cy) + _gap_behind(x, y, w, d), 0.0 if x < 480.0 else 180.0, b.furn)
 				b.fit(n, w, d)
 				b.collide(n)
 			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")

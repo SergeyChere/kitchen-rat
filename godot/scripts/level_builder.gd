@@ -1707,7 +1707,16 @@ func _furniture() -> void:
 			_sink_water(piece)
 	for j in 4:
 		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
-	var fridge := furn_piece("furniture/fridge", 895, 56, 0.0, "fridge", 130, 110)
+	# round 16 (asked): 15 cm out from the wall — a gap behind it to hide in
+	var fridge := furn_piece("furniture/fridge", 895, 71, 0.0, "fridge", 130, 110)
+	_hide("behind", 895, 15.5, 120, 15)
+	if fridge:  # the model's box can stick out past 110 cm (the handle): measure where its back really is
+		var fb := world_aabb(fridge)
+		var back_cm := (fb.position.z - W(0, 0).z) * 100.0
+		if back_cm < 24.0:  # (the wall takes the first 7 cm: this leaves her ~17)
+			fridge.global_position.z += (24.0 - back_cm) / 100.0
+			var bb: Node3D = fridge.get_meta("box_body")
+			bb.global_position.z += (24.0 - back_cm) / 100.0
 	_fridge = fridge
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
 	apply_texture(furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90), "wood", Color.WHITE, 0.72)
