@@ -1610,7 +1610,65 @@ func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_m
 			var src := m.mesh.surface_get_material(i)
 			if src and src.resource_name.begins_with(WALL_HEX):
 				m.set_surface_override_material(i, wall_mat)
+			elif src and model == "wall_mousehole" and src.resource_name == "c7a4a2a.001":
+				# round 16 (asked: "the entrance looks strange"): the model's splintered plank trim round the
+				# hole is hidden; _mouse_hole() builds an arch instead
+				var clear := StandardMaterial3D.new()
+				clear.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				clear.albedo_color = Color(0, 0, 0, 0)
+				m.set_surface_override_material(i, clear)
+	if model == "wall_mousehole":
+		_mouse_hole(n)
 	return n
+
+
+## The mouse hole as a little front door: a round-topped arch of wooden blocks with a keystone, a scrap of
+## carpet for a doormat, and a picture hung on the wall above it, at the people's height.
+func _mouse_hole(wall: Node3D) -> void:
+	var grp := group("Mouse hole")
+	var face := wall.global_transform.basis.z.normalized()  # out of the wall into the room
+	var along := wall.global_transform.basis.x.normalized()
+	var base := wall.global_position + face * 0.045
+	var wood := _paint(Color(0.55, 0.36, 0.2))
+	var dark := _paint(Color(0.36, 0.22, 0.12))
+	var r := 0.135
+	var cy := 0.13
+	var n := 9
+	for k in n:
+		var a := PI * (float(k) + 0.5) / n
+		var p := base + along * cos(a) * r + Vector3.UP * (cy + sin(a) * r)
+		var b := _bit(grp, p, Vector3(0.05, 0.034 if k != n / 2 else 0.05, 0.03), dark if k == n / 2 else wood)
+		b.global_basis = Basis(face, a - PI / 2.0) * Basis.looking_at(-face, Vector3.UP)
+	for sd in [-1.0, 1.0]:
+		for j in 2:
+			var p: Vector3 = base + along * sd * r + Vector3.UP * (0.025 + j * 0.06)
+			var b := _bit(grp, p, Vector3(0.05, 0.05, 0.03), wood)
+			b.global_basis = Basis.looking_at(-face, Vector3.UP)
+	var mat_p := base + face * 0.12 + Vector3.UP * 0.004
+	var mat := _bit(grp, mat_p, Vector3(0.3, 0.006, 0.17), _paint(Color(0.72, 0.28, 0.24)))
+	mat.global_basis = Basis.looking_at(-face, Vector3.UP)
+	for k in 3:
+		var st := _bit(grp, mat_p + Vector3.UP * 0.002 + face * (-0.05 + k * 0.05), Vector3(0.3, 0.006, 0.018), _paint(Color(0.94, 0.86, 0.66)))
+		st.global_basis = Basis.looking_at(-face, Vector3.UP)
+	# the picture above it: a framed meadow with a sun
+	var pic := base + Vector3.UP * 1.35 - face * 0.02
+	var fr := _bit(grp, pic, Vector3(0.5, 0.38, 0.03), _paint(Color(0.5, 0.32, 0.17)))
+	fr.global_basis = Basis.looking_at(-face, Vector3.UP)
+	var layers := [[Vector3(0, 0, 0.016), Vector3(0.42, 0.3, 0.004), Color(0.74, 0.86, 0.95)],
+			[Vector3(0, -0.08, 0.019), Vector3(0.42, 0.14, 0.004), Color(0.5, 0.7, 0.4)],
+			[Vector3(0.1, -0.04, 0.021), Vector3(0.16, 0.1, 0.004), Color(0.4, 0.6, 0.36)],
+			[Vector3(-0.12, 0.07, 0.022), Vector3(0.06, 0.06, 0.004), Color(0.97, 0.8, 0.3)],
+			[Vector3(-0.05, -0.05, 0.023), Vector3(0.07, 0.06, 0.004), Color(0.86, 0.36, 0.28)]]
+	for ly in layers:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = ly[1]
+		mi.mesh = bm
+		mi.material_override = _paint(ly[2])
+		fr.add_child(mi)
+		mi.position = ly[0]
+	for mi in grp.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _hide(kind: String, x: float, y: float, w: float, d: float, rot := 0.0) -> void:
@@ -2411,9 +2469,11 @@ func _nest() -> void:
 	# x 10…250, y 600…780 behind the south wall (the mouse hole is at x = 180)
 	box("Nest floor", W(130, 690, -5), Vector3(2.4, 0.1, 1.8), soil, nest)
 	box("Back", W(130, 785, 50), Vector3(2.6, 1.0, 0.1), earth, nest)
-	box("Side", W(5, 690, 50), Vector3(0.1, 1.0, 1.9), earth, nest)
-	box("Side", W(255, 690, 50), Vector3(0.1, 1.0, 1.9), earth, nest)
-	var roof := box("Roof", W(130, 690, 95), Vector3(2.6, 0.1, 1.9), earth, nest)
+	# (round 16: the sides and the roof start BEHIND the kitchen wall — they used to poke 5 cm through it, a dark
+	# brown frame on the wallpaper round the mouse hole: the user's "strange stripes")
+	box("Side", W(5, 697, 50), Vector3(0.1, 1.0, 1.76), earth, nest)
+	box("Side", W(255, 697, 50), Vector3(0.1, 1.0, 1.76), earth, nest)
+	var roof := box("Roof", W(130, 697, 95), Vector3(2.6, 0.1, 1.76), earth, nest)
 	var heap := spawn("rooms/nest", W(90, 725), 0.0, nest)
 	collide(heap)
 	apply_texture(heap, "wood", Color.WHITE, 0.85)  # the twigs get a grain (the paper scraps stay plain)
