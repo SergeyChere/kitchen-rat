@@ -1638,7 +1638,7 @@ func _start_backdrop() -> void:
 		if v.size() > 4: _back_lift = v[4]
 		if v.size() > 5: _back_side = v[5]
 		if v.size() > 6: _back_r = v[6]
-	rat.global_position = Nights.world(at.x, at.y, 1)
+	rat.global_position = Nights.world(at.x, at.y, 0)  # (1 cm up, she hovered over her own shadow)
 	rat.rotation.y = Nights.yaw_to(Nights.world(face.x, face.y) - Nights.world(at.x, at.y))
 	rat.scripted = true   # (frozen alone leaves her in the falling pose: nothing moves her onto the floor)
 	rat.anim.play("idle")

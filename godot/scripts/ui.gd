@@ -24,7 +24,7 @@ static func font(weight := 500) -> Font:
 	if ResourceLoader.exists("res://assets/fonts/Lora.ttf"):
 		var fv := FontVariation.new()
 		fv.base_font = load("res://assets/fonts/Lora.ttf")
-		fv.variation_opentype = {"wght": weight}
+		fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
 		fv.fallbacks = [ThemeDB.fallback_font]
 		f = fv
 	_fonts[weight] = f

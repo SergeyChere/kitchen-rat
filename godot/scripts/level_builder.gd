@@ -178,8 +178,8 @@ void fragment() {
 	float s1 = vnoise(sp);
 	float s2 = vnoise(sp * 1.7 + 7.3);
 	vec3 base = mix(coat, vec3(dot(coat, vec3(0.3, 0.59, 0.11))) * vec3(1.1, 1.0, 0.88), grey) * shade;
-	vec3 col = base * mix(0.93, 1.0, smoothstep(0.34, 0.52, s1));
-	col = mix(col, base * vec3(1.1, 1.06, 0.99), smoothstep(0.66, 0.76, s2) * 0.6);
+	vec3 col = base * mix(0.955, 1.0, smoothstep(0.3, 0.56, s1));  // (round 16: softer — up close it read as camouflage)
+	col = mix(col, base * vec3(1.08, 1.05, 0.99), smoothstep(0.62, 0.8, s2) * 0.5);
 	ALBEDO = col;  // one flat tone through the whole depth of the coat: the gaps between locks must not read as dots
 	ROUGHNESS = 0.6;
 }

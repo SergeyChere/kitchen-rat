@@ -227,9 +227,9 @@ func show_menu() -> void:
 	menu.set_meta("main", true)
 	var shade := TextureRect.new()
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.02, 0.02, 0.05, 0.9))
-	grad.set_color(1, Color(0.02, 0.02, 0.05, 0.0))
-	grad.add_point(0.5, Color(0.02, 0.02, 0.05, 0.62))
+	grad.set_color(0, Color(0.03, 0.03, 0.08, 0.62))
+	grad.set_color(1, Color(0.03, 0.03, 0.08, 0.0))
+	grad.add_point(0.55, Color(0.03, 0.03, 0.08, 0.32))
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.width = 256
@@ -241,21 +241,31 @@ func show_menu() -> void:
 	shade.anchor_right = 0.62
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(shade)
+	# round 16 (asked: "make the menu beautiful — it looks worse now"), after the user's own mock-up: a big bold
+	# gold title, two lines in cream, wide rounded buttons; Play stands out in gold
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	box.offset_left = 84
-	box.offset_right = 84 + 380
+	box.offset_left = 88
+	box.offset_right = 88 + 420
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 14)
 	root.add_child(box)
-	var title := UI.label("Kitchen Rat", 60, UI.ACCENT)
-	title.add_theme_constant_override("outline_size", 10)
-	title.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.85))
+	var title := UI.label("Kitchen Rat", 70, Color(0.99, 0.77, 0.32))
+	title.add_theme_font_override("font", UI.font(700))
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title.add_theme_constant_override("outline_size", 6)
+	title.add_theme_color_override("font_outline_color", Color(0.12, 0.07, 0.03, 0.55))
+	title.add_theme_constant_override("shadow_offset_x", 0)
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
 	box.add_child(title)
-	var tag := UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights.\nOne hungry family.", 18, UI.TEXT)
+	var tag := UI.label("Demo · Act 1, nights 1–5" if Nights.demo() else "A mother rat. Twenty nights.\nOne hungry family.", 22, Color(0.97, 0.94, 0.86))
+	tag.add_theme_constant_override("line_spacing", 4)
+	tag.add_theme_constant_override("shadow_offset_y", 2)
+	tag.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.4))
 	box.add_child(tag)
 	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 18)
+	gap.custom_minimum_size = Vector2(0, 26)
 	box.add_child(gap)
 	var files := Nights.files()
 	var next := clampi(Progress.unlocked, 1, Nights.last_playable())
@@ -270,8 +280,24 @@ func show_menu() -> void:
 	box.add_child(UI.button("Achievements", show_achievements))
 	box.add_child(UI.button("Settings", func(): menu.hide(); UI.settings_panel(self, func(): if is_instance_valid(menu): menu.show())))
 	box.add_child(UI.button("Quit", get_tree().quit))
+	var first := true
 	for b in box.find_children("*", "Button", false, false):
-		(b as Button).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		var bt := b as Button
+		bt.size_flags_horizontal = Control.SIZE_FILL
+		bt.custom_minimum_size = Vector2(420, 58)
+		bt.add_theme_font_size_override("font_size", 24)
+		var nb := UI._box(Color(0.13, 0.12, 0.15, 0.84), Color(0.32, 0.29, 0.33, 0.7))
+		nb.set_corner_radius_all(14)
+		var hb := UI._box(Color(0.24, 0.19, 0.14, 0.92), Color(0.99, 0.77, 0.32))
+		hb.set_corner_radius_all(14)
+		if first:  # Play: gold rim and a warm fill even before it is hovered
+			nb = UI._box(Color(0.25, 0.2, 0.14, 0.9), Color(0.96, 0.74, 0.3))
+			nb.set_corner_radius_all(14)
+			first = false
+		bt.add_theme_stylebox_override("normal", nb)
+		bt.add_theme_stylebox_override("hover", hb)
+		bt.add_theme_stylebox_override("focus", hb)
+		bt.add_theme_stylebox_override("pressed", hb)
 	UI.focus_first(box)
 
 
