@@ -86,7 +86,11 @@ static func apply() -> void:
 				DisplayServer.window_set_position((screen - want_size) / 2)
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree and tree.root:
-		tree.root.msaa_3d = Viewport.MSAA_4X if quality == "high" else (Viewport.MSAA_2X if quality == "medium" else Viewport.MSAA_DISABLED)
+		# round 16: no MSAA below high (the paper pass softens every edge anyway, and MSAA on a laptop's built-in
+		# graphics costs a third of the frame); low also renders the 3D picture at 3/4 size
+		tree.root.msaa_3d = Viewport.MSAA_2X if quality == "high" else Viewport.MSAA_DISABLED
+		tree.root.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		tree.root.scaling_3d_scale = 0.75 if quality == "low" else 1.0
 
 
 static func poison_color() -> Color:

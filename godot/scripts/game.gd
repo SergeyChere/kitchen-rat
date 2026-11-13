@@ -183,9 +183,7 @@ func _ready() -> void:
 	_moon_e = moon.light_energy if moon else 0.5
 	_last_rp = rat.global_position
 	print_verbose("night ready: ", foods.size(), " food, ", zones.size(), " zones")
-	if not Settings.shadows():
-		for l in find_children("*", "Light3D", true, false):
-			(l as Light3D).shadow_enabled = false
+	_apply_light_shadows()
 	for i in nest_pups.size():
 		nest_pups[i].visible = i < 4 - pups.size()
 	if Settings.quality != "low":
@@ -336,7 +334,7 @@ func _make_agents() -> void:
 	fl.spot_attenuation = 1.1  # round 10: the beam's pool tightens at its edge
 	fl.light_energy = 4.0
 	fl.light_color = Color(1, 0.95, 0.8)
-	fl.shadow_enabled = true
+	fl.shadow_enabled = Settings.quality == "high"
 	fl.visible = false
 	owner_ai.add_child(fl)
 	fl.position = Vector3(0.15, 1.3, 0.2)
@@ -1928,9 +1926,23 @@ func _apply_settings() -> void:
 	cam.sensitivity = 0.25 * Settings.sens
 	cam.invert_y = Settings.invert_y
 	cam.fov = Settings.fov
+	_apply_light_shadows()
+
+
+## Which lamps cast shadows. Each light keeps the choice it was built with (meta "casts"); the setting only
+## takes shadows away. (Before round 16 opening Settings in a night switched shadows ON for every lamp in the
+## room — the hall spill, the night-light, the burrow fill — and the frame rate fell to a third.)
+## The moon's shadow from medium up; lamps' shadows (six renders of the room each) only on high.
+func _apply_light_shadows() -> void:
 	for l in find_children("*", "Light3D", true, false):
-		if l is DirectionalLight3D or (l is OmniLight3D and l != tv_light):
-			(l as Light3D).shadow_enabled = Settings.shadows()
+		var li := l as Light3D
+		if not li.has_meta("casts"):
+			li.set_meta("casts", li.shadow_enabled)
+		var want: bool = li.get_meta("casts")
+		if li is DirectionalLight3D:
+			li.shadow_enabled = want and Settings.shadows()
+		else:
+			li.shadow_enabled = want and Settings.quality == "high"
 
 
 func _end(won: bool, title: String, text: String) -> void:

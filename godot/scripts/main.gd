@@ -80,9 +80,39 @@ func _tick_fps(dt: float) -> void:
 		_fps.text = "%d FPS" % int(Engine.get_frames_per_second())
 
 
+## Round 16, a safety net: if a night runs under 24 frames a second for six seconds, the graphics step down one
+## level for the rest of the session (high → medium → low) and say so once. The saved setting is left alone.
+var _slow := 0.0
+
+func _tick_perf(dt: float) -> void:
+	if game == null or game.state != "play" or _args.has("shot") or DisplayServer.get_name() == "headless" or Settings.quality == "low":
+		_slow = 0.0
+		return
+	var fps := Engine.get_frames_per_second()
+	_slow = _slow + dt if fps > 1.0 and fps < 24.0 else maxf(_slow - dt * 2.0, 0.0)
+	if _slow < 6.0:
+		return
+	_slow = 0.0
+	Settings.quality = "medium" if Settings.quality == "high" else "low"
+	Settings.apply()
+	game._apply_light_shadows()
+	if Settings.quality == "low":
+		for n in game.find_children("Paper", "CanvasLayer", true, false):
+			n.queue_free()
+		for n in game.find_children("Dust motes", "", true, false):
+			n.queue_free()
+	game.toast("Graphics lowered to %s to keep the game smooth" % Settings.quality)
+
+
 func _process(_dt: float) -> void:
+	if _args.has("perf") and _frames % 120 == 60 and game:  # dev: frame rate and what the frame costs
+		print("PERF fps %d · draw calls %d · objects %d · primitives %dk" % [Engine.get_frames_per_second(),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME) / 1000])
 	_frames += 1
 	_tick_fps(_dt)
+	_tick_perf(get_process_delta_time() / maxf(Engine.time_scale, 0.01))
 	if _args.has("auto") and game and game.state == "intro" and game.grid != null:
 		game.begin()
 		if _args.has("at"):

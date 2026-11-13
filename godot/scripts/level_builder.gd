@@ -119,7 +119,8 @@ static func _has_material(mesh: Mesh, mat_name: String) -> bool:
 ## Fur in shells: the coat is drawn again in thin layers pushed out along the (smooth) normals, each layer keeping
 ## only the spots where a lock is still that long (round 14: locks and flat painted tones, see fragment()). Strands sit in little cells of the rest pose (CUSTOM0, set by
 ## smooth_mesh), so they stay put while she moves. Dark at the roots, the coat's colour at the tips.
-const FUR_LAYERS := 14
+static func fur_layers() -> int:  # round 16: 14 shells on every furry animal cost more than the rest of the frame
+	return 12 if Settings.quality == "high" else 7
 const FUR := """
 shader_type spatial;
 render_mode diffuse_toon, specular_disabled, cull_back;
@@ -168,7 +169,7 @@ void fragment() {
 	// thick and overlapping at the root (no bare skin between locks), a fine point at the tip
 	// (the lowest layer is a solid undercoat in the coat's own colour: the model's skin under it is another
 	// colour, and every gap between locks showed it as a dark dash)
-	if (h > 0.08 && (r * 0.6 + 0.4 < tone || d > mix(1.5, 0.25, tone))) {
+	if (h > 0.16 && (r * 0.6 + 0.4 < tone || d > mix(1.5, 0.25, tone))) {
 		discard;
 	}
 	// the colour is laid in two or three flat tones with brush-shaped borders, as a painter blocks in fur:
@@ -203,11 +204,12 @@ static func _fur(after: Material, coat: Color, length: float, scale: float, z_fr
 		_fur_shader.code = FUR
 	var first: Material = after.duplicate() if after else null  # the outline is shared: this chain needs its own
 	var prev: Material = first
-	for i in FUR_LAYERS:
+	var layers := fur_layers()
+	for i in layers:
 		var sm := ShaderMaterial.new()
 		sm.shader = _fur_shader
 		sm.set_shader_parameter("coat", coat)
-		sm.set_shader_parameter("h", float(i + 1) / FUR_LAYERS)
+		sm.set_shader_parameter("h", float(i + 1) / layers)
 		sm.set_shader_parameter("len", length)
 		sm.set_shader_parameter("density", scale / 0.0022)  # a lock every ~2 mm of the world (and ~7 mm long)
 		sm.set_shader_parameter("grey", grey)
