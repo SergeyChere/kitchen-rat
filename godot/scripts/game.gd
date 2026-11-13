@@ -1006,6 +1006,8 @@ func _pick_scent(first: bool) -> void:
 		_scent.append(f)
 		f.reveal_t = 7.0
 		f.set_meta("scent_mark", 6.0)  # stays marked for a while after sniffing
+		if bool(night.get("openFood", false)) and f.global_position.distance_to(rp) < 4.0:
+			f.set_meta("found", true)  # sniffed out: it stays in sight from now on
 		if f.poison and not f.has_meta("seen"):
 			f.set_meta("seen", true)
 			tasks.flag("poisonSeen")
@@ -1028,12 +1030,22 @@ func _pick_scent(first: bool) -> void:
 	bubble_at("%s %s%s · %.1f m" % [what, where, up, Vector2(to.x, to.z).length()], rp + Vector3.UP * 0.34, 2.2)
 
 
+## Round 17 (asked: "the food shouldn't just lie about — it should be hidden, found with the nose"): the loose food
+## of every night is out of sight until she sniffs it out (then it stays found) or almost treads on it. Only the
+## food a task points at (tagged), the big prizes she drags and the finds show from afar on the "open" nights;
+## on the hidden-food nights even those need the nose, as before.
 func _tick_food_visibility(rp: Vector3) -> void:
 	var open := bool(night.get("openFood", false))
 	for f in foods:
 		if f.carried:
 			continue
-		f.visible = not f.hidden and (open or f.is_find or f.reveal_t > 0.0 or f.global_position.distance_to(rp) < 1.6)
+		var d := f.global_position.distance_to(rp)
+		var shown := f.is_find or f.reveal_t > 0.0 or f.has_meta("found")
+		if open:
+			shown = shown or f.id != "" or f.big() or d < 0.5
+		else:
+			shown = shown or d < 1.6
+		f.visible = not f.hidden and shown
 
 
 func _tick_flags() -> void:
