@@ -135,6 +135,7 @@ uniform float grey = 0.0;       // 0 = the coat's own colour … 1 = its grey (t
 uniform float shade = 1.0;      // darkens the whole coat
 varying vec3 rp;
 varying float tone;
+varying float up;
 float hash3(vec3 p) {
 	p = fract(p * 0.3183099 + vec3(0.1, 0.17, 0.13));
 	p *= 17.0;
@@ -149,6 +150,7 @@ void vertex() {
 	// each layer goes out a little and back a lot more the higher it is: the strands curve over and lie down
 	VERTEX += (n * (h * 0.55) + lay * (h * h * 0.9)) * l;
 	tone = h;
+	up = n.y;
 }
 float vnoise(vec3 p) {
 	vec3 i = floor(p);
@@ -174,12 +176,16 @@ void fragment() {
 	}
 	// the colour is laid in two or three flat tones with brush-shaped borders, as a painter blocks in fur:
 	// broad darker strokes, a few lighter warm ones on top
-	vec3 sp = rp * density * vec3(0.085, 0.085, 0.017);
+	vec3 sp = rp * density * vec3(0.07, 0.07, 0.03);
 	float s1 = vnoise(sp);
 	float s2 = vnoise(sp * 1.7 + 7.3);
 	vec3 base = mix(coat, vec3(dot(coat, vec3(0.3, 0.59, 0.11))) * vec3(1.1, 1.0, 0.88), grey) * shade;
-	vec3 col = base * mix(0.955, 1.0, smoothstep(0.3, 0.56, s1));  // (round 16: softer — up close it read as camouflage)
-	col = mix(col, base * vec3(1.08, 1.05, 0.99), smoothstep(0.62, 0.8, s2) * 0.5);
+	// round 17 (the painted key art the player sent): cool grey strokes, warm tan ones catching the light along
+	// the back, the flanks a shade darker toward the belly — brushwork you can see, but in two or three tones
+	vec3 col = base * mix(0.95, 1.0, smoothstep(0.3, 0.56, s1));
+	float top = smoothstep(-0.1, 0.7, up);
+	col = mix(col, base * vec3(1.3, 1.14, 0.9), smoothstep(0.5, 0.72, s2 * 0.7 + s1 * 0.3) * (0.2 + 0.6 * top));
+	col *= mix(0.86, 1.0, smoothstep(-0.7, 0.1, up));
 	ALBEDO = col;  // one flat tone through the whole depth of the coat: the gaps between locks must not read as dots
 	ROUGHNESS = 0.6;
 }

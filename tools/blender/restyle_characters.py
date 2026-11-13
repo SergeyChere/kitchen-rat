@@ -84,6 +84,32 @@ STYLES = {
     "guest": human(),
 }
 
+# The rats (round 17, asked: "make her in this style, a little as if drawn" — the painted key art): a rounder body,
+# short furry legs (the fur now runs down to the paws, which are a pale cream), a fuller tail root, a smaller
+# nose and longer whiskers. Their mesh is hand-made and fine already: no welding, no subdivision.
+RAT_LEGS = ["BackLeg.L", "BackUpLeg.L", "BackLowLeg.L", "BackLeg.R", "BackUpLeg.R", "BackLowLeg.R",
+            "FrontLeg.L", "FrontUpLeg.L", "FrontLowLeg.L", "FrontLeg.R", "FrontUpLeg.R", "FrontLowLeg.R"]
+RAT_FEET = ["BackFoot.L", "BackFoot.R", "FrontFoot.L", "FrontFoot.R"]
+
+
+def rat(body=1.1, legs=1.4):
+    return {
+        "weld": False,
+        "morph": [
+            ("plump", ["Body", "Back", "Hips", "Torso", "Shoulders"], body, None),
+            ("plump", RAT_LEGS, legs, None),
+            ("grow", RAT_FEET, 1.12, None),
+            ("plump", ["Tail1", "Tail2"], 1.3, None),
+        ],
+        "repaint": [("Pink", RAT_LEGS, "Grey", None), ("Pink", RAT_FEET, "Paw", (0.86, 0.78, 0.7))],
+        "islands": [(["NosePink"], 0.72, "centre"), (["Whisker"], 1.55, "root"), (["Pink"], 1.3, "root", ["Head"])],
+        "subdiv": 0,
+    }
+
+
+STYLES["rat_mother"] = rat()
+STYLES["rat_pup"] = rat(body=1.08, legs=1.35)
+
 
 def load(path):
     bpy.ops.wm.read_homefile(use_empty=True)
@@ -254,6 +280,77 @@ def add_blush(arm, me):
         bpy.ops.object.join()
 
 
+def repaint(me, rules):
+    """Faces of one material that hang mostly on the given bones take another material (made if it is new)."""
+    gname = {g.index: g.name for g in me.vertex_groups}
+    names = [m.name if m else "" for m in me.data.materials]
+    for src, bones, dst, colour in rules:
+        if src not in names:
+            continue
+        if dst not in names:
+            m = bpy.data.materials.new(dst)
+            m.use_nodes = True
+            m.node_tree.nodes.get("Principled BSDF").inputs["Base Color"].default_value = (*colour, 1.0)
+            me.data.materials.append(m)
+            names.append(dst)
+        si, di = names.index(src), names.index(dst)
+        bset = set(bones)
+        for p in me.data.polygons:
+            if p.material_index != si:
+                continue
+            w_in = w_all = 0.0
+            for vi in p.vertices:
+                for g in me.data.vertices[vi].groups:
+                    w_all += g.weight
+                    if gname.get(g.group) in bset:
+                        w_in += g.weight
+            if w_all > 0.0 and w_in / w_all > 0.5:
+                p.material_index = di
+    me.data.update()
+
+
+def scale_islands(me, mats, f, about, bones=None):
+    """Scale each connected piece of these materials: about its centre, or about its "root" (the vertex nearest
+    the middle of all the pieces: a whisker grows out from the snout)."""
+    idx = {i for i, m in enumerate(me.data.materials) if m and m.name in mats}
+    if not idx:
+        return
+    bm = bmesh.new()
+    bm.from_mesh(me.data)
+    faces = {fc for fc in bm.faces if fc.material_index in idx}
+    if bones:  # only the pieces hanging on these bones (the ears: the pink on the head)
+        dl = bm.verts.layers.deform.active
+        gi = {g.index for g in me.vertex_groups if g.name in bones}
+        faces = {fc for fc in faces if all(sum(w for k, w in v[dl].items() if k in gi) > 0.5 for v in fc.verts)}
+    allv = {v for fc in faces for v in fc.verts}
+    mid = sum((v.co for v in allv), Vector()) / max(len(allv), 1)
+    seen = set()
+    for f0 in faces:
+        if f0 in seen:
+            continue
+        stack, island = [f0], set()
+        while stack:
+            fc = stack.pop()
+            if fc in island:
+                continue
+            island.add(fc)
+            for e in fc.edges:
+                for nb in e.link_faces:
+                    if nb in faces and nb not in island:
+                        stack.append(nb)
+        seen |= island
+        verts = {v for fc in island for v in fc.verts}
+        if about == "root":
+            c = min(verts, key=lambda v: (v.co - mid).length).co.copy()
+        else:
+            c = sum((v.co for v in verts), Vector()) / len(verts)
+        for v in verts:
+            v.co = c + (v.co - c) * f
+    bm.to_mesh(me.data)
+    bm.free()
+    me.data.update()
+
+
 def subdivide(me, levels, keep):
     """Catmull-Clark on the body only: the eyes are split off first (already round) and joined back after."""
     bpy.ops.object.select_all(action="DESELECT")
@@ -302,12 +399,17 @@ def restyle(name, st):
     hi = max((me.matrix_world @ Vector(c)).z for c in me.bound_box)
     height = (hi - lo) / max(me.matrix_world.to_scale().z, 1e-9)
     before = len(me.data.polygons)
-    weld(me, height)
+    if st.get("weld", True):
+        weld(me, height)
     morph(arm, me, st["morph"])
     mats, f = st.get("eyes", ([], 1.0))
     if f != 1.0:
         enlarge_islands(me, mats, f)
-    subdivide(me, st.get("subdiv", 1), st.get("keep", []))
+    repaint(me, st.get("repaint", []))
+    for isl in st.get("islands", []):
+        scale_islands(me, *isl)
+    if st.get("subdiv", 1) > 0:
+        subdivide(me, st.get("subdiv", 1), st.get("keep", []))
     me = next(o for o in bpy.context.scene.objects if o.type == "MESH" and o.find_armature() == arm)
     if st.get("blush"):
         add_blush(arm, me)
