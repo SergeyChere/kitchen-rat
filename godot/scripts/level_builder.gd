@@ -1583,6 +1583,33 @@ func _room() -> void:
 		var d := Vector3(wcx, bot, z0)
 		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
 			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		# the light the window throws into the room, with the tree's leaves swaying through it (asked for: "a
+		# tree outside, swaying, and its shadows moving in the room"). The real moon shadow is too faint against
+		# the room's fill to show leaves, so the patch is painted by a box round the beam (moon_patch.gdshader).
+		var pm := ShaderMaterial.new()
+		pm.shader = preload("res://shaders/moon_patch.gdshader")
+		pm.render_priority = 2
+		pm.set_shader_parameter("sdir", sdir)
+		pm.set_shader_parameter("wall_z", z0)
+		pm.set_shader_parameter("win_min", Vector2(wcx - ww / 2.0, bot))
+		pm.set_shader_parameter("win_size", Vector2(ww, top - bot))
+		var lo := Vector3(INF, 0.0, z0)
+		var hi := Vector3(-INF, top + 0.1, z0)
+		for q in [a, b, Vector3(wcx - ww / 2.0, bot, z0), Vector3(wcx + ww / 2.0, bot, z0)]:
+			var f: Vector3 = q + sdir * (q.y / -sdir.y)
+			lo.x = minf(lo.x, minf(q.x, f.x))
+			hi.x = maxf(hi.x, maxf(q.x, f.x))
+			hi.z = maxf(hi.z, f.z)
+		var beam := MeshInstance3D.new()
+		beam.name = "Moon patch"
+		var bm := BoxMesh.new()
+		bm.size = hi - lo + Vector3(0.3, 0.1, 0.3)
+		beam.mesh = bm
+		beam.material_override = pm
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(beam)
+		beam.global_position = (lo + hi) / 2.0
+		shaft_mats.append(pm)
 		if Settings.quality != "low" and not OS.get_environment("HIDE").contains("motes"):
 			_dust_motes(Vector3(wcx, (top + bot) / 2.0, z0), sdir, ww, top - bot)
 		# round 3: a living sky outside the window — the moon, clouds drifting past it, branches
@@ -1617,6 +1644,15 @@ func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_m
 				clear.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 				clear.albedo_color = Color(0, 0, 0, 0)
 				m.set_surface_override_material(i, clear)
+			elif src and model == "wall_window" and src.resource_name == "c9ac4e8":
+				# the panes were opaque blue: now clear glass with a faint cool sheen, so the tree and the sky
+				# outside (window_sky.gd) show through
+				var glass := StandardMaterial3D.new()
+				glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				glass.albedo_color = Color(0.6, 0.72, 0.95, 0.12)
+				glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+				m.set_surface_override_material(i, glass)
 	if model == "wall_mousehole":
 		_mouse_hole(n)
 	return n
