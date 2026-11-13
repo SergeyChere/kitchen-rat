@@ -58,6 +58,22 @@ func _run(host: Node) -> void:
 					if z2.contains(p): inz.append(str(z2.name) + "/" + z2.get_class())
 				_check("  ...and is hidden there", g.rat.hidden(), "y %.3f spot %s zones %s zy %.3f" % [p.y, g.rat.hide_spot.id if g.rat.hide_spot else "none", str(inz), c.y])
 		_check("there is at least one gap", n > 0, "%d gaps" % n)
+		if g.night_id == "kitchen" or str(g.night.get("decor", "")) == "kitchen":
+			# the way in behind the kitchen fridge: up the side by the east wall, then left along its back
+			g.rat.teleport(Nights.world(944, 175, 1), 0.0)
+			await _wait(host, 0.3)
+			for leg in [Nights.world(944, 16), Nights.world(850, 16)]:
+				for i in 120:
+					var to: Vector3 = leg - g.rat.global_position
+					to.y = 0
+					if to.length() < 0.04:
+						break
+					g.rat.velocity = to.normalized() * 0.6 + Vector3.DOWN * 0.5
+					g.rat.rotation.y = atan2(to.x, to.z)
+					g.rat.move_and_slide()
+					await host.get_tree().physics_frame
+			var e := g.rat.global_position
+			_check("walked round the corner behind the kitchen fridge", e.x < Nights.world(880, 0).x and e.z < Nights.world(0, 30).z and g.rat.hidden(), "ended at %s" % str(e))
 		return
 	if name == "vacuum":  # night 16 or 19: the robot's whole round — dock, work, battery low, home, charge, out again
 		var v := g.vacuum
@@ -531,7 +547,7 @@ func _hides(host: Node) -> void:
 	print("TEST hides night ", g.night_id)
 	rat.frozen = true
 	for z in g.zones:
-		if not (z is HideSpot) or (z as HideSpot).id == "crack":
+		if not (z is HideSpot) or (z as HideSpot).id in ["crack", "behind"]:  # (the gaps behind appliances: --test=gaps)
 			continue
 		var c: Vector3 = Vector3(z.global_position.x, 0.0, z.global_position.z)
 		var low := (z as HideSpot).id == "sofa"  # under a sofa there's only room for a crouching rat

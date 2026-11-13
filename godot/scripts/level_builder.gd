@@ -1708,8 +1708,11 @@ func _furniture() -> void:
 	for j in 4:
 		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
 	# round 16 (asked): 15 cm out from the wall — a gap behind it to hide in
-	var fridge := furn_piece("furniture/fridge", 895, 71, 0.0, "fridge", 130, 110)
-	_hide("behind", 895, 15.5, 120, 15)
+	# (and 104 cm wide, off the east wall too: the way into the gap behind it is down the side by that wall —
+	# the worktop closes the other side)
+	var fridge := furn_piece("furniture/fridge", 884, 71, 0.0, "fridge", 104, 110)
+	_hide("behind", 890, 15.5, 126, 15)
+	_hide("behind", 944.5, 70, 15, 110)
 	if fridge:  # the model's box can stick out past 110 cm (the handle): measure where its back really is
 		var fb := world_aabb(fridge)
 		var back_cm := (fb.position.z - W(0, 0).z) * 100.0
@@ -1717,6 +1720,12 @@ func _furniture() -> void:
 			fridge.global_position.z += (24.0 - back_cm) / 100.0
 			var bb: Node3D = fridge.get_meta("box_body")
 			bb.global_position.z += (24.0 - back_cm) / 100.0
+		var fb2 := world_aabb(fridge)
+		var east_cm := (W(960, 0).x - fb2.end.x) * 100.0
+		if east_cm < 24.0:
+			fridge.global_position.x -= (24.0 - east_cm) / 100.0
+			var bb2: Node3D = fridge.get_meta("box_body")
+			bb2.global_position.x -= (24.0 - east_cm) / 100.0
 	_fridge = fridge
 	add_zone(HumZone, "Fridge hum", W(895, 140), Vector3(1.8, 1.2, 1.2))
 	apply_texture(furn_piece("furniture/kitchen_island", 480, 295, 180.0, "island", 200, 90), "wood", Color.WHITE, 0.72)
