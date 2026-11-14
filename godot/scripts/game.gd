@@ -1505,7 +1505,7 @@ func spawn_model_food(model: String, at: Vector3) -> Food:
 	if m:
 		m.position = Vector3.ZERO
 		m.rotation = Vector3.ZERO
-	if model == "food/cheese":
+	if model == "food/cheese" and not _has_texture(f):
 		# round 12 (asked): the cheese model's flat yellow read as plastic — it
 		# wears the painted cheese now, holes and their dips included (TextureGen)
 		var cm := StandardMaterial3D.new()
@@ -1519,6 +1519,15 @@ func spawn_model_food(model: String, at: Vector3) -> Food:
 			(mi as MeshInstance3D).set_surface_override_material(0, cm)
 	foods.append(f)
 	return f
+
+
+## A model that comes with its own painted texture (the Meshy ones) keeps it.
+func _has_texture(n: Node) -> bool:
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).get_active_material(0)
+		if m is BaseMaterial3D and (m as BaseMaterial3D).albedo_texture != null:
+			return true
+	return false
 
 
 func spawn_food(type: String, at: Vector3, tag: String, poison: bool) -> Food:

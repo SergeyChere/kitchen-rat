@@ -2326,11 +2326,15 @@ func _sticky(p: Dictionary, kind: String) -> void:
 	z.kind = kind
 	match kind:
 		"sticky":
-			fit(spawn("props/sticky_tape", at + Vector3.UP * 0.002, 0.0, decor), w, h)
+			var tape := "props/sticky_trap" if ResourceLoader.exists(MODELS + "props/sticky_trap.glb") else "props/sticky_tape"
+			fit(spawn(tape, at + Vector3.UP * 0.002, 0.0, decor), w, h)
 		"cage":
 			z.time = 4.0
 			z.label = "A cage trap! Gnaw your way out!"
-			fit(spawn("props/cage_trap", at + Vector3.UP * 0.13, 0.0, decor), w, h)
+			var cage := spawn("props/cage_trap", at, 0.0, decor)
+			fit(cage, w, 0.0)  # (as long as the zone is wide, its own shape kept: a wire cage stretched looks broken)
+			if cage:
+				cage.scale = Vector3.ONE * cage.scale.x
 		"spray":
 			z.time = 1.4
 			z.label = "Cough! Cough! Poison spray!"
