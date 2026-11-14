@@ -244,12 +244,14 @@ def fit(name, src, out_path):
         t = stretch(arm.matrix_world @ b.tail)
         b.head = to_local @ h
         b.tail = to_local @ t
+    legd = {}
     for key, chain in rig["legs"].items():
         # the whole leg moved onto its paw, every bone by the same step: a bone's direction must not change, or the
         # clips (which turn bones from their rest) bend the leg somewhere else and tear the paw off
         foot = arm.matrix_world @ eb[rig["feet"][key]].head
         d = np_[key] - foot
         d.z = 0.0
+        legd[key] = d
         for bn in chain:
             b = eb[bn]
             b.head = to_local @ ((arm.matrix_world @ b.head) + d)
@@ -260,17 +262,21 @@ def fit(name, src, out_path):
             arm.data.bones[bn].use_deform = False
 
     if rig.get("weights") == "transfer":
-        for g in old.vertex_groups:
-            new.vertex_groups.new(name=g.name)
-        select_only(new)
-        dt = new.modifiers.new("weights", "DATA_TRANSFER")
-        dt.object = old
-        dt.use_vert_data = True
-        dt.data_types_verts = {"VGROUP_WEIGHTS"}
-        dt.vert_mapping = "POLYINTERP_NEAREST"
-        dt.layers_vgroup_select_src = "ALL"
-        dt.layers_vgroup_select_dst = "NAME"
-        bpy.ops.object.modifier_apply(modifier="weights")
+        # the old skin's hand-made weights fit these clips best: the old skin, stretched like the skeleton and
+        # each leg's skin moved with its leg, gives every new vertex the weights of its nearest old one
+        gname = {g.index: g.name for g in old.vertex_groups}
+        leg_of = {bn: key for key, chain in rig["legs"].items() for bn in chain}
+        omw = old.matrix_world
+        oinv = omw.inverted()
+        for v in old.data.vertices:
+            off = Vector()
+            for g in v.groups:
+                key = leg_of.get(gname[g.group])
+                if key:
+                    off += legd[key] * g.weight
+            v.co = oinv @ ((omw @ v.co) + off)
+        old.data.update()
+        copy_weights(old, new)
         weighted = len(old.vertex_groups)
         bpy.data.objects.remove(old)
         return _finish(name, rig, arm, new, weighted, out_path, (sx, sy, sz))
@@ -314,22 +320,99 @@ def fit(name, src, out_path):
             bn = min(segs, key=lambda sg: dist(co, sg[1], sg[2]))[0]
             g = proxy.vertex_groups.get(bn) or proxy.vertex_groups.new(name=bn)
             g.add([vi], 1.0, "REPLACE")
-    select_only(new)
-    for g in proxy.vertex_groups:
-        new.vertex_groups.new(name=g.name)
-    dt = new.modifiers.new("weights", "DATA_TRANSFER")
-    dt.object = proxy
-    dt.use_vert_data = True
-    dt.data_types_verts = {"VGROUP_WEIGHTS"}
-    dt.vert_mapping = "POLYINTERP_NEAREST"
-    dt.layers_vgroup_select_src = "ALL"
-    dt.layers_vgroup_select_dst = "NAME"
-    bpy.ops.object.modifier_apply(modifier="weights")
+    copy_weights(proxy, new)
+    # whiskers: thin and far from the closed copy, they took the weights of whatever lay nearest (a paw) and
+    # trailed after it; anything that far out in front of the neck rides the head
+    from mathutils.bvhtree import BVHTree
+    tree = BVHTree.FromObject(proxy, bpy.context.evaluated_depsgraph_get())
+    hb = arm.data.bones[rig["head"]]
+    head_y = (arm.matrix_world @ hb.head_local).y
+    reach = (nhi.z - nlo.z) * 0.03
+    hg = new.vertex_groups.get(rig["head"]) or new.vertex_groups.new(name=rig["head"])
+    moved = 0
+    # …and a thin tail the closed copy lost goes to the nearest tail (or other) bone, not the rump beside it
+    segs = [(bb.name, arm.matrix_world @ bb.head_local, arm.matrix_world @ bb.tail_local) for bb in arm.data.bones
+            if bb.use_deform and bb.name not in rig["no_skin"]]
+
+    def seg_d(p, a2, b2):
+        ab = b2 - a2
+        t = 0.0 if ab.length_squared < 1e-12 else max(0.0, min(1.0, (p - a2).dot(ab) / ab.length_squared))
+        return (a2 + ab * t - p).length
+    back = max((proxy.matrix_world @ v.co).y for v in proxy.data.vertices)
+    for v in new.data.vertices:
+        co = new.matrix_world @ v.co
+        if co.y > back - reach:  # past the end of the closed copy: the thin tail
+            bn = min(segs, key=lambda sg: seg_d(co, sg[1], sg[2]))[0]
+        elif co.y <= head_y + reach:
+            hit = tree.find_nearest(proxy.matrix_world.inverted() @ co)
+            if hit[0] is None or hit[3] < reach:
+                continue
+            bn = rig["head"]
+        else:
+            continue
+        for g in list(v.groups):
+            new.vertex_groups[g.group].remove([v.index])
+        (new.vertex_groups.get(bn) or new.vertex_groups.new(name=bn)).add([v.index], 1.0, "REPLACE")
+        moved += 1
+    print("whisker bits on the head:", moved)
+    # the tail lies along the floor between the back paws: the heat lent its skin to the paws, and running, the
+    # tail dragged a web of skin after them. Behind the back paws on the middle line, only tail and rump bones.
+    tails = [bb.name for bb in arm.data.bones if bb.name.lower().startswith("tail") or bb.name in ("Back", "Hips", "Bone.004", "Bone.005", "Bone.006", "Bone.007")]
+    if tails:
+        back_paw_y = max(np_["BL"].y, np_["BR"].y)
+        L = nhi.y - nlo.y
+        names = {g.index: g.name for g in new.vertex_groups}
+        tsegs = [sg for sg in segs if sg[0] in tails]
+        for v in new.data.vertices:
+            co = new.matrix_world @ v.co
+            if co.y < back_paw_y + L * 0.03 or abs(co.x) > L * 0.045:
+                continue
+            ws = [(names[g.group], g.weight) for g in v.groups if g.weight > 0]
+            keep = [(n2, w) for n2, w in ws if n2 in tails]
+            if len(keep) == len(ws):
+                continue
+            for n2, _ in ws:
+                new.vertex_groups[n2].remove([v.index])
+            if not keep and tsegs:
+                keep = [(min(tsegs, key=lambda sg: seg_d(co, sg[1], sg[2]))[0], 1.0)]
+            tot = sum(w for _, w in keep) or 1.0
+            for n2, w in keep:
+                (new.vertex_groups.get(n2) or new.vertex_groups.new(name=n2)).add([v.index], w / tot, "REPLACE")
     bpy.data.objects.remove(proxy)
     return _finish(name, rig, arm, new, weighted, out_path, (sx, sy, sz))
 
 
+def clean_sides(new, arm):
+    """A vertex on the left takes nothing from a right-hand bone and the other way round (heat bleeds between
+    legs set close together, and a paw then trails a shard after the other paw)."""
+    side_of = {}
+    for b in arm.data.bones:
+        h = arm.matrix_world @ b.head_local
+        if b.name.endswith((".L", ".R")) and abs(h.x) > 1e-4:
+            side_of[b.name] = 1 if h.x > 0 else -1
+    if not side_of:
+        return
+    names = {g.index: g.name for g in new.vertex_groups}
+    width = max(abs((new.matrix_world @ v.co).x) for v in new.data.vertices)
+    for v in new.data.vertices:
+        x = (new.matrix_world @ v.co).x
+        if abs(x) < width * 0.08:
+            continue
+        sd = 1 if x > 0 else -1
+        bad = [g for g in v.groups if side_of.get(names[g.group], sd) != sd and g.weight > 0]
+        if not bad:
+            continue
+        good = [(names[g.group], g.weight) for g in v.groups if g not in bad and g.weight > 0]
+        for g in [names[g.group] for g in bad]:
+            new.vertex_groups[g].remove([v.index])
+        tot = sum(w for _, w in good)
+        if tot > 0:
+            for n2, w in good:
+                new.vertex_groups[n2].add([v.index], w / tot, "REPLACE")
+
+
 def _finish(name, rig, arm, new, weighted, out_path, st):
+    clean_sides(new, arm)
     for bn in rig.get("no_skin", []):  # a helper bone (IK, pole) must hold no skin, or it drags the paws about
         g = new.vertex_groups.get(bn)
         if g:

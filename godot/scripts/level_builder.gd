@@ -363,6 +363,12 @@ func toonify(n: Node) -> void:
 					t.rim = 0.12
 					if t.albedo_texture == null and t.albedo_color.v > 0.7 and not mat.resource_name.begins_with("Whisker"):
 						t.albedo_color = t.albedo_color.darkened(0.1)
+					elif t.albedo_texture != null:
+						# a painted (Meshy) skin: its light greys and creams bleached to paper white under the lamps and
+						# the watercolour filter — painted a shade darker, as the old rats' coats were
+						t.albedo_color = Color(0.72, 0.7, 0.7)
+						if sk.find_bone("Tail1") >= 0:
+							t.albedo_color = Color(0.55, 0.53, 0.54)  # the rats: pale fur, and the camera is always close
 					# round 14: tail, ears and paws are a clear painted pink, not a near-white that the lamps bleach
 					if mat.resource_name == "Pink" and sk.find_bone("Tail1") >= 0:
 						t.albedo_color = Color(0.83, 0.56, 0.55)
@@ -391,7 +397,8 @@ func toonify(n: Node) -> void:
 					elif sk and mat.resource_name in ["Main", "Main_Light"] and _has_material(m.mesh, "Eyes_Pupil") \
 							and Settings.quality != "low" and not OS.has_environment("NOFUR"):
 						furry = 0.012  # round 15: the dog has a coat too
-					if sk and furry == 0.0 and Settings.quality != "low" and t.albedo_color.v > 0.12:
+					# (not over a painted texture — a Meshy model is painted already, and the veil bleached it white)
+					if sk and furry == 0.0 and Settings.quality != "low" and t.albedo_color.v > 0.12 and t.albedo_texture == null:
 						t.next_pass = _wash_pass(t.next_pass as Material, sc)
 					if furry > 0.0:
 						var box := m.mesh.get_aabb()
