@@ -372,6 +372,8 @@ func toonify(n: Node) -> void:
 					# round 14: tail, ears and paws are a clear painted pink, not a near-white that the lamps bleach
 					if mat.resource_name == "Pink" and sk.find_bone("Tail1") >= 0:
 						t.albedo_color = Color(0.83, 0.56, 0.55)
+				if not m.skin and t.albedo_texture != null and str(t.albedo_texture.resource_path).contains("_Image_"):
+					t.albedo_color = Color(0.74, 0.71, 0.68)  # a painted (Meshy) prop: its pale paint bleached to white
 				# Round 14, watercolour: every plain painted thing (not the characters — their skin moves) gets the
 				# wash laid over its own colour: patches of brushwork and drying lines instead of a flat fill.
 				# Mapped in the model's own space, so the pattern travels with a thing that is pushed or carried.
@@ -2606,7 +2608,7 @@ func _nest() -> void:
 	var roof := box("Roof", W(130, 697, 95), Vector3(2.6, 0.1, 1.76), earth, nest)
 	var heap := spawn("rooms/nest", W(90, 725), 0.0, nest)
 	collide(heap)
-	apply_texture(heap, "wood", Color.WHITE, 0.85)  # the twigs get a grain (the paper scraps stay plain)
+	# (round 17: the player's painted nest from Meshy carries its own colours — no wood grain laid over it)
 	# round 5: the nest's light had no source (a bare omni mid-air) and the burrow read flat.
 	# Now the light SPILLS THROUGH THE MOUSE HOLE from the kitchen: the lamp sits just inside
 	# the hole, a warm glow disc marks the hole itself, and bedding mounds + a cloth give the

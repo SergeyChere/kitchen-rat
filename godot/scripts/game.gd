@@ -2230,6 +2230,19 @@ func _start_outro() -> void:
 func _tick_outro(dt: float) -> void:
 	dt = minf(dt, 0.05)
 	_cut_t += dt
+	if _cut_phase == "in" and _cut_t > 0.45 and bool(night.get("finale", false)) and not _dawn_done \
+			and ResourceLoader.exists(LevelBuilder.MODELS + "characters/exterminator.glb"):
+		_dawn()
+	if _cut_phase == "dawn":
+		_run_cues()
+		if is_instance_valid(_exterminator) and _cut_t < 2.0:
+			_exterminator.global_position += _exterminator.global_transform.basis.z * dt * 0.2
+		if _cut_t > 6.6:
+			_cut_phase = "in"
+			_cut_t = 0.0
+			_fade_to = 1.0
+			if is_instance_valid(_exterminator):
+				_exterminator.queue_free()
 	if _cut_phase == "in" and _cut_t > 0.45:
 		_cut_phase = "eat"
 		_cut_t = 0.0
@@ -2237,6 +2250,7 @@ func _tick_outro(dt: float) -> void:
 		rat.scripted = true
 		rat.global_position = Nights.world(165, 700, 1)
 		rat.rotation.y = Nights.yaw_to(Vector3.LEFT)
+		rat.visible = true
 		rat.anim.play("idle")
 		for p in nest_pups: p.visible = true
 		for i in pups.size():
@@ -2261,6 +2275,36 @@ func _tick_outro(dt: float) -> void:
 				_decorate(func(): _show_result(true))
 			else:
 				_show_result(true)
+
+
+## Round 17 (the player's exterminator, made in Meshy): after the last night, dawn in the house — the front door
+## opens and the exterminator walks in with his sprayer, looks round... and the house is empty. Too late.
+var _dawn_done := false
+var _exterminator: Node3D
+
+
+func _dawn() -> void:
+	_dawn_done = true
+	_cut_phase = "dawn"
+	_cut_t = 0.0
+	_cut_camera()
+	var ex: Array = night.get("exit", [520, 572])
+	var door := Nights.world(float(ex[0]), float(ex[1]) + 20.0, 0)
+	_exterminator = _builder.spawn("characters/exterminator", door, 0.0, self)
+	if _exterminator:
+		_exterminator.global_position = door
+		_exterminator.rotation.y = Nights.yaw_to(Nights.world(float(ex[0]), 300, 0) - door)
+		var clip := ClipPlayer.new(_exterminator)
+		clip.play("walk", 0.0)
+		_cues = [[2.0, func(): clip.play("look_around", 0.3)],
+			[0.6, func(): banner("Dawn", "The exterminator is here… but the house is empty.", 4.2)]]
+		_cues.sort_custom(func(x, y): return x[0] < y[0])
+	_cut_cam.fov = 55.0
+	# low by the skirting board, to one side of the door: a rat's-eye view of a giant in boots
+	_cut_cam.global_position = Nights.world(float(ex[0]) + 200.0, float(ex[1]) - 95.0, 14)
+	_cut_cam.look_at(Nights.world(float(ex[0]) - 10.0, float(ex[1]) + 5.0, 80))
+	rat.visible = false
+	_fade_to = 0.0
 
 
 func _set_paused(on: bool) -> void:

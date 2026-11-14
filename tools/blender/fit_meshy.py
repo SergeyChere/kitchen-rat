@@ -546,7 +546,7 @@ def lift_lying(arm, old_body_z):
 def fit_human(name, src, out_path, tris=16000):
     from mathutils import Matrix
     bpy.ops.wm.read_homefile(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=os.path.join(BASE, name + ".glb"))
+    bpy.ops.import_scene.gltf(filepath=os.path.join(BASE, {"exterminator": "owner"}.get(name, name) + ".glb"))
     for o in list(bpy.data.objects):
         if o.type == "MESH" and o.name.startswith("Icosphere"):
             bpy.data.objects.remove(o)
@@ -760,4 +760,4 @@ if __name__ == "__main__":
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     name, src = args[0], args[1]
     out = args[2] if len(args) > 2 else os.path.join(OUT, name + ".glb")
-    (fit_human if name in ("owner", "kid", "guest") else fit)(name, src, out)
+    (fit_human if name in ("owner", "kid", "guest", "exterminator") else fit)(name, src, out)
