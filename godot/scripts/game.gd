@@ -180,6 +180,7 @@ func _ready() -> void:
 		c.shuffle()
 		for k in mini(ps, c.size()):
 			c[k].make_poison()
+		_place_poison_boxes(2)
 	for i in 3:
 		_trails.append(_make_trail())
 	rat.landed.connect(_on_landed)
@@ -1605,6 +1606,31 @@ func place_traps(n: int) -> void:
 			continue
 		add_trap(p + Vector3(randf_range(-0.04, 0.04), 0, randf_range(-0.04, 0.04)), false)
 		placed += 1
+
+
+## The exterminator's bait boxes, against the furniture: only a sign that there is poison in the house tonight (which
+## cheese it is in, the nose still has to tell).
+func _place_poison_boxes(n: int) -> void:
+	if not ResourceLoader.exists(LevelBuilder.MODELS + "props/poison_box.glb"):
+		return
+	var placed: Array[Vector3] = []
+	for t in 400:
+		if placed.size() >= n:
+			break
+		var p := grid.random_free(0.0, Vector3.ZERO)
+		if p.distance_to(hole) < 1.5 or p.distance_to(owner_ai.door) < 0.8:
+			continue
+		if placed.any(func(q: Vector3): return q.distance_to(p) < 2.0):
+			continue
+		var side := Vector3.ZERO
+		for d in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK]:
+			if grid.blocked_at(p + d * 0.25):
+				side = d
+		if side == Vector3.ZERO:
+			continue
+		var m := _builder.spawn("props/poison_box", p, rad_to_deg(Nights.yaw_to(side)) + 90.0, _builder.decor)
+		if m:
+			placed.append(p)
 
 
 # ---------- states: cutscenes, pause, results ----------

@@ -495,14 +495,24 @@ static func _setup_input() -> void:
 
 ## --focus=cat|owner|dog|rat|pup|sleeper[,anim]: a close-up camera that follows one character (screenshots of the models);
 ## with an anim name that character plays only that clip.
+func _food_of(kind: String) -> Node3D:
+	for fd in game.foods:
+		if str(fd.get("type")) == kind:
+			return fd
+	return null
+
+
 func _focus() -> void:
 	var f := str(_args.focus).split(",")
 	var t: Node3D = {"cat": game.cat, "owner": game.owner_ai, "dog": game.dog, "rat": game.rat,
 		"pup": game.pups[0] if not game.pups.is_empty() else null,
-		"sleeper": game.sleepers[0] if not game.sleepers.is_empty() else null}.get(f[0])
+		"sleeper": game.sleepers[0] if not game.sleepers.is_empty() else null,
+		"vacuum": game.vacuum, "trap": game.traps[0] if not game.traps.is_empty() else null,
+		"pizza": _food_of("slice"), "lard": _food_of("fat")}.get(f[0])
 	if t == null:
 		return
-	var d: float = {"cat": 1.1, "owner": 2.8, "dog": 1.5, "rat": 0.55, "pup": 0.4, "sleeper": 2.2}[f[0]]
+	var d: float = {"cat": 1.1, "owner": 2.8, "dog": 1.5, "rat": 0.55, "pup": 0.4, "sleeper": 2.2, "vacuum": 0.9,
+		"trap": 0.6, "pizza": 0.5, "lard": 0.5}[f[0]]
 	var c := get_meta("focus_cam") as Camera3D if has_meta("focus_cam") else null
 	if c == null:
 		c = Camera3D.new()

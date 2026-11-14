@@ -1,6 +1,7 @@
 """Swap one of the game's prop or food models for a new one made in Meshy, at the same size and in the same place.
 
     python tools/blender/swap_prop.py food/cheese_wheel path/to/meshy.glb [--tris 4000] [--keep-height]
+    python tools/blender/swap_prop.py props/poison_box path/to/meshy.glb --size 0.28   (a new model: its longest side)
 
 The old model (godot/assets/models/<name>.glb, its first copy kept in art/props/base/) gives the size: the new one
 is scaled so its longest side matches the old one's (or its height, with --keep-height), centred on the old one's
@@ -28,7 +29,7 @@ def bounds(objs):
     return lo, hi
 
 
-def main(name, src, tris, keep_height):
+def main(name, src, tris, keep_height, size=0.0):
     path = os.path.join(MODELS, name + ".glb")
     keep = os.path.join(BASE, name + ".glb")
     if os.path.exists(path) and not os.path.exists(keep):
@@ -40,8 +41,9 @@ def main(name, src, tris, keep_height):
         olo, ohi = bounds(bpy.context.scene.objects)
         for o in list(bpy.context.scene.objects):
             bpy.data.objects.remove(o)
-    else:
-        olo, ohi = Vector((-0.05, -0.05, 0)), Vector((0.05, 0.05, 0.1))
+    else:  # a new model: standing on the floor at the origin, its longest side `size`
+        h = (size or 0.1) / 2
+        olo, ohi = Vector((-h, -h, 0)), Vector((h, h, 2 * h))
     bpy.ops.import_scene.gltf(filepath=src)
     me = next(o for o in bpy.context.scene.objects if o.type == "MESH")
     for o in list(bpy.context.scene.objects):
@@ -74,7 +76,15 @@ def main(name, src, tris, keep_height):
     for p in me.data.polygons:
         p.use_smooth = True
     nlo, nhi = bounds([me])
-    if keep_height:
+    o, n = ohi - olo, nhi - nlo
+    if abs(o.x - o.y) > 0.15 * max(o.x, o.y) and (o.x > o.y) != (n.x > n.y):  # long side the old model's way round
+        me.rotation_mode = "XYZ"  # (glTF imports in quaternions)
+        me.rotation_euler = (0, 0, 1.5707963)
+        bpy.ops.object.transform_apply(rotation=True)
+        nlo, nhi = bounds([me])
+    if size and not os.path.exists(keep):
+        k = size / max(max(nhi - nlo), 1e-6)
+    elif keep_height:
         k = (ohi.z - olo.z) / max(nhi.z - nlo.z, 1e-6)
     else:
         k = max(ohi - olo) / max(max(nhi - nlo), 1e-6)
@@ -93,4 +103,5 @@ def main(name, src, tris, keep_height):
 if __name__ == "__main__":
     a = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     tris = int(a[a.index("--tris") + 1]) if "--tris" in a else 4000
-    main(a[0], a[1], tris, "--keep-height" in a)
+    size = float(a[a.index("--size") + 1]) if "--size" in a else 0.0
+    main(a[0], a[1], tris, "--keep-height" in a, size)
