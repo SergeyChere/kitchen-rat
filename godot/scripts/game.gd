@@ -1841,113 +1841,127 @@ func _prologue() -> void:
 	# to the side (StorySet) and freed when the story ends.
 	_story_set = StorySet.new()
 	add_child(_story_set)
-	_story_set.build(_builder)
+	_story_set.build()
 	var ss := _story_set
-	_street_cat = _builder.spawn("characters/cat", ss.start + Vector3(0, 0, -0.85), 0.0, ss)
+	_cut_camera()
+	var vs := get_viewport().get_visible_rect().size
+	_story_aspect = vs.x / maxf(vs.y, 1.0)
+	var G := func(stage: String, u: float, v: float) -> Vector3: return ss.ground(stage, u, v, _story_aspect)
+	_street_cat = _builder.spawn("characters/cat", G.call("garden", 0.5, 1.3), 0.0, ss)
 	if _street_cat:
 		_street_cat.scale *= 1.12  # a big street tom
 		for mi in _street_cat.find_children("*", "MeshInstance3D", true, false):
 			_darken(mi as MeshInstance3D)
 		_cat_clip = ClipPlayer.new(_street_cat)
-		_cat_clip.play("run", 0.0)
-	rat.global_position = ss.start
-	rat.rotation.y = 0.0
-	rat.anim.play("run", 0.0)
-	ss.rain.global_position = ss.start + Vector3(0, 2.6, 0)
-	var cat_at := func(p: Vector3, spd: float, clip: String) -> void:
-		_cat_walk = [p]
-		_cat_spd = spd
-		if _cat_clip: _cat_clip.play(clip, 0.15)
+		_cat_clip.play("idle", 0.0)
+		_street_cat.visible = false
+	rat.global_position = G.call("garden", 0.56, 1.1)
+	rat.visible = false
+	var run := func(stage: String, from: Vector2, to: Array, secs: float, clip := "run") -> void:
+		rat.visible = true
+		rat.global_position = G.call(stage, from.x, from.y)
+		_walk = []
+		var dist := 0.0
+		var last := rat.global_position
+		for q in to:
+			var gq: Vector3 = G.call(stage, q.x, q.y)
+			_walk.append(gq)
+			dist += last.distance_to(gq)
+			last = gq
+		_walk_spd = dist / secs
+		rat.rotation.y = Nights.yaw_to(_walk[0] - rat.global_position)
+		rat.anim.play(clip, 0.1)
+	var chase := func(stage: String, from: Vector2, to: Vector2, secs: float) -> void:
+		if not is_instance_valid(_street_cat): return
+		_street_cat.visible = true
+		_street_cat.global_position = G.call(stage, from.x, from.y)
+		var gq: Vector3 = G.call(stage, to.x, to.y)
+		_cat_walk = [gq]
+		_cat_spd = _street_cat.global_position.distance_to(gq) / secs
+		_street_cat.rotation.y = Nights.yaw_to(gq - _street_cat.global_position)
+		if _cat_clip: _cat_clip.play("run", 0.1)
+	var stage := func(st: String, rain: bool) -> void:
+		ss.show_backdrop(_cut_cam, st, _story_aspect)
+		ss.rain.emitting = rain
+		var c: Array = ss.cam(st)
+		ss.rain.global_position = (c[0] as Vector3) + ((c[1] as Vector3) - (c[0] as Vector3)).normalized() * 1.2 + Vector3.UP * 1.0
+		if is_instance_valid(_street_cat): _street_cat.visible = false
+		_cat_walk = []
+	var cg: Array = ss.cam("garden")
+	var ch: Array = ss.cam("hole")
+	var cp: Array = ss.cam("passage")
+	var cb: Array = ss.cam("burrow")
 	_shots = [
-		# 1 · the street in the rain, the lit house across the grass
-		[0.0, 6.0, ss.O + Vector3(-3.6, 2.3, -9.5), ss.O + Vector3(-3.2, 1.9, -8.0), ss.O + Vector3(4.0, 1.0, -1.0), ss.O + Vector3(5.0, 1.3, 0.0)],
-		# 2 · running low through the grass, the cat behind her
-		[6.0, 12.4, Vector3(1.25, 0.22, 0.1), Vector3(1.3, 0.26, -0.5), null, null, "follow"],
-		# 3 · she sees the house, its windows lit
-		[12.4, 15.6, Vector3(-0.35, 0.16, -0.45), Vector3(-0.3, 0.2, -0.55), ss.house_look, ss.house_look, "follow"],
-		# 4 · the dash to the hole, seen from the wall
-		[15.6, 22.0, ss.hole + Vector3(-0.55, 0.14, 0.75), ss.hole + Vector3(-0.4, 0.12, 0.55), null, ss.hole + Vector3(0, 0.05, 0)],
-		# 5 · inside the wall: the way on is blocked; round the bend, a light
-		[22.0, 26.4, ss.tunnel_in + Vector3(0.05, 0.2, -0.38), ss.tunnel_in + Vector3(0.0, 0.22, 0.05), null, null],
-		[26.4, 29.5, ss.tunnel_in + Vector3(0.12, 0.2, 0.25), ss.tunnel_in + Vector3(0.05, 0.18, 0.25), null, ss.tunnel_out + Vector3(-0.15, 0.08, 0)],
-		# 6 · the burrow: the kitchen through the hole, too big and too bright
-		[29.5, 35.5, W.call(186, 700, 16), W.call(183, 670, 12), null, W.call(180, 560, 10)],
-		# 7 · a nest of paper and straw; she drops asleep
-		[35.5, 42.0, W.call(230, 650, 30), W.call(215, 720, 26), null, W.call(120, 715, 3)],
-		# 8 · tiny pups
-		[42.0, 47.5, W.call(215, 680, 18), W.call(205, 692, 14), W.call(132, 712, 2), W.call(132, 712, 2)],
-		# 9 · Mom comes in with cheese; they eat
-		[47.5, 54.5, W.call(225, 670, 22), W.call(210, 688, 15), W.call(160, 690, 2), W.call(132, 712, 2)],
-		# 10 · more, please
-		[54.5, 61.0, W.call(215, 678, 18), W.call(205, 690, 13), W.call(128, 715, 2), null],
+		# 1 · the garden in the rain: she comes up the trail toward the house, the cat behind her
+		[0.0, 9.6, cg[0], cg[0], cg[1], cg[1], "", Vector2(50.0, 45.0)],
+		# 2 · the hole at the foot of the wall
+		[9.6, 14.6, ch[0], ch[0], ch[1], ch[1], "", Vector2(50.0, 47.0)],
+		# 3 · inside the wall: blocked; a light round the corner
+		[14.6, 21.6, cp[0], cp[0], cp[1], cp[1], "", Vector2(55.0, 51.0)],
+		# 4 · the burrow behind the kitchen: the kitchen through the hole, too big, too bright
+		[21.6, 27.6, cb[0], cb[0], cb[1], cb[1], "", Vector2(55.0, 52.0)],
+		# 5 · a nest of paper and straw; she drops asleep
+		[27.6, 34.1, W.call(230, 650, 30), W.call(215, 720, 26), null, W.call(120, 715, 3), "", Vector2(55.0, 55.0)],
+		# 6 · tiny pups
+		[34.1, 39.6, W.call(215, 680, 18), W.call(205, 692, 14), W.call(132, 712, 2), W.call(132, 712, 2)],
+		# 7 · Mom comes in with cheese; they eat
+		[39.6, 46.6, W.call(225, 670, 22), W.call(210, 688, 15), W.call(160, 690, 2), W.call(132, 712, 2)],
+		# 8 · more, please
+		[46.6, 53.1, W.call(215, 678, 18), W.call(205, 690, 13), W.call(128, 715, 2), null],
 	]
 	_cues = [
-		[0.3, func(): banner("Night. Rain.", "", 3.4); _bolt()],
-		[3.6, _bolt],
-		[6.0, func(): _walk_spd = 1.1; _walk = [ss.turn]; cat_at.call(ss.turn, 1.12, "run")],
-		[6.4, func(): banner("", "A rat runs for her life through the wet grass. A street cat is right behind her.", 4.6)],
-		[9.5, _bolt],
-		[12.0, func(): rat.anim.play("sniff", 0.15); _cat_walk = []; if _cat_clip: _cat_clip.play("walk", 0.2)],
-		[12.6, func(): banner("", "Ahead: a house, its windows warm with light.", 3.0)],
-		[15.4, func(): rat.anim.play("run", 0.1); _walk_spd = 1.6; _walk = [ss.hole]; cat_at.call(ss.hole + Vector3(-0.22, 0, 0), 1.75, "run")],
-		[19.1, func(): rat.visible = false; Sfx.play("squeak", null, -4.0, 1.4)],
-		[19.3, func(): _cat_walk = []; if _cat_clip: _cat_clip.play("pounce", 0.05, true)],
-		[19.6, _bolt],
-		[20.2, func(): if _cat_clip: _cat_clip.play("meow_angry", 0.1, true); Sfx.play("meow_angry", null, -6.0)],
-		[20.4, func(): banner("", "She slips through the hole in the wall. Just in time.", 3.0)],
-		[21.5, func(): _fade_to = 1.0],
-		[22.0, _story_tunnel],
-		[22.6, func(): banner("", "Out of the rain. Safe from the cat… but the way on is blocked.", 3.6)],
-		[24.6, func(): rat.anim.play("sniff", 0.2)],
-		[26.2, func(): rat.anim.play("walk", 0.2); _walk = [ss.tunnel_in + Vector3(0, 0, 0.25), ss.tunnel_out]],
-		[26.8, func(): banner("", "From the other side comes a faint, warm light.", 3.0)],
-		[29.5, _story_burrow],
-		[30.2, func(): banner("", "A hole into a huge, bright kitchen. Too big. Too frightening.", 4.2)],
-		[32.4, func(): rat.anim.play("sniff", 0.15)],
-		[33.6, func(): rat.anim.play("walk", 0.15); _walk_spd = 0.45; _walk = [W.call(172, 660, 0)]],
-		[35.5, _story_nest],
-		[40.2, func(): rat.anim.play("sleep")],
-		[41.4, func(): _fade_to = 1.0],
-		[42.0, func(): _fade_to = 0.0; banner("By morning, there were four.", "", 4.0)],
-		[42.8, _pop.bind(0)], [43.5, _pop.bind(1)], [44.2, _pop.bind(2)], [44.9, _pop.bind(3)],
-		[47.0, func(): _fade_to = 1.0],
-		[47.5, func(): _fade_to = 0.0; _story_cheese(); banner("", "Mom brings home a piece of cheese.", 3.2)],
-		[50.9, func(): _story_feed()],
-		[51.3, func(): _pup_says(0, "Nom!")],
-		[51.9, func(): _pup_says(2, "Mmm!")],
-		[54.0, func(): _fade_to = 1.0],
-		[54.5, func(): _fade_to = 0.0; banner("A few days later", "", 2.6); rat.anim.play("idle"); _pups_wake()],
-		[55.6, func(): _pup_says(0, "Mom, we’re hungry!")],
-		[56.4, func(): _pup_says(2, "More cheese!")],
-		[57.2, func(): _pup_says(3, "Please?")],
-		[57.6, func(): rat.rotation.y = Nights.yaw_to(Vector3(0.3, 0, -1)); rat.anim.play("sniff")],
-		[57.8, func(): banner("Kitchen Rat", "One mother. Twenty nights. Four hungry mouths.", 3.0)],
-		[60.4, func(): _fade_to = 1.0],
-		[61.0, func(): _fade_to = 0.0; _story_restore(); Sfx.music_night(night.get("music", {})); _night_intro()],
+		[0.0, func(): stage.call("garden", true)],
+		[0.3, func(): banner("Night. Rain.", "", 2.6); _bolt()],
+		[1.6, func(): run.call("garden", Vector2(0.56, 1.12), [Vector2(0.6, 0.86), Vector2(0.672, 0.67)], 7.6)],
+		[3.0, func(): chase.call("garden", Vector2(0.47, 1.4), Vector2(0.64, 0.74), 6.6)],
+		[3.2, func(): banner("", "A rat runs for her life through the wet grass. A street cat is right behind her.", 3.4)],
+		[4.4, _bolt],
+		[6.7, func(): banner("", "Ahead: a house, its windows warm with light.", 2.8)],
+		[8.2, _bolt],
+		[9.6, func(): stage.call("hole", true); run.call("hole", Vector2(0.16, 1.06), [Vector2(0.45, 0.72), Vector2(0.615, 0.585)], 2.7)],
+		[10.4, func(): chase.call("hole", Vector2(0.05, 0.63), Vector2(0.5, 0.605), 2.2)],
+		[11.2, _bolt],
+		[12.3, func(): rat.visible = false; _walk = []; Sfx.play("squeak", null, -4.0, 1.4)],
+		[12.6, func(): _cat_walk = []; if _cat_clip: _cat_clip.play("pounce", 0.05, true)],
+		[12.8, func(): banner("", "She slips through the hole in the wall. Just in time.", 2.6)],
+		[13.3, func(): if _cat_clip: _cat_clip.play("meow_angry", 0.1, true); Sfx.play("meow_angry", null, -6.0)],
+		[14.0, func(): _fade_to = 1.0],
+		[14.6, func(): _fade_to = 0.0; _rain_off(); stage.call("passage", false)],
+		[14.61, func(): run.call("passage", Vector2(0.5, 1.08), [Vector2(0.46, 0.76)], 2.6, "walk")],
+		[15.0, func(): banner("", "Out of the rain. Safe from the cat… but the way on is blocked.", 3.4)],
+		[17.3, func(): rat.anim.play("sniff", 0.2)],
+		[18.7, func(): var at := rat.global_position; run.call("passage", Vector2(0.46, 0.76), [Vector2(0.62, 0.72), Vector2(0.71, 0.665), Vector2(0.78, 0.63)], 2.6, "walk"); rat.global_position = at],
+		[19.2, func(): banner("", "From the other side comes a faint, warm light.", 2.6)],
+		[21.6, func(): stage.call("burrow", false); run.call("burrow", Vector2(0.56, 1.08), [Vector2(0.655, 0.765)], 2.4, "walk")],
+		[22.0, func(): banner("", "A hole into a huge, bright kitchen. Too big. Too frightening.", 3.6)],
+		[24.0, func(): rat.anim.play("sniff", 0.15)],
+		[25.4, func(): var at := rat.global_position; run.call("burrow", Vector2(0.655, 0.765), [Vector2(0.6, 1.0)], 1.4, "walk"); rat.global_position = at],
+		[27.0, func(): _fade_to = 1.0],
+		[27.6, func(): _fade_to = 0.0; ss.hide_backdrop(); rat.visible = true],
+		[27.61, func(): rat.global_position = W.call(172, 660, 0); rat.anim.play("walk", 0.0); _story_nest()],
+		[32.3, func(): rat.anim.play("sleep")],
+		[33.5, func(): _fade_to = 1.0],
+		[34.1, func(): _fade_to = 0.0; banner("By morning, there were four.", "", 4.0)],
+		[34.9, _pop.bind(0)], [35.6, _pop.bind(1)], [36.3, _pop.bind(2)], [37.0, _pop.bind(3)],
+		[39.1, func(): _fade_to = 1.0],
+		[39.6, func(): _fade_to = 0.0; _story_cheese(); banner("", "Mom brings home a piece of cheese.", 3.2)],
+		[43.0, func(): _story_feed()],
+		[43.4, func(): _pup_says(0, "Nom!")],
+		[44.0, func(): _pup_says(2, "Mmm!")],
+		[46.1, func(): _fade_to = 1.0],
+		[46.6, func(): _fade_to = 0.0; banner("A few days later", "", 2.6); rat.anim.play("idle"); _pups_wake()],
+		[47.7, func(): _pup_says(0, "Mom, we’re hungry!")],
+		[48.5, func(): _pup_says(2, "More cheese!")],
+		[49.3, func(): _pup_says(3, "Please?")],
+		[49.7, func(): rat.rotation.y = Nights.yaw_to(Vector3(0.3, 0, -1)); rat.anim.play("sniff")],
+		[49.9, func(): banner("Kitchen Rat", "One mother. Twenty nights. Four hungry mouths.", 3.0)],
+		[52.5, func(): _fade_to = 1.0],
+		[53.1, func(): _fade_to = 0.0; _story_restore(); Sfx.music_night(night.get("music", {})); _night_intro()],
 	]
 
 
+var _story_aspect := 16.0 / 9.0
 var _story_set: StorySet
-
-
-func _story_tunnel() -> void:
-	_fade_to = 0.0
-	_rain_off()
-	_story_set.rain.emitting = false
-	rat.visible = true
-	rat.global_position = _story_set.tunnel_in
-	rat.rotation.y = 0.0
-	rat.anim.play("walk", 0.0)
-	_walk_spd = 0.3
-	_walk = [_story_set.tunnel_block + Vector3(0, 0, -0.16)]
-
-
-func _story_burrow() -> void:
-	rat.global_position = Nights.world(176, 650, 0)
-	rat.rotation.y = Nights.yaw_to(Vector3.FORWARD)
-	rat.anim.play("walk", 0.0)
-	_walk_spd = 0.25
-	_walk = [Nights.world(180, 618, 0)]
 
 
 func _story_nest() -> void:
@@ -2080,6 +2094,10 @@ func _story_cam(dt: float) -> void:
 			_cut_cam.global_position = (sh[2] as Vector3).lerp(sh[3], k)
 			if sh.size() > 6 and sh[6] == "follow":  # an offset from her, so the camera runs along with her
 				_cut_cam.global_position += rat.global_position
+			if sh.size() > 7:  # a slow push in (on the painted stages, the painting and the animals zoom together)
+				_cut_cam.fov = lerpf((sh[7] as Vector2).x, (sh[7] as Vector2).y, k)
+			elif _cut_cam.fov != 55.0:
+				_cut_cam.fov = 55.0
 			var look: Vector3 = rat.global_position + Vector3.UP * 0.05
 			if sh[4] != null:
 				look = (sh[4] as Vector3).lerp(sh[5] if sh[5] != null else sh[4], k)
@@ -2088,6 +2106,8 @@ func _story_cam(dt: float) -> void:
 			_cut_cam.look_at(look)
 			break
 	_flash = maxf(0.0, _flash - dt * 2.6)
+	if is_instance_valid(_story_set):
+		_story_set.flash(_flash)
 	if env:
 		env.ambient_light_energy = _ambient + _flash * _flash * 4.5
 
