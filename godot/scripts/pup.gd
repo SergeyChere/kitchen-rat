@@ -35,6 +35,7 @@ func setup(k: String, i: int, model: Node3D) -> void:
 	title = INFO.get(k, INFO.brave).name
 	spd_k = INFO.get(k, INFO.brave).speed
 	anim = ClipPlayer.new(model)
+	LevelBuilder.mark_pup(model, k)
 
 
 func say(t: String, d := 1.4) -> void:

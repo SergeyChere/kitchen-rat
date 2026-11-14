@@ -441,6 +441,24 @@ static var _skin_wash: Shader
 
 
 ## The wash pass for one character material; `after` (the outline) is drawn after it.
+## Each pup's own mark (the player's idea: four brothers, four colours): its coat texture swapped for one with
+## the mark painted on (tools/blender/pup_spots.py) — Brave's eyes blue, Curious's green, Shy's ear red,
+## Greedy's tail orange.
+static func mark_pup(model: Node3D, kind: String) -> void:
+	var path := MODELS + "characters/pup_%s.png" % kind
+	if not ResourceLoader.exists(path):
+		return
+	var tex := load(path) as Texture2D
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		for i in m.mesh.get_surface_count():
+			var cur := m.get_active_material(i) as BaseMaterial3D
+			if cur and cur.albedo_texture:
+				var d := cur.duplicate() as BaseMaterial3D
+				d.albedo_texture = tex
+				m.set_surface_override_material(i, d)
+
+
 static func _wash_pass(after: Material, sc: float) -> Material:
 	var w := TextureLib.get_detail("wash", 1.9)
 	if w.is_empty() or OS.get_environment("HIDE").contains("wash"):
@@ -2678,6 +2696,7 @@ func _nest() -> void:
 		if pup:
 			var cp := ClipPlayer.new(pup)
 			cp.play(p[3], 0.0)
+			mark_pup(pup, ["brave", "curious", "shy", "greedy"][g.nest_pups.size() % 4])
 			g.nest_pups.append(pup)
 	add_zone(NestZone, "Nest", W(130, 692), Vector3(2.4, 0.9, 1.75))
 	g.hole = W(180, 585)
