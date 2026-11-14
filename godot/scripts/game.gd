@@ -1847,11 +1847,14 @@ func _prologue() -> void:
 	var vs := get_viewport().get_visible_rect().size
 	_story_aspect = vs.x / maxf(vs.y, 1.0)
 	var G := func(stage: String, u: float, v: float) -> Vector3: return ss.ground(stage, u, v, _story_aspect)
-	_street_cat = _builder.spawn("characters/cat", G.call("garden", 0.5, 1.3), 0.0, ss)
-	if _street_cat:
-		_street_cat.scale *= 1.12  # a big street tom
+	# the black street cat: its own model and skeleton (tools/blender/street_cat.py); the house cat dyed dark if missing
+	var own := ResourceLoader.exists(LevelBuilder.MODELS + "characters/cat_street.glb")
+	_street_cat = _builder.spawn("characters/cat_street" if own else "characters/cat", G.call("garden", 0.5, 1.3), 0.0, ss)
+	if _street_cat and not own:
+		_street_cat.scale *= 1.12
 		for mi in _street_cat.find_children("*", "MeshInstance3D", true, false):
 			_darken(mi as MeshInstance3D)
+	if _street_cat:
 		_cat_clip = ClipPlayer.new(_street_cat)
 		_cat_clip.play("idle", 0.0)
 		_street_cat.visible = false
@@ -1889,7 +1892,7 @@ func _prologue() -> void:
 		_street_cat.rotation.y = Nights.yaw_to(_cat_walk[0] - _street_cat.global_position)
 		if _cat_clip:
 			_cat_clip.play("run", 0.1)
-			_cat_clip.set_speed(1.5)
+			_cat_clip.set_speed(1.15)
 	var stage := func(st: String, rain: bool) -> void:
 		ss.show_backdrop(_cut_cam, st, _story_aspect)
 		ss.rain.emitting = rain
