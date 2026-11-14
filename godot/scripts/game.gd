@@ -1793,16 +1793,13 @@ func _talkers() -> Array:
 	return out
 
 
-## The prologue (round 16, asked: "add an animation of the rat's backstory"), played in the house itself, six
-## shots with camera moves, like the first pages of a picture book:
-##   1 a stormy night: the dark kitchen, lightning in the window, rain
-##   2 a crack in the wall: she squeezes through, soaked, and looks round
-##   3 the kitchen floor: she crosses it to a hole in the skirting board…
-##   4 …behind it a warm, dry hollow: she makes a nest of paper and straw and curls up
-##   5 morning: four pups, one after another
-##   6 a few days later: their eyes are open, they are hungry, she looks at the hole. The title.
-## Space / Esc / Enter skip it (as before). Each shot: [start, end, camera from, camera to, look from, look to];
-## a look of null follows her.
+## The prologue: the night outside as a painted comic (ComicStory, round 18), then in the house itself:
+##   5 a nest of paper and straw; she drops asleep
+##   6 morning: four pups, one after another
+##   7 Mom brings home cheese; they eat
+##   8 a few days later: they are hungry, she looks at the hole. The title.
+## Space / Esc / Enter skip it. Each shot: [start, end, camera from, camera to, look from, look to]; a look of null
+## follows her.
 var _shots: Array = []
 var _rain_loop: Node
 var _flash := 0.0
@@ -1835,84 +1832,17 @@ func _prologue() -> void:
 		p3.global_position = (hit.position if not hit.is_empty() else W.call(spots[i][0], spots[i][1], 2)) + Vector3.UP * 0.004
 		p3.rotation.y = deg_to_rad(float(spots[i][2]))
 		ClipPlayer.new(p3).play(str(spots[i][3]), 0.0)
-	# Round 17 (the player's own script): a rainy night outside, a street cat on her tail, a lit house, a hole at
-	# the last moment, a blocked passage, a light, the burrow behind the kitchen — too frightening to go out —
-	# a nest, sleep; tiny pups; Mom bringing cheese; the pups asking for more. The outside is a set built far off
-	# to the side (StorySet) and freed when the story ends.
-	_story_set = StorySet.new()
-	add_child(_story_set)
-	_story_set.build()
-	var ss := _story_set
+	# Round 18 (the player: "like Frostpunk — a comic, a picture that moves a little"): the night outside is a painted
+	# comic (ComicStory) over the screen — the garden in the rain, the street cat on her tail, the hole in the wall,
+	# the blocked passage, the burrow behind the kitchen; then the nest, the pups and the cheese in the house itself.
+	_comic = ComicStory.new()
+	add_child(_comic)
+	_comic.build()
 	_cut_camera()
-	var vs := get_viewport().get_visible_rect().size
-	_story_aspect = vs.x / maxf(vs.y, 1.0)
-	var G := func(stage: String, u: float, v: float) -> Vector3: return ss.ground(stage, u, v, _story_aspect)
-	# the black street cat: its own model and skeleton (tools/blender/street_cat.py); the house cat dyed dark if missing
-	var own := ResourceLoader.exists(LevelBuilder.MODELS + "characters/cat_street.glb")
-	_street_cat = _builder.spawn("characters/cat_street" if own else "characters/cat", G.call("garden", 0.5, 1.3), 0.0, ss)
-	if _street_cat and not own:
-		_street_cat.scale *= 1.12
-		for mi in _street_cat.find_children("*", "MeshInstance3D", true, false):
-			_darken(mi as MeshInstance3D)
-	if _street_cat:
-		_cat_clip = ClipPlayer.new(_street_cat)
-		_cat_clip.play("idle", 0.0)
-		_street_cat.visible = false
-	rat.global_position = G.call("garden", 0.56, 1.1)
-	rat.visible = false
-	var run := func(stage: String, from: Vector2, to: Array, secs: float, clip := "run") -> void:
-		rat.visible = true
-		rat.global_position = G.call(stage, from.x, from.y)
-		_walk = []
-		var dist := 0.0
-		var last := rat.global_position
-		for q in to:
-			var gq: Vector3 = G.call(stage, q.x, q.y)
-			_walk.append(gq)
-			dist += last.distance_to(gq)
-			last = gq
-		_walk_spd = dist / secs
-		rat.rotation.y = Nights.yaw_to(_walk[0] - rat.global_position)
-		rat.anim.play(clip, 0.1)
-	# the street cat runs after her along her own path, from behind, a little faster than she is (round 17:
-	# "it should run after the rat, not walk beside her")
-	var chase := func(stage: String, from: Vector2, path: Array, secs: float) -> void:
-		if not is_instance_valid(_street_cat): return
-		_street_cat.visible = true
-		_street_cat.global_position = G.call(stage, from.x, from.y)
-		_cat_walk = []
-		var dist := 0.0
-		var last := _street_cat.global_position
-		for q in path:
-			var gq: Vector3 = G.call(stage, q.x, q.y)
-			_cat_walk.append(gq)
-			dist += last.distance_to(gq)
-			last = gq
-		_cat_spd = dist / secs
-		_street_cat.rotation.y = Nights.yaw_to(_cat_walk[0] - _street_cat.global_position)
-		if _cat_clip:
-			_cat_clip.play("run", 0.1)
-			_cat_clip.set_speed(1.15)
-	var stage := func(st: String, rain: bool) -> void:
-		ss.show_backdrop(_cut_cam, st, _story_aspect)
-		ss.rain.emitting = rain
-		var c: Array = ss.cam(st)
-		ss.rain.global_position = (c[0] as Vector3) + ((c[1] as Vector3) - (c[0] as Vector3)).normalized() * 1.2 + Vector3.UP * 1.0
-		if is_instance_valid(_street_cat): _street_cat.visible = false
-		_cat_walk = []
-	var cg: Array = ss.cam("garden")
-	var ch: Array = ss.cam("hole")
-	var cp: Array = ss.cam("passage")
-	var cb: Array = ss.cam("burrow")
+	var nest_cam: Vector3 = W.call(230, 650, 30)
 	_shots = [
-		# 1 · the garden in the rain: she comes up the trail toward the house, the cat behind her
-		[0.0, 9.6, cg[0], cg[0], cg[1], cg[1], "", Vector2(50.0, 45.0)],
-		# 2 · the hole at the foot of the wall
-		[9.6, 14.6, ch[0], ch[0], ch[1], ch[1], "", Vector2(50.0, 47.0)],
-		# 3 · inside the wall: blocked; a light round the corner
-		[14.6, 21.6, cp[0], cp[0], cp[1], cp[1], "", Vector2(55.0, 51.0)],
-		# 4 · the burrow behind the kitchen: the kitchen through the hole, too big, too bright
-		[21.6, 27.6, cb[0], cb[0], cb[1], cb[1], "", Vector2(55.0, 52.0)],
+		# 1–4 · the comic (the camera waits at the nest under it)
+		[0.0, 27.6, nest_cam, nest_cam, W.call(120, 715, 3), W.call(120, 715, 3)],
 		# 5 · a nest of paper and straw; she drops asleep
 		[27.6, 34.1, W.call(230, 650, 30), W.call(215, 720, 26), null, W.call(120, 715, 3), "", Vector2(55.0, 55.0)],
 		# 6 · tiny pups
@@ -1923,34 +1853,18 @@ func _prologue() -> void:
 		[46.6, 53.1, W.call(215, 678, 18), W.call(205, 690, 13), W.call(128, 715, 2), null],
 	]
 	_cues = [
-		[0.0, func(): stage.call("garden", true)],
-		[0.3, func(): banner("Night. Rain.", "", 2.6); _bolt()],
-		[1.6, func(): run.call("garden", Vector2(0.56, 1.12), [Vector2(0.6, 0.86), Vector2(0.672, 0.67)], 7.6)],
-		[2.4, func(): chase.call("garden", Vector2(0.55, 1.45), [Vector2(0.56, 1.12), Vector2(0.6, 0.86), Vector2(0.66, 0.71)], 7.0)],
-		[3.2, func(): banner("", "A rat runs for her life through the wet grass. A street cat is right behind her.", 3.4)],
+		[0.3, _bolt],
+		[4.0, func(): Sfx.play("meow_angry", null, -14.0, 0.8)],
 		[4.4, _bolt],
-		[6.7, func(): banner("", "Ahead: a house, its windows warm with light.", 2.8)],
 		[8.2, _bolt],
-		[9.6, func(): stage.call("hole", true); run.call("hole", Vector2(0.02, 0.64), [Vector2(0.34, 0.62), Vector2(0.615, 0.585)], 2.7)],
-		[9.9, func(): chase.call("hole", Vector2(-0.22, 0.66), [Vector2(0.02, 0.64), Vector2(0.34, 0.62), Vector2(0.52, 0.6)], 2.6)],
 		[11.2, _bolt],
-		[12.3, func(): rat.visible = false; _walk = []; Sfx.play("squeak", null, -4.0, 1.4)],
-		[12.6, func(): _cat_walk = []; if _cat_clip: _cat_clip.set_speed(1.0); _cat_clip.play("pounce", 0.05, true)],
-		[12.8, func(): banner("", "She slips through the hole in the wall. Just in time.", 2.6)],
-		[13.3, func(): if _cat_clip: _cat_clip.play("meow_angry", 0.1, true); Sfx.play("meow_angry", null, -6.0)],
-		[14.0, func(): _fade_to = 1.0],
-		[14.6, func(): _fade_to = 0.0; _rain_off(); stage.call("passage", false)],
-		[14.61, func(): run.call("passage", Vector2(0.5, 1.08), [Vector2(0.46, 0.76)], 2.6, "walk")],
-		[15.0, func(): banner("", "Out of the rain. Safe from the cat… but the way on is blocked.", 3.4)],
-		[17.3, func(): rat.anim.play("sniff", 0.2)],
-		[18.7, func(): var at := rat.global_position; run.call("passage", Vector2(0.46, 0.76), [Vector2(0.62, 0.72), Vector2(0.71, 0.665), Vector2(0.78, 0.63)], 2.6, "walk"); rat.global_position = at],
-		[19.2, func(): banner("", "From the other side comes a faint, warm light.", 2.6)],
-		[21.6, func(): stage.call("burrow", false); run.call("burrow", Vector2(0.56, 1.08), [Vector2(0.655, 0.765)], 2.4, "walk")],
-		[22.0, func(): banner("", "A hole into a huge, bright kitchen. Too big. Too frightening.", 3.6)],
-		[24.0, func(): rat.anim.play("sniff", 0.15)],
-		[25.4, func(): var at := rat.global_position; run.call("burrow", Vector2(0.655, 0.765), [Vector2(0.6, 1.0)], 1.4, "walk"); rat.global_position = at],
+		[12.3, func(): Sfx.play("squeak", null, -4.0, 1.4)],
+		[12.5, func(): Sfx.play("meow_angry", null, -6.0)],
+		[13.4, _bolt],
+		[14.6, func(): _rain_off()],
+		[17.3, func(): Sfx.play("squeak", null, -12.0, 1.6)],
 		[27.0, func(): _fade_to = 1.0],
-		[27.6, func(): _fade_to = 0.0; ss.hide_backdrop(); rat.visible = true],
+		[27.6, func(): _fade_to = 0.0; _comic_free(); rat.visible = true],
 		[27.61, func(): rat.global_position = W.call(172, 660, 0); rat.anim.play("walk", 0.0); _story_nest()],
 		[32.3, func(): rat.anim.play("sleep")],
 		[33.5, func(): _fade_to = 1.0],
@@ -1973,8 +1887,7 @@ func _prologue() -> void:
 	]
 
 
-var _story_aspect := 16.0 / 9.0
-var _story_set: StorySet
+var _comic: ComicStory
 
 
 func _story_nest() -> void:
@@ -1983,35 +1896,14 @@ func _story_nest() -> void:
 	_walk = [Nights.world(130, 700, 0), Nights.world(115, 690, 0), Nights.world(135, 680, 0), Nights.world(152, 704, 0)]
 
 
-var _street_cat: Node3D
-var _cat_clip: ClipPlayer
-var _cat_walk: Array = []
-var _cat_spd := 1.0
 var _walk_spd := 0.32
 var _story_food: Food
 
 
-## The street cat: the house cat's model in a dark, tabby-grey coat.
-func _darken(mi: MeshInstance3D) -> void:
-	for i in mi.mesh.get_surface_count():
-		var m := mi.get_active_material(i)
-		if m == null:
-			continue
-		var d := m.duplicate() as Material
-		var cur := d
-		while cur:
-			if cur is BaseMaterial3D and (cur as BaseMaterial3D).albedo_texture != null:
-				(cur as BaseMaterial3D).albedo_color = Color(0.2, 0.19, 0.22)  # the painted ginger coat, dyed near black
-			elif cur is BaseMaterial3D and (cur as BaseMaterial3D).albedo_color.v > 0.25 and cur.resource_name not in ["Eye", "CatIris", "EyeShine"]:
-				(cur as BaseMaterial3D).albedo_color = Color(0.28, 0.27, 0.3) if (cur as BaseMaterial3D).albedo_color.s > 0.2 else Color(0.5, 0.49, 0.5)
-			elif cur is ShaderMaterial and (cur as ShaderMaterial).get_shader_parameter("coat") != null:
-				(cur as ShaderMaterial).set_shader_parameter("coat", Color(0.3, 0.29, 0.32))
-				(cur as ShaderMaterial).set_shader_parameter("grey", 1.0)
-				(cur as ShaderMaterial).set_shader_parameter("shade", 0.55)
-			if cur.next_pass:
-				cur.next_pass = cur.next_pass.duplicate()
-			cur = cur.next_pass
-		mi.set_surface_override_material(i, d)
+func _comic_free() -> void:
+	if is_instance_valid(_comic):
+		_comic.queue_free()
+	_comic = null
 
 
 func _story_cheese() -> void:
@@ -2040,16 +1932,7 @@ func _story_feed() -> void:
 
 
 func _story_free() -> void:
-	if is_instance_valid(_story_set):
-		# hidden first, freed a moment later: freed at once, its darkened cat materials went while the renderer
-		# still had them on its list ("material is null")
-		var ss := _story_set
-		ss.visible = false
-		get_tree().create_timer(0.3).timeout.connect(func(): if is_instance_valid(ss): ss.queue_free())
-	_story_set = null
-	_street_cat = null
-	_cat_clip = null
-	_cat_walk = []
+	_comic_free()
 	if is_instance_valid(_story_food):
 		rat.carried.erase(_story_food)
 		_story_food.queue_free()
@@ -2074,7 +1957,7 @@ func _pop(i: int) -> void:
 	p.visible = true
 	var base: Vector3 = _pup_base[i] if i < _pup_base.size() else Vector3.ONE
 	p.scale = base * 0.05
-	create_tween().tween_property(p, "scale", base * (0.62 if is_instance_valid(_story_set) else 1.0), 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	create_tween().tween_property(p, "scale", base * (0.62 if _cut_phase == "prologue" else 1.0), 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	Sfx.play("squeak", null, -8.0, randf_range(1.6, 1.9))
 
 
@@ -2121,8 +2004,8 @@ func _story_cam(dt: float) -> void:
 			_cut_cam.look_at(look)
 			break
 	_flash = maxf(0.0, _flash - dt * 2.6)
-	if is_instance_valid(_story_set):
-		_story_set.flash(_flash)
+	if is_instance_valid(_comic):
+		_comic.tick(_cut_t, _flash)
 	if env:
 		env.ambient_light_energy = _ambient + _flash * _flash * 4.5
 
@@ -2158,20 +2041,6 @@ func _run_cues() -> void:
 		c.call()
 
 
-## The street cat in the prologue, after her along _cat_walk.
-func _walk_cat(dt: float) -> void:
-	if _cat_walk.is_empty() or not is_instance_valid(_street_cat):
-		return
-	var t: Vector3 = _cat_walk[0]
-	var d := t - _street_cat.global_position
-	d.y = 0.0
-	if d.length() < 0.03:
-		_cat_walk.pop_front()
-		return
-	_street_cat.global_position += d.normalized() * minf(d.length(), _cat_spd * dt)
-	_street_cat.rotation.y = lerp_angle(_street_cat.rotation.y, Nights.yaw_to(d), minf(1.0, dt * 8.0))
-
-
 ## Walk the rat along _walk; true when she got there.
 func _walk_rat(dt: float, spd: float) -> bool:
 	if _walk.is_empty():
@@ -2202,7 +2071,6 @@ func _tick_intro(dt: float) -> void:
 	match _cut_phase:
 		"prologue":
 			_walk_rat(dt, _walk_spd)
-			_walk_cat(dt)
 			_story_cam(dt)
 		"nest":
 			_orbit(dt, nest_c, 0.5 + _cut_t * 0.09, lerpf(0.95, 0.7, clampf(_cut_t / 5.0, 0.0, 1.0)), lerpf(0.5, 0.32, clampf(_cut_t / 5.0, 0.0, 1.0)))
