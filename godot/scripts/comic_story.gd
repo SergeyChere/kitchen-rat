@@ -278,7 +278,7 @@ func tick(t: float, flash: float) -> void:
 		# the painting drifts: centre and width, eased over the panel's life
 		var life := clampf((t - float(d.at)) / maxf(float(page[1]) - float(d.at), 0.1), 0.0, 1.0)
 		var k := smoothstep(0.0, 1.0, life)
-		var v: Array = d.view
+		var v: Array = d.view if not p.own else [Vector2(0.5, 0.5), 1.0, Vector2(0.5, 0.48), 0.9]  # (its own painting: all of it, a slow push in)
 		var c: Vector2 = (v[0] as Vector2).lerp(v[2], k)
 		var wpart := lerpf(float(v[1]), float(v[3]), k)
 		var ts: Vector2 = (p.tex as Texture2D).get_size()
