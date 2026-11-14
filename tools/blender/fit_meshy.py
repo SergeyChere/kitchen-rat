@@ -37,7 +37,30 @@ RIGS = {
         "tris": 14000,
         "material": "Main",
     },
+    # the rats' bones are points (head and tail together), which bone heat cannot weigh skin to: their skin takes
+    # the weights of the old rat's skin instead, stretched the same way as the skeleton
+    "rat_mother": {
+        "feet": {"FL": "FrontFoot.L", "FR": "FrontFoot.R", "BL": "BackFoot.L", "BR": "BackFoot.R"},
+        "legs": {"FL": ["FrontUpLeg.L", "FrontLowLeg.L", "FrontFoot.L"], "FR": ["FrontUpLeg.R", "FrontLowLeg.R", "FrontFoot.R"],
+                 "BL": ["BackUpLeg.L", "BackLowLeg.L", "BackFoot.L"], "BR": ["BackUpLeg.R", "BackLowLeg.R", "BackFoot.R"]},
+        "head": "Head",
+        "no_skin": [],
+        "tris": 12000,
+        "material": "RatSkin",
+    },
 }
+RIGS["dog"] = {
+    "feet": {"FL": "FF.L", "FR": "FF.R", "BL": "FFB.L", "BR": "FFB.R"},
+    "legs": {"FL": ["FrontUpperLeg.L", "FrontLowerLeg.L", "IKFrontLeg.L", "FF.L"], "FR": ["FrontUpperLeg.R", "FrontLowerLeg.R", "IKFrontLeg.R", "FF.R"],
+             "BL": ["BackUpperLeg.L", "BackLowerLeg.L", "IKBackLeg.L", "FFB.L"], "BR": ["BackUpperLeg.R", "BackLowerLeg.R", "IKBackLeg.R", "FFB.R"]},
+    "head": "Head",
+    "no_skin": ["IKFrontLeg.L", "IKFrontLeg.R", "IKBackLeg.L", "IKBackLeg.R", "FF.L", "FF.R", "FFB.L", "FFB.R",
+                "PoleTarget.L", "PoleTarget.R", "PoleTargetBack.L", "PoleTargetBack.R"],
+    "tris": 14000,
+    "material": "Main",
+}
+RIGS["cat_street"] = dict(RIGS["cat"], base="cat")
+RIGS["rat_pup"] = dict(RIGS["rat_mother"], tris=6000)
 
 
 def world_verts(o):
@@ -72,7 +95,7 @@ def paws(points, floor, height):
 def fit(name, src, out_path):
     rig = RIGS[name]
     bpy.ops.wm.read_homefile(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=os.path.join(BASE, name + ".glb"))
+    bpy.ops.import_scene.gltf(filepath=os.path.join(BASE, rig.get("base", name) + ".glb"))
     for o in list(bpy.data.objects):
         if o.type == "MESH" and o.name.startswith("Icosphere"):
             bpy.data.objects.remove(o)
@@ -147,16 +170,24 @@ def fit(name, src, out_path):
     n_front = (np_["FL"].y + np_["FR"].y) / 2
     n_back = (np_["BL"].y + np_["BR"].y) / 2
     sx = n_px / o_px
-    sy = (n_back - n_front) / (o_back - o_front)
+    # lengthwise: nose to back paws (the paws alone mislead: a sitting rat has her front paws under her chest)
+    n_nose = min(p.y for p in nv)
+    sy = (n_back - n_nose) / (o_back - o_nose)
     head = arm.matrix_world @ arm.data.bones[rig["head"]].head_local
     head_top_new = max(p.z for p in nv if p.y < n_front)
     head_top_old = max(p.z for p in ov if p.y < o_front)
     sz = head_top_new / head_top_old
 
     def stretch(p):
-        return Vector((p.x * sx, n_front + (p.y - o_front) * sy, p.z * sz))
+        return Vector((p.x * sx, n_nose + (p.y - o_nose) * sy, p.z * sz))
 
     to_local = arm.matrix_world.inverted()
+    if rig.get("weights") == "transfer":  # the old skin, stretched like the skeleton, to take its weights from
+        omw = old.matrix_world
+        oinv = omw.inverted()
+        for v in old.data.vertices:
+            v.co = oinv @ stretch(omw @ v.co)
+        old.data.update()
     select_only(arm)
     bpy.ops.object.mode_set(mode="EDIT")
     eb = arm.data.edit_bones
@@ -168,25 +199,39 @@ def fit(name, src, out_path):
         b.head = to_local @ h
         b.tail = to_local @ t
     for key, chain in rig["legs"].items():
+        # the whole leg moved onto its paw, every bone by the same step: a bone's direction must not change, or the
+        # clips (which turn bones from their rest) bend the leg somewhere else and tear the paw off
         foot = arm.matrix_world @ eb[rig["feet"][key]].head
         d = np_[key] - foot
         d.z = 0.0
         for bn in chain:
             b = eb[bn]
-            # the top of the leg stays put inside the body; the knee follows half way; the paw and its IK all the way
-            share = {0: 0.35, 1: 0.75}.get(chain.index(bn), 1.0)
-            if chain.index(bn) == 0:
-                b.tail = to_local @ ((arm.matrix_world @ b.tail) + d * 0.75)
-                b.head = to_local @ ((arm.matrix_world @ b.head) + d * 0.35)
-            else:
-                b.head = to_local @ ((arm.matrix_world @ b.head) + d * (0.75 if chain.index(bn) == 1 else 1.0))
-                b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
+            b.head = to_local @ ((arm.matrix_world @ b.head) + d)
+            b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
     bpy.ops.object.mode_set(mode="OBJECT")
     for bn in rig["no_skin"]:
         if bn in arm.data.bones:
             arm.data.bones[bn].use_deform = False
 
+    if rig.get("weights") == "transfer":
+        for g in old.vertex_groups:
+            new.vertex_groups.new(name=g.name)
+        select_only(new)
+        dt = new.modifiers.new("weights", "DATA_TRANSFER")
+        dt.object = old
+        dt.use_vert_data = True
+        dt.data_types_verts = {"VGROUP_WEIGHTS"}
+        dt.vert_mapping = "POLYINTERP_NEAREST"
+        dt.layers_vgroup_select_src = "ALL"
+        dt.layers_vgroup_select_dst = "NAME"
+        bpy.ops.object.modifier_apply(modifier="weights")
+        weighted = len(old.vertex_groups)
+        bpy.data.objects.remove(old)
+        return _finish(name, rig, arm, new, weighted, out_path, (sx, sy, sz))
     # the skin: bone heat on a closed, smoothed copy, then copied onto the real mesh
+    omw = old.matrix_world
+    oldpts = [stretch(omw @ v.co) for v in old.data.vertices]
+    oldw = [[(old.vertex_groups[g.group].name, g.weight) for g in v.groups if g.weight > 0.01] for v in old.data.vertices]
     bpy.data.objects.remove(old)
     select_only(new)
     bpy.ops.object.duplicate()
@@ -199,12 +244,53 @@ def fit(name, src, out_path):
     sm.iterations = 4
     bpy.ops.object.modifier_apply(modifier="close")
     bpy.ops.object.modifier_apply(modifier="soft")
+    # only the body: the remesh leaves crumbs (whisker and fur tips) that bone heat cannot solve, and one unsolved
+    # island used to leave the whole skin unweighted
+    bm = bmesh.new()
+    bm.from_mesh(proxy.data)
+    seen, best = set(), []
+    for v0 in bm.verts:
+        if v0 in seen:
+            continue
+        isl, stack = [], [v0]
+        seen.add(v0)
+        while stack:
+            v = stack.pop()
+            isl.append(v)
+            for e in v.link_edges:
+                w = e.other_vert(v)
+                if w not in seen:
+                    seen.add(w)
+                    stack.append(w)
+        if len(isl) > len(best):
+            best = isl
+    keep = set(best)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v not in keep], context="VERTS")
+    bm.to_mesh(proxy.data)
+    bm.free()
     select_only(proxy, arm)
     proxy.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
     weighted = len(proxy.vertex_groups)
+    bare = [v.index for v in proxy.data.vertices if sum(g.weight for g in v.groups) < 0.01]
+    if bare:  # where the heat found no answer: the nearest bone (its head-to-tail segment), wholly
+        print("bone heat left", len(bare), "of", len(proxy.data.vertices), "bare: given to the nearest bone")
+        segs = []
+        for bb in arm.data.bones:
+            if bb.use_deform and bb.name not in rig["no_skin"]:
+                segs.append((bb.name, arm.matrix_world @ bb.head_local, arm.matrix_world @ bb.tail_local))
+
+        def dist(p, a2, b2):
+            ab = b2 - a2
+            t = 0.0 if ab.length_squared < 1e-12 else max(0.0, min(1.0, (p - a2).dot(ab) / ab.length_squared))
+            return (a2 + ab * t - p).length
+        for vi in bare:
+            co = proxy.matrix_world @ proxy.data.vertices[vi].co
+            bn = min(segs, key=lambda sg: dist(co, sg[1], sg[2]))[0]
+            g = proxy.vertex_groups.get(bn) or proxy.vertex_groups.new(name=bn)
+            g.add([vi], 1.0, "REPLACE")
     select_only(new)
     for g in proxy.vertex_groups:
         new.vertex_groups.new(name=g.name)
@@ -217,6 +303,14 @@ def fit(name, src, out_path):
     dt.layers_vgroup_select_dst = "NAME"
     bpy.ops.object.modifier_apply(modifier="weights")
     bpy.data.objects.remove(proxy)
+    return _finish(name, rig, arm, new, weighted, out_path, (sx, sy, sz))
+
+
+def _finish(name, rig, arm, new, weighted, out_path, st):
+    for bn in rig.get("no_skin", []):  # a helper bone (IK, pole) must hold no skin, or it drags the paws about
+        g = new.vertex_groups.get(bn)
+        if g:
+            new.vertex_groups.remove(g)
     new.parent = arm
     new.matrix_parent_inverse = arm.matrix_world.inverted()
     mod = new.modifiers.new("Armature", "ARMATURE")
@@ -228,7 +322,7 @@ def fit(name, src, out_path):
         new.data.materials[0].name = rig["material"]
     new.name = name.capitalize()
     print("fit", name, "tris", sum(len(p.vertices) - 2 for p in new.data.polygons), "groups", weighted,
-          "stretch", round(sx, 3), round(sy, 3), round(sz, 3), "clips", len(bpy.data.actions))
+          "stretch", [round(x, 3) for x in st], "clips", len(bpy.data.actions))
 
     select_only(arm)
     for o in bpy.context.scene.objects:
