@@ -21,10 +21,10 @@ var PANELS := [
 	{"name": "garden_chase", "page": [0.0, 9.6], "rect": Rect2(0.035, 0.05, 0.93, 0.56), "img": "garden",
 		"view": [Vector2(0.45, 0.6), 1.0, Vector2(0.42, 0.62), 0.8], "rain": true, "at": 0.15,
 		"figs": [["rat_run", Vector2(0.1, 0.97), Vector2(0.33, 0.8), 0.1, 1.4, 7.5, false, 0.006, null, -1.0]]},
-	{"name": "cat_eyes", "page": [0.0, 9.6], "rect": Rect2(0.035, 0.645, 0.45, 0.305), "img": "garden",
+	{"name": "cat_eyes", "page": [0.0, 9.6], "rect": Rect2(0.035, 0.645, 0.6, 0.305), "img": "garden",
 		"view": [Vector2(0.17, 0.58), 0.34, Vector2(0.2, 0.6), 0.3], "rain": true, "at": 3.9,
 		"figs": [["cat_run", Vector2(-0.08, 0.9), Vector2(0.17, 0.88), 0.34, 3.9, 9.6, false, 0.008, Vector2(0.935, 0.205), -1.0]]},
-	{"name": "warm_windows", "page": [0.0, 9.6], "rect": Rect2(0.515, 0.645, 0.45, 0.305), "img": "garden",
+	{"name": "warm_windows", "page": [0.0, 9.6], "rect": Rect2(0.665, 0.645, 0.3, 0.305), "img": "garden",
 		"view": [Vector2(0.7, 0.3), 0.4, Vector2(0.72, 0.28), 0.3], "rain": true, "at": 6.6, "figs": []},
 	# ---- page 2 · the hole at the foot of the wall
 	{"name": "hole_dash", "page": [9.6, 14.6], "rect": Rect2(0.035, 0.05, 0.93, 0.56), "img": "hole",
@@ -48,14 +48,26 @@ var PANELS := [
 		"figs": [["rat_run", Vector2(0.52, 0.93), Vector2(0.64, 0.86), 0.13, 21.7, 24.0, false, 0.004, null, -1.0]]},
 ]
 
+## The panels' own paintings (the figures drawn in, made for the panel): how each drifts — [centre from, width
+## from, centre to, width to]. A panel not named here shows all of its painting with a slow push in.
+const OWN_VIEW := {
+	"garden_chase": [Vector2(0.45, 0.5), 1.0, Vector2(0.55, 0.55), 0.82],
+	"cat_eyes": [Vector2(0.45, 0.52), 1.0, Vector2(0.55, 0.5), 0.85],
+	"hole_dash": [Vector2(0.45, 0.55), 1.0, Vector2(0.62, 0.58), 0.8],
+	"cat_pounce": [Vector2(0.5, 0.5), 1.0, Vector2(0.62, 0.52), 0.82],
+	"cat_waits": [Vector2(0.5, 0.5), 1.0, Vector2(0.45, 0.5), 0.88],
+	"blocked": [Vector2(0.35, 0.55), 1.0, Vector2(0.42, 0.55), 0.85],
+	"too_big": [Vector2(0.5, 0.5), 1.0, Vector2(0.5, 0.42), 0.82],
+}
+
 ## Captions: text, panel, where in it (0..1 of the panel, the box's top left), width (part of the panel), at.
 var CAPTIONS := [
 	["Night. Rain.", "garden_chase", Vector2(0.025, 0.05), 0.2, 0.4],
 	["A rat runs for her life through the wet grass.", "garden_chase", Vector2(0.6, 0.05), 0.37, 2.0],
-	["A street cat is right behind her.", "cat_eyes", Vector2(0.04, 0.07), 0.52, 4.5],
-	["Ahead: a house, its windows warm with light.", "warm_windows", Vector2(0.05, 0.72), 0.6, 7.0],
+	["A street cat is right behind her.", "cat_eyes", Vector2(0.62, 0.07), 0.36, 4.5],
+	["Ahead: a house, its windows warm with light.", "warm_windows", Vector2(0.05, 0.6), 0.9, 7.0],
 	["A hole at the foot of the wall…", "hole_dash", Vector2(0.025, 0.05), 0.3, 10.0],
-	["She slips through. Just in time.", "cat_pounce", Vector2(0.04, 0.07), 0.42, 12.8],
+	["She slips through. Just in time.", "cat_pounce", Vector2(0.6, 0.07), 0.36, 12.8],
 	["Out of the rain. Safe from the cat…", "blocked", Vector2(0.05, 0.04), 0.6, 15.0],
 	["…but the way on is blocked.", "blocked", Vector2(0.35, 0.86), 0.6, 16.6],
 	["From the other side comes a faint, warm light.", "warm_light", Vector2(0.08, 0.05), 0.84, 19.2],
@@ -278,7 +290,7 @@ func tick(t: float, flash: float) -> void:
 		# the painting drifts: centre and width, eased over the panel's life
 		var life := clampf((t - float(d.at)) / maxf(float(page[1]) - float(d.at), 0.1), 0.0, 1.0)
 		var k := smoothstep(0.0, 1.0, life)
-		var v: Array = d.view if not p.own else [Vector2(0.5, 0.5), 1.0, Vector2(0.5, 0.48), 0.9]  # (its own painting: all of it, a slow push in)
+		var v: Array = d.view if not p.own else OWN_VIEW.get(d.name, [Vector2(0.5, 0.5), 1.0, Vector2(0.5, 0.48), 0.9])
 		var c: Vector2 = (v[0] as Vector2).lerp(v[2], k)
 		var wpart := lerpf(float(v[1]), float(v[3]), k)
 		var ts: Vector2 = (p.tex as Texture2D).get_size()
