@@ -1871,15 +1871,25 @@ func _prologue() -> void:
 		_walk_spd = dist / secs
 		rat.rotation.y = Nights.yaw_to(_walk[0] - rat.global_position)
 		rat.anim.play(clip, 0.1)
-	var chase := func(stage: String, from: Vector2, to: Vector2, secs: float) -> void:
+	# the street cat runs after her along her own path, from behind, a little faster than she is (round 17:
+	# "it should run after the rat, not walk beside her")
+	var chase := func(stage: String, from: Vector2, path: Array, secs: float) -> void:
 		if not is_instance_valid(_street_cat): return
 		_street_cat.visible = true
 		_street_cat.global_position = G.call(stage, from.x, from.y)
-		var gq: Vector3 = G.call(stage, to.x, to.y)
-		_cat_walk = [gq]
-		_cat_spd = _street_cat.global_position.distance_to(gq) / secs
-		_street_cat.rotation.y = Nights.yaw_to(gq - _street_cat.global_position)
-		if _cat_clip: _cat_clip.play("run", 0.1)
+		_cat_walk = []
+		var dist := 0.0
+		var last := _street_cat.global_position
+		for q in path:
+			var gq: Vector3 = G.call(stage, q.x, q.y)
+			_cat_walk.append(gq)
+			dist += last.distance_to(gq)
+			last = gq
+		_cat_spd = dist / secs
+		_street_cat.rotation.y = Nights.yaw_to(_cat_walk[0] - _street_cat.global_position)
+		if _cat_clip:
+			_cat_clip.play("run", 0.1)
+			_cat_clip.set_speed(1.5)
 	var stage := func(st: String, rain: bool) -> void:
 		ss.show_backdrop(_cut_cam, st, _story_aspect)
 		ss.rain.emitting = rain
@@ -1913,16 +1923,16 @@ func _prologue() -> void:
 		[0.0, func(): stage.call("garden", true)],
 		[0.3, func(): banner("Night. Rain.", "", 2.6); _bolt()],
 		[1.6, func(): run.call("garden", Vector2(0.56, 1.12), [Vector2(0.6, 0.86), Vector2(0.672, 0.67)], 7.6)],
-		[3.0, func(): chase.call("garden", Vector2(0.47, 1.4), Vector2(0.64, 0.74), 6.6)],
+		[2.4, func(): chase.call("garden", Vector2(0.55, 1.45), [Vector2(0.56, 1.12), Vector2(0.6, 0.86), Vector2(0.66, 0.71)], 7.0)],
 		[3.2, func(): banner("", "A rat runs for her life through the wet grass. A street cat is right behind her.", 3.4)],
 		[4.4, _bolt],
 		[6.7, func(): banner("", "Ahead: a house, its windows warm with light.", 2.8)],
 		[8.2, _bolt],
-		[9.6, func(): stage.call("hole", true); run.call("hole", Vector2(0.16, 1.06), [Vector2(0.45, 0.72), Vector2(0.615, 0.585)], 2.7)],
-		[10.4, func(): chase.call("hole", Vector2(0.05, 0.63), Vector2(0.5, 0.605), 2.2)],
+		[9.6, func(): stage.call("hole", true); run.call("hole", Vector2(0.02, 0.64), [Vector2(0.34, 0.62), Vector2(0.615, 0.585)], 2.7)],
+		[9.9, func(): chase.call("hole", Vector2(-0.22, 0.66), [Vector2(0.02, 0.64), Vector2(0.34, 0.62), Vector2(0.52, 0.6)], 2.6)],
 		[11.2, _bolt],
 		[12.3, func(): rat.visible = false; _walk = []; Sfx.play("squeak", null, -4.0, 1.4)],
-		[12.6, func(): _cat_walk = []; if _cat_clip: _cat_clip.play("pounce", 0.05, true)],
+		[12.6, func(): _cat_walk = []; if _cat_clip: _cat_clip.set_speed(1.0); _cat_clip.play("pounce", 0.05, true)],
 		[12.8, func(): banner("", "She slips through the hole in the wall. Just in time.", 2.6)],
 		[13.3, func(): if _cat_clip: _cat_clip.play("meow_angry", 0.1, true); Sfx.play("meow_angry", null, -6.0)],
 		[14.0, func(): _fade_to = 1.0],
@@ -1987,7 +1997,9 @@ func _darken(mi: MeshInstance3D) -> void:
 		var d := m.duplicate() as Material
 		var cur := d
 		while cur:
-			if cur is BaseMaterial3D and (cur as BaseMaterial3D).albedo_color.v > 0.25 and cur.resource_name not in ["Eye", "CatIris", "EyeShine"]:
+			if cur is BaseMaterial3D and (cur as BaseMaterial3D).albedo_texture != null:
+				(cur as BaseMaterial3D).albedo_color = Color(0.2, 0.19, 0.22)  # the painted ginger coat, dyed near black
+			elif cur is BaseMaterial3D and (cur as BaseMaterial3D).albedo_color.v > 0.25 and cur.resource_name not in ["Eye", "CatIris", "EyeShine"]:
 				(cur as BaseMaterial3D).albedo_color = Color(0.28, 0.27, 0.3) if (cur as BaseMaterial3D).albedo_color.s > 0.2 else Color(0.5, 0.49, 0.5)
 			elif cur is ShaderMaterial and (cur as ShaderMaterial).get_shader_parameter("coat") != null:
 				(cur as ShaderMaterial).set_shader_parameter("coat", Color(0.3, 0.29, 0.32))
