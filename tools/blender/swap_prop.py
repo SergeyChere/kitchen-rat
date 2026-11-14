@@ -2,6 +2,7 @@
 
     python tools/blender/swap_prop.py food/cheese_wheel path/to/meshy.glb [--tris 4000] [--keep-height]
     python tools/blender/swap_prop.py props/poison_box path/to/meshy.glb --size 0.28   (a new model: its longest side)
+    ... --upright   (a candle that came in leaning: stood up along its long axis)
 
 The old model (godot/assets/models/<name>.glb, its first copy kept in art/props/base/) gives the size: the new one
 is scaled so its longest side matches the old one's (or its height, with --keep-height), centred on the old one's
@@ -29,7 +30,7 @@ def bounds(objs):
     return lo, hi
 
 
-def main(name, src, tris, keep_height, size=0.0):
+def main(name, src, tris, keep_height, size=0.0, upright=False):
     path = os.path.join(MODELS, name + ".glb")
     keep = os.path.join(BASE, name + ".glb")
     if os.path.exists(path) and not os.path.exists(keep):
@@ -54,6 +55,16 @@ def main(name, src, tris, keep_height, size=0.0):
     me.select_set(True)
     bpy.context.view_layer.objects.active = me
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if upright:  # a tall thin thing that came in leaning: its long axis (the vertices' main direction) straight up
+        import numpy as np
+        co = np.array([v.co[:] for v in me.data.vertices])
+        co -= co.mean(axis=0)
+        w, v = np.linalg.eigh(co.T @ co)
+        ax = Vector(v[:, 2].tolist())
+        if ax.z < 0:
+            ax = -ax
+        me.data.transform(ax.rotation_difference(Vector((0, 0, 1))).to_matrix().to_4x4())
+        me.data.update()
     t0 = sum(len(p.vertices) - 2 for p in me.data.polygons)
     if t0 > tris:
         d = me.modifiers.new("cut", "DECIMATE")
@@ -104,4 +115,4 @@ if __name__ == "__main__":
     a = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     tris = int(a[a.index("--tris") + 1]) if "--tris" in a else 4000
     size = float(a[a.index("--size") + 1]) if "--size" in a else 0.0
-    main(a[0], a[1], tris, "--keep-height" in a, size)
+    main(a[0], a[1], tris, "--keep-height" in a, size, "--upright" in a)
