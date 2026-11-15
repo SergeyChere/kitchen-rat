@@ -190,6 +190,11 @@ func _unhandled_input(e: InputEvent) -> void:
 		show_menu()
 	elif e.is_action_pressed("pause") and menu and game == null and not menu.has_meta("main"):
 		show_menu()
+	elif e is InputEventKey and e.pressed and not e.echo and (e as InputEventKey).keycode == KEY_U \
+			and (e as InputEventKey).ctrl_pressed and menu and menu.has_meta("nights"):
+		Progress.unlocked = maxi(Progress.unlocked, Nights.last_playable())  # playtest: Ctrl+U on the Nights screen opens every night
+		Progress.save()
+		show_nights()
 
 
 ## From the menu into a night: the menu and its kitchen dip to black first (the night then fades in from
@@ -370,6 +375,7 @@ func show_nights() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.theme = UI.theme()
+	root.set_meta("nights", true)
 	add_child(root)
 	menu = root
 	var bg := ColorRect.new()
