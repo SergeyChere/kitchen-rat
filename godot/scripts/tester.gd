@@ -126,9 +126,10 @@ func _run(host: Node) -> void:
 		await _wait(host, 1.0)
 		_check("walking off the table she climbs down", saw and r.global_position.y < 0.05, "y %.2f" % r.global_position.y)
 		# a hop that falls short of the chair seat: she grabs the edge and pulls up
-		r.teleport(Nights.world(634, 420, 1), Nights.yaw_to(Vector3.LEFT))
+		# (from the room side: the painted table's thick legs and apron leave no room to hop under its edge)
+		r.teleport(Nights.world(556, 418, 1), Nights.yaw_to(Vector3.RIGHT))
 		await _wait(host, 0.3)
-		r.velocity = Vector3(-0.9, 1.7, 0)
+		r.velocity = Vector3(0.9, 1.7, 0)
 		r._hopping = true
 		await _wait(host, 1.4)
 		_check("a short hop grabs the chair edge and climbs up", r.surface_id == "chair", "surface " + r.surface_id + " y %.2f" % r.global_position.y)

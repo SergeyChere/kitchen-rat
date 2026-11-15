@@ -1774,17 +1774,28 @@ func _furniture() -> void:
 	# cloth. The island's pale top is shaded down: under the moon it was pure white and the white rat vanished
 	# on it.
 	apply_texture(furn_piece("furniture/counter_corner", 36, 36, 0.0, "counter", 72, 72), "wood")
-	var n := 12
-	var w := (830.0 - 72.0) / n
-	for i in n:
-		var piece := furn_piece("furniture/counter_sink" if i == 6 else "furniture/counter_section", 72 + w * (i + 0.5), 36, 0.0, "counter", w, 72)
-		apply_texture(piece, "wood")
-		if i == 0 and piece:
-			_worktop = world_aabb(piece).end.y
-		if i == 6 and piece:
-			_sink_water(piece)
-	for j in 4:
-		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 60 * (j + 0.5), 90.0, "counter", 60, 72), "wood")
+	# Round 19 (the player: "the cabinet under the sink is squeezed, the others stretched"): each piece as wide as
+	# its model is for a 72 cm deep counter (the painted counter ~85 cm, the sink ~110), the sink under the window.
+	var sink_c := _window_centre_cm(540.0)
+	var runs := [[72.0, sink_c - 55.0], [sink_c + 55.0, 830.0]]
+	var first := true
+	for run in runs:
+		var a0: float = run[0]
+		var a1: float = run[1]
+		var cnt := maxi(1, int(round((a1 - a0) / 82.0)))
+		var cw2 := (a1 - a0) / cnt
+		for i in cnt:
+			var piece := furn_piece("furniture/counter_section", a0 + cw2 * (i + 0.5), 36, 0.0, "counter", cw2, 72)
+			apply_texture(piece, "wood")
+			if first and piece:
+				_worktop = world_aabb(piece).end.y
+				first = false
+	var sink := furn_piece("furniture/counter_sink", sink_c, 36, 0.0, "counter", 110, 72)
+	apply_texture(sink, "wood")
+	if sink:
+		_sink_water(sink)
+	for j in 3:
+		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 80 * (j + 0.5), 90.0, "counter", 80, 72), "wood")
 	# round 16 (asked): 15 cm out from the wall — a gap behind it to hide in
 	# (and 104 cm wide, off the east wall too: the way into the gap behind it is down the side by that wall —
 	# the worktop closes the other side)
@@ -1824,8 +1835,10 @@ func _furniture() -> void:
 	# a storage box and the kid's backpack, and she ducks in among them
 	collide(spawn("props/small_box", W(655, 485), 18.0, decor))
 	spawn("props/backpack", W(778, 402), -35.0, decor)
-	for c in [[596, 420, 90], [596, 472, 90], [846, 446, -90]]:
-		furn_piece("furniture/chair", c[0], c[1], c[2], "chair")
+	# Round 19: the painted chair has a solid back (she jumped "through" the old ladder back), so the first chair
+	# stands pulled out and turned side-on: its seat is open to the room and to the table. 44 cm wide, not to touch.
+	for c in [[596, 418, 0], [596, 474, 90], [846, 446, -90]]:
+		furn_piece("furniture/chair", c[0], c[1], c[2], "chair", 44, 44)
 		_hide("chair", c[0], c[1], 28, 28)
 	furn_piece("furniture/low_shelf", 231, 325, 0.0, "lowShelf", 62, 50)
 	_hide("shelf", 231, 325, 54, 42)
@@ -2077,7 +2090,8 @@ func _backsplash() -> void:
 	# north wall, x 0…830 (the fridge stands beyond): full height beside the window, a low strip under it
 	var spans := [[0.0, 830.0, hi]]
 	if ww > 0.0:
-		spans = [[0.0, wx - 28.0, hi], [wx - 28.0, wx + ww + 28.0, 108.0], [wx + ww + 28.0, 830.0, hi]]
+		var we := _window_edges_cm(wx - 28.0, wx + ww + 28.0)  # (round 19: full height right up to the curtains)
+		spans = [[0.0, float(we[0]), hi], [float(we[0]), float(we[1]), 108.0], [float(we[1]), 830.0, hi]]
 	for sp in spans:
 		var a: float = sp[0]
 		var b: float = sp[1]
@@ -2094,9 +2108,33 @@ func _backsplash() -> void:
 ## The kitchen's second level (night 1): wall cabinets over the counter left and right of the window, a shelf over
 ## the window joining them, two open shelves on the west wall to climb up by (counter 92 → 140 → 180 → cabinet tops
 ## 215 → fridge top 185), a kettle and a toaster on the counter, a clock and pictures on the free walls.
+## The window's left and right edges along the north wall (cm), the curtains included; `lo`/`hi` when there are none.
+func _window_edges_cm(lo: float, hi: float) -> Array:
+	var l := INF
+	var r := -INF
+	for c in g.curtains:
+		if not is_instance_valid(c):
+			continue
+		var bb := world_aabb(c)
+		l = minf(l, bb.position.x * 100.0 + Nights.ROOM_W / 2.0)
+		r = maxf(r, bb.end.x * 100.0 + Nights.ROOM_W / 2.0)
+	if l == INF:
+		return [lo, hi]
+	return [l + 2.0, r - 2.0]  # (a little behind the curtains: no sliver of wall between)
+
+
+func _window_centre_cm(fallback: float) -> float:
+	var e := _window_edges_cm(fallback, fallback)
+	return (float(e[0]) + float(e[1])) / 2.0
+
+
 func _kitchen_upper() -> void:
 	var white := Color8(0xee, 0xe2, 0xc8)
-	for blk in [[0.0, 400.0], [640.0, 830.0]]:
+	# round 19 (the player: "the cabinets should hang right up to the window, no blue wall between"): the two runs
+	# reach the curtains
+	var edges := _window_edges_cm(400.0, 640.0)
+	var blocks := [[0.0, float(edges[0])], [float(edges[1]), 830.0]]
+	for blk in blocks:
 		var n := int(round((blk[1] - blk[0]) / 64.0))
 		var cw: float = (blk[1] - blk[0]) / n
 		for i in n:
@@ -2112,7 +2150,7 @@ func _kitchen_upper() -> void:
 	var strip_mat := StandardMaterial3D.new()
 	strip_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	strip_mat.albedo_color = Color(1.0, 0.8, 0.52)
-	for blk2 in [[0.0, 400.0], [640.0, 830.0]]:
+	for blk2 in blocks:
 		var bcx: float = (float(blk2[0]) + float(blk2[1])) / 2.0
 		var strip := MeshInstance3D.new()
 		strip.name = "Cabinet light strip"
@@ -2133,7 +2171,7 @@ func _kitchen_upper() -> void:
 		furn.add_child(spot)
 		spot.global_position = W(bcx, 30, 141)
 	var wood := mat_named("wood", hex(0x8a5a34))
-	box("Shelf over the window", W(520, 13, 213.5), Vector3(2.4, 0.03, 0.26), wood, furn).get_child(0).set_meta("surface", "shelf")
+	box("Shelf over the window", W((float(edges[0]) + float(edges[1])) / 2.0, 13, 213.5), Vector3((float(edges[1]) - float(edges[0])) / 100.0 + 0.2, 0.03, 0.26), wood, furn).get_child(0).set_meta("surface", "shelf")
 	for sh in [[195.0, 138.5], [100.0, 178.5]]:  # [y centre, top − 1.5]
 		var b := box("Wall shelf", W(14, sh[0], sh[1]), Vector3(0.28, 0.03, 1.0), wood, furn)
 		b.get_child(0).set_meta("surface", "shelf")
