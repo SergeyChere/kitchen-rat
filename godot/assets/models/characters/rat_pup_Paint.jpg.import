@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bc8wfbf2i5sxh"
-path="res://.godot/imported/rat_pup_Image_2.jpg-71c63e5d3969f87319d68b1a49a77727.ctex"
+uid="uid://dxhtv8twg11jx"
+path="res://.godot/imported/rat_pup_Paint.jpg-9afab33c4b01a013d79277f4cbb3be3c.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "1b404268d21bb1e68f7fdad38c784653"
+"md5": "f99734dccb9a2da76d606320aff0625e"
 }
 
 [deps]
 
-source_file="res://assets/models/characters/rat_pup_Image_2.jpg"
-dest_files=["res://.godot/imported/rat_pup_Image_2.jpg-71c63e5d3969f87319d68b1a49a77727.ctex"]
+source_file="res://assets/models/characters/rat_pup_Paint.jpg"
+dest_files=["res://.godot/imported/rat_pup_Paint.jpg-9afab33c4b01a013d79277f4cbb3be3c.ctex"]
 
 [params]
 

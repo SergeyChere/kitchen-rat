@@ -31,7 +31,7 @@ def main():
     zs = [p.z for p in pts]
     top = max(zs)
     img = me.data.materials[0].node_tree.nodes["Image Texture"].image if "Image Texture" in me.data.materials[0].node_tree.nodes \
-        else next(n.image for n in me.data.materials[0].node_tree.nodes if n.type == "TEX_IMAGE" and "Image_0" in n.image.name)
+        else next(n.image for n in me.data.materials[0].node_tree.nodes if n.type == "TEX_IMAGE" and n.image)
     w, h = img.size
     px = list(img.pixels[:])
     base = Image.new("RGB", (w, h))
