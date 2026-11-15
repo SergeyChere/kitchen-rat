@@ -2495,6 +2495,13 @@ func _toys() -> void:
 			body.add_child(cs)
 			g.knockables.append(body)
 		ti += 1
+	for z in night.get("ziplines", []):  # round 21: a zip line down from the crate stairs (ZipLine)
+		var zl := ZipLine.new()
+		zl.name = "Zip line"
+		decor.add_child(zl)
+		var za: Array = z.a
+		var zb: Array = z.b
+		zl.setup(self, W(float(za[0]), float(za[1]), float(za[2])), float(za[3]) / 100.0, W(float(zb[0]), float(zb[1]), float(zb[2])), float(zb[3]) / 100.0)
 	for y in night.get("yarn", []):  # round 21: a ball of yarn for the cat to play with (YarnBall)
 		var ball := YarnBall.new()
 		ball.name = "Yarn ball"

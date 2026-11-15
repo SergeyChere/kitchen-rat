@@ -552,6 +552,15 @@ func drop_one() -> Food:
 	return f
 
 
+## Off a ride (the zip line): she drops from where she is now with this velocity, and a fall is measured from here.
+func ride_off(vel: Vector3) -> void:
+	carrier = null
+	velocity = vel
+	_air_top = global_position.y
+	_was_on_floor = false
+	_hopping = true
+
+
 ## Put her somewhere instantly (after being caught).
 func teleport(p: Vector3, yaw: float) -> void:
 	if water:
@@ -599,7 +608,9 @@ func _physics_process(dt: float) -> void:
 			_sneak_toggle = not _sneak_toggle
 			sneaking = _sneak_toggle
 		_show_marker(false)
-		if anim: anim.play("sneak")
+		if anim: anim.play(str(carrier.get_meta("ride_clip", "sneak")))
+		if model:  # hanging from the zip line she points her nose up at it (ZipLine sets the tilt)
+			model.rotation.x = lerp_angle(model.rotation.x, -deg_to_rad(float(carrier.get_meta("ride_tilt", 0.0))), clampf(dt * 10.0, 0.0, 1.0))
 		return
 
 	if water:

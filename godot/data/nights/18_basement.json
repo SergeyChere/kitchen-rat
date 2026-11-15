@@ -179,6 +179,14 @@
     "reveal": -1
    },
    {
+    "text": "Zip down the line with the lard",
+    "hint": "Stand under the clothes peg on the top crate and press F. Space lets go early: from up there that’s a long drop.",
+    "type": "flag",
+    "arg": "zip",
+    "n": 0,
+    "reveal": -1
+   },
+   {
     "text": "Drag the lard home",
     "hint": "Running on the pipes makes them ring through the whole house.",
     "type": "deliver",
@@ -462,5 +470,21 @@
     "M"
    ]
   ]
- }
+ },
+ "ziplines": [
+  {
+   "a": [
+    360,
+    172,
+    158,
+    120
+   ],
+   "b": [
+    175,
+    520,
+    27,
+    0
+   ]
+  }
+ ]
 }

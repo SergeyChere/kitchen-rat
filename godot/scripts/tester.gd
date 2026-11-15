@@ -405,6 +405,11 @@ func _run(host: Node) -> void:
 			var p := Nights.world(float(v[0]), float(v[1]), 220.0)
 			var hit := g.ray(p, p + Vector3.DOWN * 3.0)
 			print("top %s: %s" % [spot, "-" if hit.is_empty() else "%.1f cm on %s" % [hit.position.y * 100.0, g.surface_of(hit.collider)]])
+		print("hole at room cm %.0f, %.0f" % [g.hole_point().x * 100.0 + Nights.ROOM_W / 2.0, g.hole_point().z * 100.0 + Nights.ROOM_D / 2.0])
+		host.get_tree().quit()
+		return
+	if name == "zip":  # night 7: down the zip line with the salami
+		await _zip(host)
 		host.get_tree().quit()
 		return
 	if name == "yarn":  # night 3: the cat plays with a rolled ball of yarn
@@ -1114,6 +1119,52 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Round 21, night 7: with the salami from the top crate, F under the clothes peg: she zips down the line with it and
+## lands near the stake on her feet (not a hard fall); the peg springs back up; Space lets go early.
+func _zip(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 999.0
+	await _wait(host, 0.5)
+	var zl: ZipLine = null
+	for n in g.find_children("*", "ZipLine", true, false):
+		zl = n
+		break
+	_check("night 7 has a zip line", zl != null)
+	if zl == null:
+		return
+	for f in g.foods:
+		if f.id == "salami":
+			r.teleport(f.global_position + Vector3.UP * 0.01, 0.0)
+	await _wait(host, 0.4)
+	_check("she has the salami", r.dragging(), "carrying %d" % r.carried.size())
+	var hand := zl.peg_point() + Vector3.DOWN * ZipLine.HANG
+	r.teleport(Vector3(hand.x, 1.21, hand.z), Nights.yaw_to(Vector3(zl.b.x - zl.a.x, 0.0, zl.b.z - zl.a.z)))
+	await _wait(host, 0.4)
+	await _press(host, "push")
+	await _wait(host, 0.1)
+	_check("F under the peg: she grabs it", r.carrier == zl, "carrier %s surf %s y %.2f hand %.2f" % [r.carrier, r.surface_id, r.global_position.y, hand.y])
+	var vmax := 0.0
+	for i in 60:
+		await _wait(host, 0.1)
+		vmax = maxf(vmax, zl.v)
+		if r.carrier != zl:
+			break
+	await _wait(host, 1.0)
+	var land := r.global_position
+	_check("she zips down and lets go at the bottom", g.tasks.flag_value("zip") > 0 and r.carrier == null, "flag %d top speed %.2f" % [g.tasks.flag_value("zip"), vmax])
+	_check("on her feet by the stake, the salami still in her teeth", r.is_on_floor() and land.y < 0.05 and Vector2(land.x - zl.b.x, land.z - zl.b.z).length() < 0.45 and r.dragging() and not r.stunned(), "at %s, %.2f from the stake, dragging %s stunned %s" % [land, Vector2(land.x - zl.b.x, land.z - zl.b.z).length(), r.dragging(), r.stunned()])
+	await _wait(host, 4.5)
+	_check("the peg springs back up the line", absf(zl.t - zl.rest_t) < 0.01, "t %.3f" % zl.t)
+	r.teleport(Vector3(hand.x, 1.21, hand.z), Nights.yaw_to(Vector3(zl.b.x - zl.a.x, 0.0, zl.b.z - zl.a.z)))
+	await _wait(host, 0.4)
+	await _press(host, "push")
+	await _wait(host, 0.4)
+	var mid := r.carrier == zl
+	await _press(host, "jump")
+	await _wait(host, 0.1)
+	_check("Space lets go mid-line: she drops", mid and r.carrier == null, "was riding %s" % mid)
 
 
 ## Round 21, night 3: running into the ball of yarn rolls it; the cat sees it rolling and plays — trots to it, bats it
