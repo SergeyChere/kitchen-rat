@@ -200,6 +200,8 @@ static func play(name: String, at = null, vol_db := 0.0, pitch := 1.0, pitch_jit
 	var s := I._pick(name)
 	if s == null:
 		return
+	if not name.begins_with("step"):
+		HitchLog.note("sound " + name)
 	var real := s is AudioStreamOggVorbis
 	var db := level_db(name) + vol_db + (float(REAL_DB.get(name, 0.0)) if real else 0.0)
 	var ps := pitch * (float(REAL_PITCH.get(name, 1.0)) if real else 1.0) * (1.0 + randf_range(-pitch_jitter, pitch_jitter))

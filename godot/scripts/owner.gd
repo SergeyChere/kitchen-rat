@@ -52,13 +52,17 @@ func _show(on: bool) -> void:
 	if body:
 		body.visible = on
 	if flashlight:
-		flashlight.visible = on and _has_plan() and _plan_active and not bool(_plan.get("light", true))
+		var fv: bool = on and _has_plan() and _plan_active and not bool(_plan.get("light", true))
+		if fv != flashlight.visible:
+			HitchLog.note("flashlight " + ("on" if fv else "off"))
+		flashlight.visible = fv
 
 
 func _room_light(on: bool) -> void:
 	if room_light:
 		if room_light.visible != on:
 			Sfx.play("light_switch", room_light.global_position)
+			HitchLog.note("ceiling light " + ("on" if on else "off"))
 		room_light.visible = on
 		if on:
 			_flicker()

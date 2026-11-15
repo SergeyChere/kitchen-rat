@@ -148,7 +148,17 @@ func _tag(cam: Camera3D, s: float, at: Vector3, text: String, size: int, col: Co
 	_text(sp + Vector2(-60, 0), text, size, col, 120, HORIZONTAL_ALIGNMENT_CENTER)
 
 
+## Round 19: during the warm-up every letter is drawn once, unseen, at every size the HUD uses, so the first banner
+## or toast never has to build its letters mid-game.
+var warm_letters := false
+
+
 func _draw_hud() -> void:
+	if warm_letters:
+		warm_letters = false
+		var all := "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 .,:;!?'\"()-+*/%&…·—–«»‘’“”★☆♥✔×→←"
+		for sz in [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 24, 28]:
+			_canvas.draw_string(font, Vector2(0, -40), all, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, Color(1, 1, 1, 0))
 	var g := Game.I
 	if g == null or g.rat == null:
 		return

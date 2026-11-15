@@ -1497,6 +1497,7 @@ func _loose_food() -> int:
 
 
 func spawn_model_food(model: String, at: Vector3) -> Food:
+	HitchLog.note("spawn " + model)
 	var f := Food.new()
 	_builder.foods.add_child(f)
 	f.global_position = at
@@ -1762,6 +1763,7 @@ func _start_intro() -> void:
 ## stall a frame for a tenth of a second. While the nest scene plays, a small hidden camera looks round the room
 ## from a few spots with every piece of food and every trap shown, and every sound is loaded.
 var _warming := false
+const WARM_LAYER := 1 << 19  # what only the warm-up camera sees
 
 
 func _warm_up() -> void:
@@ -1787,11 +1789,60 @@ func _warm_up() -> void:
 		if is_instance_valid(t) and not t.visible:
 			t.visible = true
 			shown.append(t)
+	# Round 19 (asked again: "it still freezes now and then"): what turns up only later in the night is built now too,
+	# seen by the hidden camera alone (a layer the main camera leaves out): the lights that come on later (the
+	# ceiling light, the flashlight, the vacuum's lamps) at a ten-thousandth of their strength, so nothing on
+	# screen changes; the owner, who walks in later; the scent trails; and every letter of the speech bubbles
+	# (their font draws each new letter the first time it is needed).
+	var main_cam := get_viewport().get_camera_3d()
+	var main_mask := main_cam.cull_mask if main_cam else 0
+	if main_cam:
+		main_cam.cull_mask &= ~WARM_LAYER
+	c.cull_mask = 0xFFFFF
+	var layered: Array = []  # [GeometryInstance3D, its own layers]
+	var lit: Array = []  # [Light3D, its energy]
+	for l in find_children("*", "Light3D", true, false):
+		var li := l as Light3D
+		if not li.visible:
+			lit.append([li, li.light_energy])
+			li.light_energy *= 0.0001
+			li.visible = true
+			for gi in li.find_children("*", "GeometryInstance3D", true, false):
+				layered.append([gi, gi.layers])
+				gi.layers = WARM_LAYER
+	var body_shown := false
+	if owner_ai and is_instance_valid(owner_ai.body) and not owner_ai.body.visible:
+		owner_ai.body.visible = true
+		body_shown = true
+		for gi in owner_ai.body.find_children("*", "GeometryInstance3D", true, false):
+			layered.append([gi, gi.layers])
+			gi.layers = WARM_LAYER
+	var trails_shown: Array = []
+	for k in mini(2, _trails.size()):
+		var tm := _trails[k] as MeshInstance3D
+		_draw_trail(tm, Nights.world(440 + 40 * k, 300, 0), Nights.world(520 + 40 * k, 340, 0), k == 1, k)
+		layered.append([tm, tm.layers])
+		tm.layers = WARM_LAYER
+		tm.visible = true
+		trails_shown.append(tm)
+	var letters := Label3D.new()
+	letters.text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz\n0123456789 .,:;!?'\"()-+*/%&…·—–«»‘’“”★☆♥✔×→←"
+	letters.font_size = 30
+	letters.outline_size = 10
+	letters.pixel_size = 0.0009
+	letters.fixed_size = true
+	letters.no_depth_test = true
+	letters.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	letters.layers = WARM_LAYER
+	add_child(letters)
 	var spots := [Nights.world(240, 300, 25), Nights.world(720, 300, 25), Nights.world(480, 300, 130)]
 	for p in spots:
 		for k in 6:
 			c.global_position = p
 			c.rotation = Vector3(-0.35 if p.y > 1.0 else 0.1, TAU * k / 6.0, 0.0)
+			letters.global_position = c.global_position - c.global_transform.basis.z * 1.0
+			if hud:
+				hud.warm_letters = true
 			await get_tree().process_frame
 			if not is_instance_valid(vp):
 				return
@@ -1799,6 +1850,21 @@ func _warm_up() -> void:
 	for n in shown:
 		if is_instance_valid(n) and n is Trap:
 			n.visible = not (n as Trap).hidden  # food sorts itself out every frame of play; traps stay hidden until found
+	for e in lit:
+		if is_instance_valid(e[0]):
+			(e[0] as Light3D).visible = false
+			(e[0] as Light3D).light_energy = e[1]
+	for e in layered:
+		if is_instance_valid(e[0]):
+			(e[0] as GeometryInstance3D).layers = e[1]
+	for tm in trails_shown:
+		if is_instance_valid(tm):
+			tm.visible = false
+	if body_shown and is_instance_valid(owner_ai.body):
+		owner_ai.body.visible = false
+	if is_instance_valid(main_cam):
+		main_cam.cull_mask = main_mask
+	letters.queue_free()
 	vp.queue_free()
 
 
@@ -2551,18 +2617,22 @@ static func _star_text(n: int) -> String:
 # ---------- messages ----------
 
 func bubble_at(text: String, at: Vector3, dur: float, col := Color.WHITE) -> void:
+	HitchLog.note("text \"%s\"" % text.left(24))
 	hud.bubble(text, at, null, 0.0, dur, col)
 
 
 func bubble_on(text: String, follow: Node3D, height: float, dur: float) -> void:
+	HitchLog.note("text \"%s\"" % text.left(24))
 	hud.bubble(text, Vector3.ZERO, follow, height, dur, Color.WHITE)
 
 
 func toast(text: String) -> void:
+	HitchLog.note("text \"%s\"" % text.left(24))
 	hud.toast(text)
 
 
 func banner(title: String, sub: String, dur: float) -> void:
+	HitchLog.note("banner \"%s\"" % title.left(24))
 	hud.banner(title, sub, dur)
 
 

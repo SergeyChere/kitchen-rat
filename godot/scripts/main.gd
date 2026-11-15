@@ -19,6 +19,8 @@ func _init() -> void:
 
 func _ready() -> void:
 	Sfx.setup(self)
+	if DisplayServer.get_name() != "headless":
+		add_child(HitchLog.new())
 	TextureLib.boot(self)  # round 6: CDN texture pack + background painter (never blocks)
 	if "--pad" in OS.get_cmdline_user_args():
 		Keys.pad = true
