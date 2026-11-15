@@ -4,6 +4,7 @@
     python tools/blender/swap_prop.py props/poison_box path/to/meshy.glb --size 0.28   (a new model: its longest side)
     ... --upright   (a candle that came in leaning: stood up along its long axis)
     ... --flat      (food that came in tilted: laid on its broadest side)
+    ... --height 0.92  (an exact height in metres)
 
 The old model (godot/assets/models/<name>.glb, its first copy kept in art/props/base/) gives the size: the new one
 is scaled so its longest side matches the old one's (or its height, with --keep-height), centred on the old one's
@@ -31,7 +32,7 @@ def bounds(objs):
     return lo, hi
 
 
-def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False):
+def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, height=0.0):
     path = os.path.join(MODELS, name + ".glb")
     keep = os.path.join(BASE, name + ".glb")
     if os.path.exists(path) and not os.path.exists(keep):
@@ -104,7 +105,9 @@ def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False):
         me.rotation_euler = (0, 0, 1.5707963)
         bpy.ops.object.transform_apply(rotation=True)
         nlo, nhi = bounds([me])
-    if size and not os.path.exists(keep):
+    if height:  # an exact height (m), whatever the old model's was
+        k = height / max(nhi.z - nlo.z, 1e-6)
+    elif size and not os.path.exists(keep):
         k = size / max(max(nhi - nlo), 1e-6)
     elif keep_height:
         k = (ohi.z - olo.z) / max(nhi.z - nlo.z, 1e-6)
@@ -126,4 +129,5 @@ if __name__ == "__main__":
     a = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     tris = int(a[a.index("--tris") + 1]) if "--tris" in a else 4000
     size = float(a[a.index("--size") + 1]) if "--size" in a else 0.0
-    main(a[0], a[1], tris, "--keep-height" in a, size, "--upright" in a, "--flat" in a)
+    main(a[0], a[1], tris, "--keep-height" in a, size, "--upright" in a, "--flat" in a,
+         float(a[a.index("--height") + 1]) if "--height" in a else 0.0)
