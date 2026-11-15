@@ -161,6 +161,50 @@ func line_of_sight() -> bool:
 	return G.ray(global_position + Vector3.UP * eye_height, rat.global_position + Vector3.UP * 0.06).is_empty()
 
 
+## Round 20: dazed after skidding into the wall by the mouse hole (Game.reached_nest) — it sits a moment, three
+## little stars spinning round its head.
+var dazed := 0.0
+var _stars: Node3D
+
+
+func bonk(head: Vector3, secs := 2.4) -> void:
+	dazed = secs
+	path.clear()
+	if _stars == null:
+		_stars = Node3D.new()
+		_stars.name = "Stars"
+		add_child(_stars)
+		var mt := StandardMaterial3D.new()
+		mt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mt.albedo_color = Color(1.0, 0.86, 0.32)
+		for i in 3:
+			var s := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.016
+			sm.height = 0.032
+			sm.radial_segments = 8
+			sm.rings = 4
+			s.mesh = sm
+			s.material_override = mt
+			s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_stars.add_child(s)
+			s.position = Vector3(cos(TAU * i / 3.0), 0.0, sin(TAU * i / 3.0)) * 0.08
+	_stars.position = head
+	_stars.visible = true
+
+
+## While dazed: true (the agent skips its own mind for the frame).
+func tick_dazed(dt: float) -> bool:
+	if dazed <= 0.0:
+		return false
+	dazed -= dt
+	speed = 0.0
+	if _stars:
+		_stars.rotate_y(dt * 7.0)
+		_stars.visible = dazed > 0.0
+	return true
+
+
 func play(clip: String, blend := 0.2) -> void:
 	if anim:
 		anim.play(clip, blend)

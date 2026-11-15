@@ -81,9 +81,21 @@ func _see() -> bool:
 	return (d < 0.4 or (d < 3.0 and angle_to_rat() < 43.0)) and line_of_sight()
 
 
+## The chase ended at the mouse hole with the dog right behind her: it skids into the wall.
+func bonk_at_hole() -> void:
+	mode = Mode.TRACK
+	bonk(Vector3(0, 0.62, 0.2), 2.8)
+	G.bubble_on("Yip?!", self, 0.7, 1.6)
+	Sfx.play("thud", global_position + Vector3.UP * 0.3)
+
+
 func _process(dt: float) -> void:
 	if not G.playing():
 		sees = false
+		return
+	if tick_dazed(dt):
+		sees = false
+		play("sit", 0.25)
 		return
 	var now := G.night_time
 	if rat.surface_id == "floor" and not rat.jumping and rat.global_position.y < 0.05:

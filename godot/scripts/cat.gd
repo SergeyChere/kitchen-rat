@@ -132,6 +132,15 @@ func wake_up(toward = null) -> void:
 
 
 ## After it catches the rat it wanders off for a while.
+## The chase ended at the mouse hole with the cat right behind her: it skids into the wall.
+func bonk_at_hole() -> void:
+	mode = Mode.SEARCH; _search = 0.0; alert = 0.5
+	bonk(Vector3(0, 0.46, 0.12))
+	G.bubble_on("Mrrowf!", self, 0.56, 1.6)
+	Sfx.play("thud", global_position + Vector3.UP * 0.2)
+	Sfx.play("meow_angry", global_position + Vector3.UP * 0.3, -6.0)
+
+
 func after_catch() -> void:
 	if mode == Mode.SLEEP or mode == Mode.AWAY:
 		return
@@ -213,6 +222,12 @@ func _process(dt: float) -> void:
 	if is_instance_valid(model):
 		model.position.y = lerpf(model.position.y, -LOAF_SINK * model.scale.y if mode == Mode.SLEEP else 0.0, minf(1.0, dt * 4.0))
 	_lift(dt)
+	if tick_dazed(dt):
+		sees = false
+		play("idle_sit", 0.25)
+		if dazed <= 0.0:
+			mode = Mode.SEARCH; _search = 1.6; alert = 0.4
+		return
 	if not G.playing() or mode == Mode.AWAY:
 		sees = false
 		return

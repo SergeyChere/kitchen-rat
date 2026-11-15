@@ -5,6 +5,7 @@ extends Zone
 
 func enter(rat: Rat) -> void:
 	rat.in_nest = true
+	Game.I.reached_nest()
 
 
 func exit(rat: Rat) -> void:

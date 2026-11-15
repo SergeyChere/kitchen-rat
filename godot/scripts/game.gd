@@ -2680,6 +2680,30 @@ func bubble_on(text: String, follow: Node3D, height: float, dur: float) -> void:
 	hud.bubble(text, Vector3.ZERO, follow, height, dur, Color.WHITE)
 
 
+## Round 20 (the player: "it's boring — make the missions like It Takes Two"): a chase that ends at the mouse hole
+## with the cat or the dog a whisker behind is a moment of its own — time slows, the chaser skids into the wall
+## beside the hole and sits there dazed, and the night counts its near misses.
+var near_misses := 0
+
+
+func reached_nest() -> void:
+	if not playing():
+		return
+	var who: Agent = null
+	if cat and cat.mode == CatAI.Mode.CHASE and cat.dazed <= 0.0 and cat.global_position.distance_to(rat.global_position) < 1.4:
+		who = cat
+	elif dog and dog.mode == DogAI.Mode.CHASE and dog.dazed <= 0.0 and dog.global_position.distance_to(rat.global_position) < 1.6:
+		who = dog
+	if who == null:
+		return
+	near_misses += 1
+	tasks.flag("nearMiss")
+	who.call("bonk_at_hole")
+	cam.shake(0.3)
+	toast("Close shave!" if near_misses == 1 else "Close shave! ×%d" % near_misses)
+	feel.slowmo(0.35, 0.5)  # (a rare moment, like the trap snap: not the spotting slow-mo the player had removed)
+
+
 func toast(text: String) -> void:
 	HitchLog.note("text \"%s\"" % text.left(24))
 	hud.toast(text)

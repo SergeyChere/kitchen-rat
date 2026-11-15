@@ -1081,6 +1081,18 @@ func _juice(host: Node) -> void:
 				break
 		await _wait(host, 1.2)
 		_check("hiding muffles the room", not r.hidden() or g.feel._lp.cutoff_hz < 3000.0, "hidden %s cutoff %.0f" % [r.hidden(), g.feel._lp.cutoff_hz])
+	r._sneak_toggle = false
+	# round 20: a chase that ends at the mouse hole with the cat right behind — it skids into the wall, dazed
+	var c := g.cat
+	c.visible = true
+	c.global_position = Nights.world(175, 575)
+	c.mode = CatAI.Mode.CHASE
+	var nm0: int = g.near_misses
+	r.teleport(Nights.world(150, 640, 1), PI)  # just through the hole, in the burrow
+	await _wait(host, 0.3)
+	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
+	await _wait(host, 2.8)
+	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
 
 
 ## Hopping and pressing Space under tables and sofas never puts her on top of them.
