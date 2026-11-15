@@ -398,6 +398,10 @@ func _run(host: Node) -> void:
 		await _juice(host)
 		host.get_tree().quit()
 		return
+	if name == "toycar":  # night 13: drive the wind-up car into the block tower
+		await _toycar(host)
+		host.get_tree().quit()
+		return
 	if name == "balloon":  # night 14: the helium balloon up onto the fridge and the cake down again
 		await _balloon(host)
 		host.get_tree().quit()
@@ -1097,6 +1101,61 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Round 20, night 13: F beside the toy car hops her in, W drives it, it topples the block tower, Space hops out.
+func _toycar(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 999.0
+	await _wait(host, 0.5)
+	var car: ToyCar = null
+	for n in g.find_children("*", "ToyCar", true, false):
+		car = n
+		break
+	_check("night 13 has a toy car", car != null)
+	if car == null:
+		return
+	r.teleport(car.global_position - car.global_basis.x * 0.2 + Vector3.UP * 0.02, 0.0)
+	await _wait(host, 0.3)
+	await _press(host, "push")
+	await _wait(host, 0.2)
+	_check("F beside it: she hops into the car", r.carrier == car and car.driver == r, "carrier %s" % r.carrier)
+	var p0 := car.global_position
+	Input.action_press("forward")
+	await _wait(host, 1.0)
+	Input.action_release("forward")
+	await _wait(host, 0.6)
+	var moved := car.global_position.distance_to(p0)
+	_check("W drives it (fast), she rides along", moved > 0.6 and r.global_position.distance_to(car.global_position) < 0.15, "moved %.2f" % moved)
+	var tower: Array = []
+	for k in g.knockables:
+		if k.has_meta("tower"):
+			tower.append(k)
+	_check("the room has a block tower", tower.size() >= 6, "%d blocks" % tower.size())
+	if tower.is_empty():
+		return
+	var tc := Vector3.ZERO
+	for k in tower:
+		tc += (k as Node3D).global_position
+	tc /= tower.size()
+	car.global_position = Vector3(tc.x - 1.0, car.global_position.y, tc.z)
+	car.rotation.y = Nights.yaw_to(Vector3.RIGHT)
+	car.speed = 0.0
+	Input.action_press("forward")
+	for i in 240:
+		await host.get_tree().physics_frame
+		if g.tasks.flag_value("tower") > 0:
+			break
+	Input.action_release("forward")
+	await _wait(host, 1.0)
+	var down := 0
+	for k in tower:
+		if (k as Knockable).knocked:
+			down += 1
+	_check("driven into the tower, every block topples", g.tasks.flag_value("tower") > 0 and down == tower.size(), "flag %d, %d of %d" % [g.tasks.flag_value("tower"), down, tower.size()])
+	await _press(host, "jump")
+	await _wait(host, 0.3)
+	_check("Space hops her out beside the car", r.carrier == null and car.driver == null and r.global_position.distance_to(car.global_position) < 0.5, "carrier %s d %.2f" % [r.carrier, r.global_position.distance_to(car.global_position)])
 
 
 ## Round 20, night 14: take a balloon by its string, float up, sink onto the fridge, take the cake, float down with

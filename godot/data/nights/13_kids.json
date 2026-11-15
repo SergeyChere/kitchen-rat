@@ -178,6 +178,22 @@
     "reveal": -1
    },
    {
+    "text": "Hop into the wind-up car",
+    "hint": "Walk up to the toy car and press F. W/S drive, A/D steer, Space hops out.",
+    "type": "flag",
+    "arg": "car",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Crash the car into the block tower",
+    "hint": "Build up speed and drive straight at it. It’s loud: mind the kid.",
+    "type": "flag",
+    "arg": "tower",
+    "n": 0,
+    "reveal": -1
+   },
+   {
     "text": "Find 3 small toys for the pups",
     "hint": "A dinosaur, a marble, a toy car. They’re scattered around the room.",
     "type": "count",
@@ -467,5 +483,18 @@
     "M"
    ]
   ]
- }
+ },
+ "toycars": [
+  {
+   "x": 330,
+   "y": 440,
+   "yaw": 90
+  }
+ ],
+ "towers": [
+  {
+   "x": 660,
+   "y": 440
+  }
+ ]
 }

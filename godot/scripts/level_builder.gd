@@ -877,6 +877,7 @@ func build_contents() -> void:
 	_nest()
 	_knockables()
 	_helium()
+	_toys()
 	_food()
 	_traps()
 	RoomFurniture.new(self).life(str(night.get("decor", "kitchen")))
@@ -2453,6 +2454,47 @@ static func _knock_model(kind: String) -> String:
 		"carton", "book": return "props/small_box"
 		"vase": return "props/jar"
 	return "props/" + kind
+
+
+## Round 20: the kids' room's toys — a wind-up car she can drive (ToyCar) and towers of toy blocks to crash it into
+## (knockables that all topple together: ToyCar._knock).
+func _toys() -> void:
+	for c in night.get("toycars", []):
+		var car := ToyCar.new()
+		car.name = "Toy car"
+		decor.add_child(car)
+		car.setup(self, W(float(c.x), float(c.y)), float(c.get("yaw", 0.0)))
+	var cols := [Color8(0xd9, 0x4f, 0x3f), Color8(0x3f, 0x7f, 0xd0), Color8(0xf0, 0xc0, 0x3a), Color8(0x55, 0xa8, 0x5a)]
+	var ti := 0
+	for t in night.get("towers", []):
+		var base := W(float(t.x), float(t.y))
+		var s := 0.075
+		var lay := [[-1.04, 0], [0.0, 0], [1.04, 0], [-0.52, 1], [0.52, 1], [0.0, 2], [0.0, 3]]
+		for i in lay.size():
+			var body := Knockable.new()
+			body.kind = "block"
+			body.mass = 0.08
+			body.collision_layer = 1
+			body.collision_mask = 1
+			body.set_meta("tower", ti)
+			decor.add_child(body)
+			body.global_position = base + Vector3(float(lay[i][0]) * s, int(lay[i][1]) * s * 1.01, 0.0)
+			body.rotation.y = randf_range(-0.12, 0.12)
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(s, s, s)
+			mi.mesh = bm
+			mi.material_override = mat(cols[i % cols.size()])
+			mi.position = Vector3(0, s * 0.5, 0)
+			body.add_child(mi)
+			var cs := CollisionShape3D.new()
+			var sh := BoxShape3D.new()
+			sh.size = Vector3(s, s, s) * 0.98
+			cs.shape = sh
+			cs.position = Vector3(0, s * 0.5, 0)
+			body.add_child(cs)
+			g.knockables.append(body)
+		ti += 1
 
 
 ## Round 20: helium balloons tied to chair legs — the party night's gadget (HeliumBalloon).
