@@ -5,6 +5,7 @@
     ... --upright   (a candle that came in leaning: stood up along its long axis)
     ... --flat      (food that came in tilted: laid on its broadest side)
     ... --height 0.92  (an exact height in metres)
+    ... --turn 90   (turn it by hand, degrees about the up axis; 0 = as it came, no automatic turn)
 
 The old model (godot/assets/models/<name>.glb, its first copy kept in art/props/base/) gives the size: the new one
 is scaled so its longest side matches the old one's (or its height, with --keep-height), centred on the old one's
@@ -32,7 +33,7 @@ def bounds(objs):
     return lo, hi
 
 
-def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, height=0.0):
+def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, height=0.0, turn=None):
     path = os.path.join(MODELS, name + ".glb")
     keep = os.path.join(BASE, name + ".glb")
     if os.path.exists(path) and not os.path.exists(keep):
@@ -100,7 +101,13 @@ def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, heig
         p.use_smooth = True
     nlo, nhi = bounds([me])
     o, n = ohi - olo, nhi - nlo
-    if abs(o.x - o.y) > 0.15 * max(o.x, o.y) and (o.x > o.y) != (n.x > n.y):  # long side the old model's way round
+    if turn is not None:  # turned by hand (0: as it came — its front already the old one's way)
+        if turn:
+            me.rotation_mode = "XYZ"
+            me.rotation_euler = (0, 0, turn * 3.14159265 / 180.0)
+            bpy.ops.object.transform_apply(rotation=True)
+            nlo, nhi = bounds([me])
+    elif abs(o.x - o.y) > 0.15 * max(o.x, o.y) and (o.x > o.y) != (n.x > n.y):  # long side the old model's way round
         me.rotation_mode = "XYZ"  # (glTF imports in quaternions)
         me.rotation_euler = (0, 0, 1.5707963)
         bpy.ops.object.transform_apply(rotation=True)
@@ -130,4 +137,5 @@ if __name__ == "__main__":
     tris = int(a[a.index("--tris") + 1]) if "--tris" in a else 4000
     size = float(a[a.index("--size") + 1]) if "--size" in a else 0.0
     main(a[0], a[1], tris, "--keep-height" in a, size, "--upright" in a, "--flat" in a,
-         float(a[a.index("--height") + 1]) if "--height" in a else 0.0)
+         float(a[a.index("--height") + 1]) if "--height" in a else 0.0,
+         float(a[a.index("--turn") + 1]) if "--turn" in a else None)

@@ -267,10 +267,12 @@ func _climb_out() -> bool:
 		dirs.append(Vector3(cos(k * TAU / 8.0), 0.0, sin(k * TAU / 8.0)))
 	for i in dirs.size():
 		var dir: Vector3 = dirs[i]
-		for reach in ([0.1, 0.16, 0.22] if i == 0 else [0.1, 0.14]):
+		for reach in [0.1, 0.16, 0.22]:
 			var o: Vector3 = global_position + dir * float(reach) + Vector3.UP * 0.3
 			var hit := _ray(o, o + Vector3.DOWN * 0.4)
 			if hit.is_empty() or hit.normal.y < 0.75 or hit.position.y < water.level + 0.03:
+				continue
+			if not _clear(hit.position):  # (round 19: the painted sink's back edge is the tap's: no room to sit there)
 				continue
 			stop_swim()
 			rotation.y = Nights.yaw_to(dir)

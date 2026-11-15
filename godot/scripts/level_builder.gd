@@ -635,11 +635,12 @@ static func _soft(n: String) -> bool:
 	return l.contains("cloth") or l.contains("blanket") or l.contains("pillow") or l.contains("teddy") or l.contains("screen")
 
 
-## Water in the sink's basin (the model's bowl: 40 × 36 cm inside, bottom at 74 cm, water up to 84 cm).
+## Water in the sink's basin (the painted model's bowl: 68 × 48 cm inside, in the middle of the worktop, bottom at
+## 75 cm, water up to 84 cm; the worktop is at 92 cm like the counters beside it).
 func _sink_water(n: Node3D) -> void:
-	var bottom := n.to_global(Vector3(0, 0.74, 0))
+	var bottom := n.to_global(Vector3(0, 0.75, 0))
 	var surface := n.to_global(Vector3(0, 0.84, 0))
-	var sz := Vector3(0.40 * n.scale.x, 0.14, 0.36 * n.scale.z)
+	var sz := Vector3(0.66 * n.scale.x, 0.14, 0.46 * n.scale.z)
 	var z := add_zone(SinkWater, "Sink water", bottom, sz, rad_to_deg(n.rotation.y)) as SinkWater
 	z.setup(surface.y)
 
