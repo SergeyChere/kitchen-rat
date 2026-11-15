@@ -78,6 +78,7 @@ RIGS["dog"] = {
                 "PoleTarget.L", "PoleTarget.R", "PoleTargetBack.L", "PoleTargetBack.R"],
     "tris": 14000,
     "material": "Main",
+    # (no "stubs" here: the dog's legs are long and bone heat weighs them well; the stub rule froze its front legs)
 }
 RIGS["cat_street"] = dict(RIGS["cat"], base="cat")
 RIGS["rat_pup"] = dict(RIGS["rat_mother"], tris=6000)
