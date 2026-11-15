@@ -522,8 +522,8 @@ func _tick_carry(dt: float) -> void:
 			add_noise(0.3)
 
 
-## Drop the last thing she carries in front of her (key G). Returns it, or null.
-func drop_one() -> Food:
+## Drop the last thing she carries in front of her (key G), or right at place (a spoon's bowl). Returns it, or null.
+func drop_one(place = null) -> Food:
 	if carried.is_empty() or jumping:
 		return null
 	var f: Food = carried.pop_back()
@@ -534,6 +534,8 @@ func drop_one() -> Food:
 	var hit := _ray(at + Vector3.UP * 0.15, at + Vector3.DOWN * 3.0)
 	if not hit.is_empty():
 		at = hit.position
+	if place is Vector3:
+		at = place
 	var from := f.global_position
 	f.reparent(Game.I._builder.foods, true)
 	f.global_position = from
@@ -541,7 +543,7 @@ func drop_one() -> Food:
 	f.scale = Vector3.ONE * f.wscale
 	var roll := at + fw * 0.06
 	var hit2 := _ray(roll + Vector3.UP * 0.05, roll + Vector3.DOWN * 0.06)
-	if hit2.is_empty():
+	if hit2.is_empty() or place is Vector3:
 		roll = at
 	var tw := f.create_tween()
 	tw.tween_method(func(t: float): f.global_position = from.lerp(at, t) + Vector3.UP * sin(t * PI) * 0.1; f.rotation.x = t * 4.0, 0.0, 1.0, 0.32)

@@ -16,6 +16,7 @@ var nav: NavWorld
 var feel: GameFeel
 var rat: Rat
 var cat: CatAI
+var catapults: Array[SpoonCatapult] = []  # round 21: spoons to fling food off a table with (LevelBuilder)
 var owner_ai: OwnerAI
 var cam: FollowCamera
 var hud: Hud
@@ -827,11 +828,17 @@ func _process(dt: float) -> void:
 	_tick_rat_noise(dt)
 	_keep_in_room(rp)
 	if Input.is_action_just_pressed("drop"):
-		var dropped := rat.drop_one()
+		var into: SpoonCatapult = null  # right by a spoon catapult's bowl: it goes in the bowl
+		for c in catapults:
+			if c.takes(rat):
+				into = c
+		var dropped := rat.drop_one(into.bowl_point() if into else null)
 		if dropped:
 			if not foods.has(dropped):
 				foods.append(dropped)
 			Sfx.play("pickup", rp, -4.0, 0.8)
+			if into:
+				into.load_food(dropped)
 		elif rat.balloon:
 			rat.balloon.release()
 	_pick_up(rp)

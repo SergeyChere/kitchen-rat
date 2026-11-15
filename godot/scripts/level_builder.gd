@@ -2495,6 +2495,14 @@ func _toys() -> void:
 			body.add_child(cs)
 			g.knockables.append(body)
 		ti += 1
+	for c in night.get("catapults", []):  # round 21: a spoon across a cork, to fling food off a table (SpoonCatapult)
+		var sc := SpoonCatapult.new()
+		sc.name = "Spoon catapult"
+		decor.add_child(sc)
+		var ca: Array = c.at
+		var ct: Array = c.to
+		sc.setup(self, W(float(ca[0]), float(ca[1]), float(ca[2])), W(float(ct[0]), float(ct[1]), float(ct[2]) if ct.size() > 2 else 0.0))
+		g.catapults.append(sc)
 	for z in night.get("ziplines", []):  # round 21: a zip line down from the crate stairs (ZipLine)
 		var zl := ZipLine.new()
 		zl.name = "Zip line"

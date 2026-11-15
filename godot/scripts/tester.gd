@@ -408,6 +408,10 @@ func _run(host: Node) -> void:
 		print("hole at room cm %.0f, %.0f" % [g.hole_point().x * 100.0 + Nights.ROOM_W / 2.0, g.hole_point().z * 100.0 + Nights.ROOM_D / 2.0])
 		host.get_tree().quit()
 		return
+	if name == "catapult":  # night 8: fling the chicken leg off the table with the spoon
+		await _catapult(host)
+		host.get_tree().quit()
+		return
 	if name == "zip":  # night 7: down the zip line with the salami
 		await _zip(host)
 		host.get_tree().quit()
@@ -1119,6 +1123,46 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Round 21, night 8: G by the spoon's bowl drops the chicken leg in it; F at the handle flings it off the table in an
+## arc to the floor by the hole, where she can pick it up again.
+func _catapult(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 999.0
+	await _wait(host, 0.5)
+	var sc: SpoonCatapult = null
+	for n in g.find_children("*", "SpoonCatapult", true, false):
+		sc = n
+		break
+	_check("night 8 has a spoon catapult", sc != null)
+	if sc == null:
+		return
+	var leg: Food = null
+	for f in g.foods:
+		if f.id == "chicken":
+			leg = f
+	if leg:
+		r.teleport(leg.global_position + Vector3.UP * 0.01, 0.0)
+	await _wait(host, 0.4)
+	_check("she has the chicken leg", leg != null and leg.carried, "carrying %d" % r.carried.size())
+	var bp := sc.bowl_point()
+	var side := sc.global_basis.x
+	r.teleport(Vector3(bp.x, sc.global_position.y + 0.01, bp.z) + side * 0.09, Nights.yaw_to(-side))
+	await _wait(host, 0.3)
+	await _press(host, "drop")
+	await _wait(host, 0.8)
+	_check("G by the bowl drops it in the spoon", sc.loaded == leg and leg.global_position.distance_to(sc.bowl_point()) < 0.03, "loaded %s d %.3f" % [sc.loaded, leg.global_position.distance_to(sc.bowl_point())])
+	var hp := sc.handle_point()
+	r.teleport(Vector3(hp.x, sc.global_position.y + 0.01, hp.z) + side * 0.08, Nights.yaw_to(-side))
+	await _wait(host, 0.3)
+	await _press(host, "push")
+	await _wait(host, 1.3)
+	var d := Vector2(leg.global_position.x - sc.target.x, leg.global_position.z - sc.target.z).length()
+	_check("F at the handle flings it to the floor by the hole", g.tasks.flag_value("catapult") > 0 and sc.loaded == null and d < 0.05 and leg.global_position.y < 0.05, "flag %d d %.2f y %.2f" % [g.tasks.flag_value("catapult"), d, leg.global_position.y])
+	r.teleport(leg.global_position + Vector3.UP * 0.01, 0.0)
+	await _wait(host, 0.4)
+	_check("down there she picks it up again", leg.carried)
 
 
 ## Round 21, night 7: with the salami from the top crate, F under the clothes peg: she zips down the line with it and

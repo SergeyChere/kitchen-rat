@@ -187,6 +187,14 @@
     "reveal": -1
    },
    {
+    "text": "Fling it off the table with the spoon",
+    "hint": "At the corner of the table: drop the chicken leg (G) in the spoon’s bowl, then stomp on the handle (F). It lands with a thump, so mind the cat.",
+    "type": "flag",
+    "arg": "catapult",
+    "n": 0,
+    "reveal": -1
+   },
+   {
     "text": "Drag the chicken leg home",
     "hint": "Heavy and slow. The wall paths are a safe shortcut.",
     "type": "deliver",
@@ -467,5 +475,18 @@
     "M"
    ]
   ]
- }
+ },
+ "catapults": [
+  {
+   "at": [
+    352,
+    333,
+    79.9
+   ],
+   "to": [
+    250,
+    540
+   ]
+  }
+ ]
 }
