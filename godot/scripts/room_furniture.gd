@@ -536,6 +536,7 @@ func build(list: Array) -> void:
 				_fit_keep(n, w, d, 0.0, [1.3, 1.08])  # (its depth is its own x, its width along the wall its z)
 				b.collide(n)
 			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")
+			"beanbag": place("furniture/beanbag", f, "beanbag", 0.0, float(f.get("rot", 25.0)))  # round 22: soft, quiet to land on
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)
