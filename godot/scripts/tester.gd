@@ -398,6 +398,10 @@ func _run(host: Node) -> void:
 		await _juice(host)
 		host.get_tree().quit()
 		return
+	if name == "balloon":  # night 14: the helium balloon up onto the fridge and the cake down again
+		await _balloon(host)
+		host.get_tree().quit()
+		return
 	if name == "under":
 		await _under(host)
 		host.get_tree().quit()
@@ -1093,6 +1097,82 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Round 20, night 14: take a balloon by its string, float up, sink onto the fridge, take the cake, float down with
+## it (gently), drop the cake with G, then let the balloon go with G.
+func _balloon(host: Node) -> void:
+	var r := g.rat
+	await _wait(host, 0.5)
+	var hb: HeliumBalloon = null
+	for n in g.find_children("*", "HeliumBalloon", true, false):
+		hb = n
+		break
+	_check("night 14 has a helium balloon", hb != null)
+	if hb == null:
+		return
+	g.grace_t = 999.0  # (the guests and the owner keep out of it)
+	r.teleport(hb.knot + Vector3(0.05, 0.0, 0.0), 0.0)
+	await _wait(host, 0.4)
+	_check("walking into the string she takes the balloon", r.balloon == hb, "balloon %s" % r.balloon)
+	Input.action_press("jump")
+	await _wait(host, 2.0)
+	Input.action_release("jump")
+	_check("holding Space she floats up", r.global_position.y > 0.9, "y %.2f" % r.global_position.y)
+	# over the fridge, then Space let go: she sinks onto it
+	var fridge: Node3D = null
+	for n in g.find_children("*", "Node3D", true, false):
+		if n.has_meta("box_body") and str(n.scene_file_path).ends_with("fridge.glb"):
+			fridge = n
+			break
+	_check("the room has the fridge", fridge != null)
+	if fridge == null:
+		return
+	var fb := g._builder.world_aabb(fridge)
+	var top := fb.end.y
+	r.teleport(Vector3(fb.get_center().x, top + 0.35, fb.get_center().z), 0.0)
+	var low := 0.0
+	for i in 200:
+		await host.get_tree().physics_frame
+		low = minf(low, r.velocity.y)
+		if r.is_on_floor():
+			break
+	await _wait(host, 0.3)
+	_check("Space let go she sinks gently onto the fridge", r.is_on_floor() and r.surface_id.begins_with("fridge") and low > -0.7, "on floor %s surface %s vy min %.2f top %.2f y %.2f" % [r.is_on_floor(), r.surface_id, low, top, r.global_position.y])
+	var cake: Food = null
+	for f in g.foods:
+		if is_instance_valid(f) and f.id == "cake":
+			cake = f
+	_check("the cake is up on the fridge", cake != null and cake.global_position.y > top - 0.1, "cake y %.2f" % (cake.global_position.y if cake else -1.0))
+	if cake == null:
+		return
+	r.teleport(cake.global_position + Vector3(0, 0.02, 0), 0.0)
+	await _wait(host, 0.5)
+	_check("she takes the cake (heavy: she drags it)", r.dragging(), "carried %d" % r.carried.size())
+	# off the edge, still holding the balloon: a parachute
+	var edge := Vector3(fb.get_center().x, top + 0.02, fb.end.z - 0.08)  # (the side toward the room, not the counter)
+	r.teleport(edge, Nights.yaw_to(Vector3.BACK))
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.2)
+	Input.action_press("forward")
+	low = 0.0
+	var landed := false
+	for i in 600:
+		await host.get_tree().physics_frame
+		if r.global_position.y < top - 0.2:
+			Input.action_release("forward")
+		low = minf(low, r.velocity.y)
+		if r.global_position.y < 0.05 and r.is_on_floor():
+			landed = true
+			break
+	Input.action_release("forward")
+	_check("off the edge with the cake she floats down to the floor, slowly", landed and low > -0.7 and r.dragging() and r.balloon == hb, "landed %s vy min %.2f y %.2f dragging %s" % [landed, low, r.global_position.y, r.dragging()])
+	await _press(host, "drop")
+	await _wait(host, 0.2)
+	_check("G drops the cake first, the balloon stays", not r.dragging() and r.balloon == hb)
+	await _press(host, "drop")
+	await _wait(host, 0.3)
+	_check("G again lets the balloon go; it drifts up", r.balloon == null and hb.state == HeliumBalloon.State.FREE)
 
 
 ## Hopping and pressing Space under tables and sofas never puts her on top of them.

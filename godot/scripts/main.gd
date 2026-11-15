@@ -506,6 +506,11 @@ func _food_of(kind: String) -> Node3D:
 
 func _focus() -> void:
 	var f := str(_args.focus).split(",")
+	if "balloon" in f and game.rat.balloon == null:  # dev: her with a helium balloon, a metre up
+		for hb in game.find_children("*", "HeliumBalloon", true, false):
+			game.rat.teleport((hb as HeliumBalloon).knot + Vector3(0, 1.0, 0), 0.0)
+			(hb as HeliumBalloon).take(game.rat)
+			break
 	var t: Node3D = {"cat": game.cat, "owner": game.owner_ai, "dog": game.dog, "rat": game.rat,
 		"pup": game.pups[0] if not game.pups.is_empty() else null,
 		"sleeper": game.sleepers[0] if not game.sleepers.is_empty() else null,

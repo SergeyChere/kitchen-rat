@@ -76,8 +76,8 @@
   "spots": [
    {
     "type": "cake",
-    "x": 720,
-    "y": 450,
+    "x": 895,
+    "y": 127,
     "tag": "cake",
     "hidden": false,
     "floor": false
@@ -187,8 +187,24 @@
     "reveal": -1
    },
    {
+    "text": "Grab a party balloon",
+    "hint": "Balloons are tied to the chairs. Walk into a string to take it.",
+    "type": "flag",
+    "arg": "balloon",
+    "n": 0,
+    "reveal": -1
+   },
+   {
+    "text": "Float up onto the fridge",
+    "hint": "Hold Space to rise, steer over the fridge, then let Space go to sink onto it.",
+    "type": "surf",
+    "arg": "fridge",
+    "n": 0,
+    "reveal": -1
+   },
+   {
     "text": "Steal a piece of cake",
-    "hint": "Greedy will run for it as soon as he smells it. Tell him to wait (Q) first.",
+    "hint": "It’s on top of the fridge. Greedy will run for it — tell him to wait (Q) first.",
     "type": "pick",
     "arg": "cake",
     "n": 0,
@@ -196,7 +212,7 @@
    },
    {
     "text": "Drag the cake home",
-    "hint": "Heavy and sticky. Go around the guests.",
+    "hint": "Walk off the fridge holding the balloon: it lowers you gently, cake and all.",
     "type": "deliver",
     "arg": "cake",
     "n": 0,
@@ -490,5 +506,17 @@
    ]
   ]
  },
- "kitchenUpper": true
+ "kitchenUpper": true,
+ "helium": [
+  {
+   "x": 850,
+   "y": 505,
+   "c": "red"
+  },
+  {
+   "x": 555,
+   "y": 525,
+   "c": "blue"
+  }
+ ]
 }

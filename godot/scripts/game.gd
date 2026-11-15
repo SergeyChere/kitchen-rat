@@ -646,6 +646,8 @@ func deliver() -> void:
 func caught(text: String, at: Vector3) -> void:
 	if grace_t > 0.0 or state != "play":
 		return
+	if rat.balloon:
+		rat.balloon.release()
 	lives -= 1
 	run.caught = true
 	Sfx.play("caught")
@@ -830,6 +832,8 @@ func _process(dt: float) -> void:
 			if not foods.has(dropped):
 				foods.append(dropped)
 			Sfx.play("pickup", rp, -4.0, 0.8)
+		elif rat.balloon:
+			rat.balloon.release()
 	_pick_up(rp)
 	_tick_zones(rp, dt)
 	_tick_knockables(rp)

@@ -5,6 +5,8 @@ extends Zone
 
 func enter(rat: Rat) -> void:
 	rat.in_nest = true
+	if rat.balloon:
+		rat.balloon.release()  # (a balloon never fits through the mouse hole)
 	Game.I.reached_nest()
 
 

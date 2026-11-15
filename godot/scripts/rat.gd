@@ -52,6 +52,8 @@ var noise_level := 0.0
 var surface_id := "floor"
 var blocked := false
 var carried: Array[Food] = []
+var balloon: HeliumBalloon = null  # round 20: holding a helium balloon (the party night)
+const BALLOON_TOP := 2.15
 var carrier: Node3D  # riding the robot vacuum
 var stand_shape: CollisionShape3D  # set by Game: the upright capsule and the one along her body
 var body_shape: CollisionShape3D
@@ -445,6 +447,17 @@ func has_jump_target() -> bool: return _has_target
 func add_noise(v: float) -> void: noise_level = maxf(noise_level, v)
 
 
+## Holding a helium balloon: Space floats her up (not with something big in her mouth — too heavy), and with Space
+## let go she sinks gently, like under a parachute.
+func _balloon_vy(dt: float) -> float:
+	var up := Input.is_action_pressed("jump") and not dragging() and global_position.y < BALLOON_TOP
+	if up:
+		up = _ray(global_position + Vector3.UP * 0.1, global_position + Vector3.UP * 0.42).is_empty()
+	if is_on_floor():
+		return 0.35 if up else -0.5  # (lifting off: straight away upward, or the floor holds her down again)
+	return move_toward(velocity.y, 0.8 if up else -0.45, dt * 4.0)
+
+
 func dragging() -> bool:
 	for f in carried:
 		if f.big():
@@ -649,7 +662,7 @@ func _physics_process(dt: float) -> void:
 		return
 	var before := global_position
 	# velocity eases toward the wanted one; in the air she mostly keeps her momentum
-	var acc := (acceleration * (1.0 - 0.12 * carry_weight())) if is_on_floor() else air_acceleration
+	var acc := (acceleration * (1.0 - 0.12 * carry_weight())) if is_on_floor() else (acceleration * 0.5 if balloon else air_acceleration)
 	var want := d * spd
 	var y_vel := velocity.y
 	velocity.y = 0.0
@@ -661,10 +674,13 @@ func _physics_process(dt: float) -> void:
 	velocity.y = y_vel
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = -0.5
-	_hold_edge(dt)
-	velocity.y -= gravity * dt
-	if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump") and not _low_roof:
-		velocity.y += hop_hold_force * dt  # hold Space: a higher hop
+	if balloon:
+		velocity.y = _balloon_vy(dt)  # (and off an edge she simply floats: no holding back at it)
+	else:
+		_hold_edge(dt)
+		velocity.y -= gravity * dt
+		if not is_on_floor() and velocity.y > 0.0 and Input.is_action_pressed("jump") and not _low_roof:
+			velocity.y += hop_hold_force * dt  # hold Space: a higher hop
 	_pre_slide = Vector3(velocity.x, 0.0, velocity.z)
 	move_and_slide()
 	_push_things()
@@ -674,7 +690,10 @@ func _physics_process(dt: float) -> void:
 	# landing after a fall or a hop (the aimed jumps land on their own)
 	if not is_on_floor():
 		_air_top = maxf(_air_top, global_position.y) if not _was_on_floor else global_position.y
-		_try_ledge_grab()
+		if balloon:
+			_air_top = global_position.y  # (floating down is no fall)
+		else:
+			_try_ledge_grab()
 		if jumping:
 			_play_anim()
 			return
@@ -726,6 +745,9 @@ func _physics_process(dt: float) -> void:
 		press = false
 	elif not press and _jump_buf > 0.0 and is_on_floor():
 		press = true
+		_jump_buf = 0.0
+	if balloon:
+		press = false  # (Space floats her up instead: _balloon_vy)
 		_jump_buf = 0.0
 	if press:
 		var grounded := is_on_floor() or (_coyote > 0.0 and not _hopping)

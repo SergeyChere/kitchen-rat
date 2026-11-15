@@ -876,6 +876,7 @@ func build_contents() -> void:
 	_decor()
 	_nest()
 	_knockables()
+	_helium()
 	_food()
 	_traps()
 	RoomFurniture.new(self).life(str(night.get("decor", "kitchen")))
@@ -2452,6 +2453,15 @@ static func _knock_model(kind: String) -> String:
 		"carton", "book": return "props/small_box"
 		"vase": return "props/jar"
 	return "props/" + kind
+
+
+## Round 20: helium balloons tied to chair legs — the party night's gadget (HeliumBalloon).
+func _helium() -> void:
+	for h in night.get("helium", []):
+		var hb := HeliumBalloon.new()
+		hb.name = "Helium balloon"
+		decor.add_child(hb)
+		hb.setup(W(float(h.x), float(h.y)), str(h.get("c", "red")))
 
 
 func _knockables() -> void:
