@@ -2,19 +2,19 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://igikjx1hlrol"
-path="res://.godot/imported/rat_mother_Image_0.jpg-d8bff40460c160826a07f80d69c3f3d1.ctex"
+uid="uid://c6e4ftrkji3pf"
+path="res://.godot/imported/rat_mother_Paint.jpg-58a334fdeee4279b582f5b620cdd1969.ctex"
 metadata={
 "vram_texture": false
 }
 generator_parameters={
-"md5": "37a24f090d956764be82eda33c1ec38f"
+"md5": "dbba1fa8d7cbafc6124fdffd3bd0fb3e"
 }
 
 [deps]
 
-source_file="res://assets/models/characters/rat_mother_Image_0.jpg"
-dest_files=["res://.godot/imported/rat_mother_Image_0.jpg-d8bff40460c160826a07f80d69c3f3d1.ctex"]
+source_file="res://assets/models/characters/rat_mother_Paint.jpg"
+dest_files=["res://.godot/imported/rat_mother_Paint.jpg-58a334fdeee4279b582f5b620cdd1969.ctex"]
 
 [params]
 

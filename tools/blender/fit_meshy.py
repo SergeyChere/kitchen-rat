@@ -22,6 +22,9 @@ import os
 import sys
 from mathutils import Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from meshy_common import rebake, weld  # noqa: E402
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = os.path.join(REPO, "art", "characters", "base")
 OUT = os.path.join(REPO, "godot", "assets", "models", "characters")
@@ -48,6 +51,14 @@ RIGS = {
         "no_skin": [],
         "tris": 12000,
         "material": "RatSkin",
+        # the painted rat is round, her legs short stubs under her: the tail bones are laid along the mesh's own
+        # tail, and a leg's bones hold only the skin of the stub itself (radii as parts of her height)
+        "tail": ["Tail1", "Tail2", "Tail3", "Tail4", "Tail5", "Tail6", "Tail7"],
+        "tail_root": "Back",
+        # the clips lift the root of the old rat's tail as she steps; the painted tail sits low on a round rump
+        # and the lift pulled a cone of skin out of it: the root stays on the body
+        "still": ["Back"],
+        "stubs": {"lower": (0.06, 0.15), "upper": (0.02, 0.09), "girdle": ["FrontLeg.L", "FrontLeg.R", "BackLeg.L", "BackLeg.R"]},
     },
 }
 RIGS["dog"] = {
@@ -62,6 +73,28 @@ RIGS["dog"] = {
 }
 RIGS["cat_street"] = dict(RIGS["cat"], base="cat")
 RIGS["rat_pup"] = dict(RIGS["rat_mother"], tris=6000)
+
+
+def cut_down(new, budget):
+    """The Meshy mesh welded into one skin, cut down to the budget, and its paint baked onto a plain unwrap (see
+    meshy_common: Meshy's mosaic of tiny texture islands speckles the model along every seam)."""
+    hi = new.copy()
+    hi.data = new.data.copy()
+    bpy.context.scene.collection.objects.link(hi)
+    weld(new)
+    tris = sum(len(p.vertices) - 2 for p in new.data.polygons)
+    if tris > budget:
+        dec = new.modifiers.new("cut", "DECIMATE")
+        dec.ratio = budget / tris
+        dec.use_collapse_triangulate = True
+        bpy.ops.object.modifier_apply(modifier="cut")
+    for p in new.data.polygons:
+        p.use_smooth = True
+    rebake(new, hi, 1024)
+    for img in list(bpy.data.images):
+        if img.users == 0:
+            bpy.data.images.remove(img)
+    return new
 
 
 def keep_largest_island(proxy):
@@ -179,12 +212,7 @@ def fit(name, src, out_path):
             bpy.data.images.remove(img)
         elif img.size[0] > 1024:
             img.scale(1024, 1024)
-    tris = sum(len(p.vertices) - 2 for p in new.data.polygons)
-    if tris > rig["tris"]:
-        dec = new.modifiers.new("cut", "DECIMATE")
-        dec.ratio = rig["tris"] / tris
-        dec.use_collapse_triangulate = True
-        bpy.ops.object.modifier_apply(modifier="cut")
+    new = cut_down(new, rig["tris"])
     # its size: the body (its paws to its nose, not the tail) as long as the old one's, the paws on the floor
     nv = world_verts(new)
     nlo, nhi = bbox(nv)
@@ -256,6 +284,18 @@ def fit(name, src, out_path):
             b = eb[bn]
             b.head = to_local @ ((arm.matrix_world @ b.head) + d)
             b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
+    tail_line = None
+    if rig.get("tail"):
+        tail_line = tail_centres(nv)
+        if tail_line:
+            n = len(rig["tail"])
+            for i, bn in enumerate(rig["tail"]):
+                b = eb[bn]
+                at = line_at(tail_line, i / float(n))
+                d = at - (arm.matrix_world @ b.head)
+                b.head = to_local @ ((arm.matrix_world @ b.head) + d)
+                b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
+            print("tail: %d bones laid from y %.3f to %.3f" % (n, tail_line[0].y, tail_line[-1].y))
     bpy.ops.object.mode_set(mode="OBJECT")
     for bn in rig["no_skin"]:
         if bn in arm.data.bones:
@@ -330,6 +370,7 @@ def fit(name, src, out_path):
     reach = (nhi.z - nlo.z) * 0.03
     hg = new.vertex_groups.get(rig["head"]) or new.vertex_groups.new(name=rig["head"])
     moved = 0
+    thin = set()
     # …and a thin tail the closed copy lost goes to the nearest tail (or other) bone, not the rump beside it
     segs = [(bb.name, arm.matrix_world @ bb.head_local, arm.matrix_world @ bb.tail_local) for bb in arm.data.bones
             if bb.use_deform and bb.name not in rig["no_skin"]]
@@ -354,7 +395,18 @@ def fit(name, src, out_path):
             new.vertex_groups[g.group].remove([v.index])
         (new.vertex_groups.get(bn) or new.vertex_groups.new(name=bn)).add([v.index], 1.0, "REPLACE")
         moved += 1
+        if bn == rig["head"]:
+            thin.add(v.index)
     print("whisker bits on the head:", moved)
+    # the whiskers are spikes of the one skin: the game's ink outline swelled them into black knots at her nose.
+    # Their faces get a material of their own, "Whisker", which the game draws without an outline.
+    if thin and new.data.materials:
+        wm = new.data.materials[0].copy()
+        wm.name = "Whisker"
+        new.data.materials.append(wm)
+        for poly in new.data.polygons:
+            if sum(1 for vi in poly.vertices if vi in thin) >= 2:
+                poly.material_index = 1
     # the tail lies along the floor between the back paws: the heat lent its skin to the paws, and running, the
     # tail dragged a web of skin after them. Behind the back paws on the middle line, only tail and rump bones.
     tails = [bb.name for bb in arm.data.bones if bb.name.lower().startswith("tail") or bb.name in ("Back", "Hips", "Bone.004", "Bone.005", "Bone.006", "Bone.007")]
@@ -379,7 +431,200 @@ def fit(name, src, out_path):
             for n2, w in keep:
                 (new.vertex_groups.get(n2) or new.vertex_groups.new(name=n2)).add([v.index], w / tot, "REPLACE")
     bpy.data.objects.remove(proxy)
+    if rig.get("stubs"):
+        stub_legs(new, arm, rig, np_, nhi.z - nlo.z)
+    if tail_line:
+        skin_tail(new, arm, rig, tail_line)
+    if rig.get("stubs") or tail_line:
+        smooth_weights(new, 2)
+    for bn in rig.get("still", []):
+        for act in bpy.data.actions:
+            for fc in list(_fcurves(act)):
+                if fc.data_path == 'pose.bones["%s"].location' % bn:
+                    for k in fc.keyframe_points:
+                        k.co[1] = 0.0
+                        k.handle_left[1] = 0.0
+                        k.handle_right[1] = 0.0
     return _finish(name, rig, arm, new, weighted, out_path, (sx, sy, sz))
+
+
+def tail_centres(points):
+    """The mesh's own tail: from the back end forward, the slices that are much thinner than the body. Returns the
+    centre of each slice, root first (None when there is no such tail)."""
+    lo, hi = bbox(points)
+    L = hi.y - lo.y
+    n = 90
+    step = L / n
+    bins = [[] for _ in range(n)]
+    for p in points:
+        bins[min(int((p.y - lo.y) / step), n - 1)].append(p)
+    width = [(max(abs(q.x - (lo.x + hi.x) / 2) for q in b) if b else 0.0) for b in bins]
+    height = [((max(q.z for q in b) - min(q.z for q in b)) if b else 0.0) for b in bins]
+    wmax, hmax = max(width), max(height)
+    out = []
+    for i in range(n - 1, -1, -1):
+        if not bins[i]:
+            continue
+        if width[i] > wmax * 0.38 or height[i] > hmax * 0.38:
+            break
+        b = bins[i]
+        out.append(Vector((sum(q.x for q in b) / len(b), lo.y + (i + 0.5) * step, sum(q.z for q in b) / len(b))))
+    out.reverse()
+    return out if len(out) >= 4 else None
+
+
+def line_at(line, f):
+    """The point a part f (0..1) of the way along a list of points."""
+    u = max(0.0, min(1.0, f)) * (len(line) - 1)
+    i = min(int(u), len(line) - 2)
+    return line[i].lerp(line[i + 1], u - i)
+
+
+def _set_weights(obj, vi, ws):
+    for g in list(obj.data.vertices[vi].groups):
+        obj.vertex_groups[g.group].remove([vi])
+    tot = sum(w for _, w in ws) or 1.0
+    for bn, w in ws:
+        if w / tot > 0.003:
+            (obj.vertex_groups.get(bn) or obj.vertex_groups.new(name=bn)).add([vi], w / tot, "REPLACE")
+
+
+def _smooth(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / (b - a))) if b != a else (1.0 if x >= b else 0.0)
+    return t * t * (3 - 2 * t)
+
+
+def skin_tail(new, arm, rig, line):
+    """Each tail bone holds its own stretch of the mesh's tail (a blend at the joints), nothing else does; just in
+    front of the tail the rump leans on the tail's root bone."""
+    bones = rig["tail"]
+    n = len(bones)
+    y0, y1 = line[0].y, line[-1].y
+    span = y1 - y0
+    names = {g.index: g.name for g in new.vertex_groups}
+    root = rig.get("tail_root")
+    m = span * 0.25
+    cnt = 0
+    for v in new.data.vertices:
+        co = new.matrix_world @ v.co
+        if co.y >= y0:
+            c = (co.y - y0) / span * n - 0.5
+            i0 = int(math.floor(c))
+            t = c - i0
+            ws = [(bones[max(0, min(n - 1, i0))], 1.0 - t), (bones[max(0, min(n - 1, i0 + 1))], t)]
+            _set_weights(new, v.index, ws)
+            cnt += 1
+        elif root and co.y > y0 - m:
+            # (only the skin round the root of the tail: within a tail's width and a half of its line)
+            r = (Vector((co.x, 0, co.z)) - Vector((line[0].x, 0, line[0].z))).length
+            b = _smooth(y0 - m, y0, co.y) * (1.0 - _smooth(m * 0.6, m * 1.4, r)) * 0.7
+            if b > 0.01:
+                ws = [(names[g.group], g.weight * (1.0 - b)) for g in v.groups if g.weight > 0]
+                _set_weights(new, v.index, ws + [(root, b)])
+    print("tail skin:", cnt, "vertices on", n, "bones")
+
+
+def stub_legs(new, arm, rig, paws_at, H):
+    """A round body on short legs: a leg's bones hold the skin of the stub itself and nothing of the belly, the
+    rump or the tail beside it. (Bone heat lent them half the body: running, the legs dragged webs of skin.)"""
+    cfg = rig["stubs"]
+    mw = arm.matrix_world
+    head = {b.name: mw @ b.head_local for b in arm.data.bones}
+    tailp = {b.name: mw @ b.tail_local for b in arm.data.bones}
+    legs = {}
+    leg_bones = set(cfg.get("girdle", []))
+    for key, chain in rig["legs"].items():
+        chain = [b for b in chain if b not in rig["no_skin"]]
+        leg_bones.update(chain)
+        paw = paws_at[key].copy()
+        paw.z = 0.0
+        segs = []
+        if arm.data.bones[chain[-1]].parent and arm.data.bones[chain[-1]].parent.name not in chain:
+            # the foot is a bone of its own on the floor (the rats): the leg above it, the paw to it
+            ankle = paw + Vector((0, 0, H * 0.07))
+            up = chain[:-1]
+            for i, bn in enumerate(up):
+                segs.append((bn, head[bn], head[up[i + 1]] if i + 1 < len(up) else ankle, "upper" if i == 0 and len(up) > 1 else "lower"))
+            segs.append((chain[-1], ankle, paw, "lower"))
+        else:
+            for i, bn in enumerate(chain):
+                end = head[chain[i + 1]] if i + 1 < len(chain) else tailp[bn]
+                segs.append((bn, head[bn], end, "upper" if i == 0 else "lower"))
+        legs[key] = segs
+
+    def seg_d(p, a, b):
+        ab = b - a
+        t = 0.0 if ab.length_squared < 1e-12 else max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
+        return (a + ab * t - p).length
+
+    trunk = [(b.name, head[b.name]) for b in arm.data.bones if b.use_deform and b.name not in leg_bones
+             and b.name not in rig["no_skin"] and b.name != "root" and not (rig.get("tail") and b.name in rig["tail"])]
+    names = {g.index: g.name for g in new.vertex_groups}
+    width = max(abs((new.matrix_world @ v.co).x) for v in new.data.vertices)
+    changed = 0
+    for v in new.data.vertices:
+        co = new.matrix_world @ v.co
+        best = None
+        for key, segs in legs.items():
+            sx_ = 1 if paws_at[key].x > 0 else -1
+            if co.x * sx_ < -width * 0.05:
+                continue  # the other side's leg
+            f = 0.0
+            ds = []
+            for bn, a, b, kind in segs:
+                d = seg_d(co, a, b)
+                r_in, r_out = cfg[kind]
+                f = max(f, 1.0 - _smooth(r_in * H, r_out * H, d))
+                ds.append((bn, d))
+            if best is None or f > best[0]:
+                best = (f, ds)
+        f, ds = best if best else (0.0, [])
+        ws = [(names[g.group], g.weight) for g in v.groups if g.weight > 0]
+        had_leg = any(n2 in leg_bones for n2, _ in ws)
+        if f <= 0.0 and not had_leg:
+            continue
+        rest = [(n2, w) for n2, w in ws if n2 not in leg_bones]
+        if not rest:
+            rest = [(min(trunk, key=lambda t: (t[1] - co).length)[0], 1.0)]
+        tot = sum(w for _, w in rest)
+        out = [(n2, w / tot * (1.0 - f)) for n2, w in rest]
+        if f > 0.0:
+            dmin = min(d for _, d in ds)
+            tau = H * 0.03
+            sh = [(bn, math.exp(-(d - dmin) / tau)) for bn, d in ds]
+            st = sum(w for _, w in sh)
+            out += [(bn, w / st * f) for bn, w in sh]
+        _set_weights(new, v.index, out)
+        changed += 1
+    print("leg stubs:", changed, "vertices re-weighted")
+
+
+def smooth_weights(obj, iters):
+    """The weights eased over the surface (each vertex half its own, half its neighbours'): no hard line where one
+    rule's region meets another's."""
+    import numpy as np
+    nv, ng = len(obj.data.vertices), len(obj.vertex_groups)
+    W = np.zeros((nv, ng))
+    for v in obj.data.vertices:
+        for g in v.groups:
+            W[v.index, g.group] = g.weight
+    nb = [[] for _ in range(nv)]
+    for e in obj.data.edges:
+        a, b = e.vertices
+        nb[a].append(b)
+        nb[b].append(a)
+    for _ in range(iters):
+        avg = np.array([W[n].mean(axis=0) if n else W[i] for i, n in enumerate(nb)])
+        W = 0.5 * W + 0.5 * avg
+    for i in range(nv):
+        row = W[i]
+        keep = np.argsort(row)[-4:]
+        tot = row[keep].sum() or 1.0
+        for g in list(obj.data.vertices[i].groups):
+            obj.vertex_groups[g.group].remove([i])
+        for gi in keep:
+            if row[gi] / tot > 0.004:
+                obj.vertex_groups[gi].add([i], float(row[gi] / tot), "REPLACE")
 
 
 def clean_sides(new, arm):
@@ -435,7 +680,8 @@ def _finish(name, rig, arm, new, weighted, out_path, st):
         o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=out_path, export_format="GLB", use_selection=True,
                               export_animations=True, export_animation_mode="ACTIONS", export_apply=False,
-                              export_force_sampling=True, export_yup=True)
+                              export_force_sampling=True, export_yup=True,
+                              export_image_format="JPEG", export_jpeg_quality=92)
 
 
 
