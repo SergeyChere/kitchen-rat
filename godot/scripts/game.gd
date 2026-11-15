@@ -327,6 +327,7 @@ func _make_agents() -> void:
 	var cm := _builder.spawn("characters/cat", Vector3.ZERO, 0.0, cat)
 	cm.position = Vector3.ZERO
 	cat.anim = ClipPlayer.new(cm)
+	cat.model = cm
 	owner_ai = OwnerAI.new()
 	owner_ai.name = "Owner"
 	add_child(owner_ai)

@@ -9,6 +9,10 @@ extends Agent
 enum Mode { AWAY, SLEEP, EAT, TO_BED, WANDER, IDLE, INVESTIGATE, SEARCH, CHASE, WATCH }
 
 var mode := Mode.AWAY
+## The painted cat sleeps as a loaf: its clips keep the body as it stands, and the model is sunk until the belly is
+## on the floor (its legs under it).
+const LOAF_SINK := 0.085
+var model: Node3D
 var alert := 0.0
 var sleep := 1.0
 var bed := Vector3.ZERO
@@ -206,6 +210,8 @@ func _living_model(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_living_model(dt)
+	if is_instance_valid(model):
+		model.position.y = lerpf(model.position.y, -LOAF_SINK * model.scale.y if mode == Mode.SLEEP else 0.0, minf(1.0, dt * 4.0))
 	_lift(dt)
 	if not G.playing() or mode == Mode.AWAY:
 		sees = false

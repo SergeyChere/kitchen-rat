@@ -40,6 +40,14 @@ RIGS = {
         "no_skin": ["IKBackLeft", "IKBackRight", "IKFrontLeft", "IKFrontRight", "Eyes"],
         "tris": 14000,
         "material": "Main",
+        # (a round cat on short legs, like the rat: a leg's bones hold the leg, not the belly)
+        "stubs": {"lower": (0.09, 0.2), "upper": (0.05, 0.13), "girdle": []},
+        # the old cat slept curled up, spine bent double: the round one cannot (it crumpled). It lies as a loaf:
+        # in these clips the body, legs and tail keep their rest pose and only the head moves; the game sinks the
+        # model until its belly is on the floor (CatAI: LOAF_SINK)
+        "tail": ["Bone.004", "Bone.005", "Bone.006", "Bone.007"],
+        "tail_root": "Bone",
+        "loaf": {"clips": ["sleep", "stir", "head_up"], "still": ["Bone", "Bone.001", "Bone.002"]},
     },
     # the rats' bones are points (head and tail together), which bone heat cannot weigh skin to: their skin takes
     # the weights of the old rat's skin instead, stretched the same way as the skeleton
@@ -284,9 +292,9 @@ def fit(name, src, out_path):
             b = eb[bn]
             b.head = to_local @ ((arm.matrix_world @ b.head) + d)
             b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
-    tail_line = None
+    tail_line = tail_idx = None
     if rig.get("tail"):
-        tail_line = tail_centres(nv)
+        tail_line, tail_idx = tail_centres(nv)
         if tail_line:
             n = len(rig["tail"])
             for i, bn in enumerate(rig["tail"]):
@@ -295,7 +303,7 @@ def fit(name, src, out_path):
                 d = at - (arm.matrix_world @ b.head)
                 b.head = to_local @ ((arm.matrix_world @ b.head) + d)
                 b.tail = to_local @ ((arm.matrix_world @ b.tail) + d)
-            print("tail: %d bones laid from y %.3f to %.3f" % (n, tail_line[0].y, tail_line[-1].y))
+            print("tail: %d bones laid from" % n, tuple(round(c, 3) for c in tail_line[0]), "to", tuple(round(c, 3) for c in tail_line[-1]))
     bpy.ops.object.mode_set(mode="OBJECT")
     for bn in rig["no_skin"]:
         if bn in arm.data.bones:
@@ -434,9 +442,11 @@ def fit(name, src, out_path):
     if rig.get("stubs"):
         stub_legs(new, arm, rig, np_, nhi.z - nlo.z)
     if tail_line:
-        skin_tail(new, arm, rig, tail_line)
+        skin_tail(new, arm, rig, tail_line, tail_idx)
     if rig.get("stubs") or tail_line:
         smooth_weights(new, 2)
+    if rig.get("loaf"):
+        loaf(arm, rig)
     for bn in rig.get("still", []):
         for act in bpy.data.actions:
             for fc in list(_fcurves(act)):
@@ -449,28 +459,39 @@ def fit(name, src, out_path):
 
 
 def tail_centres(points):
-    """The mesh's own tail: from the back end forward, the slices that are much thinner than the body. Returns the
-    centre of each slice, root first (None when there is no such tail)."""
+    """The mesh's own tail: from the back end forward, the slices that are much narrower than the body. Returns
+    (the centre line, root first; the indices of the tail's vertices), or (None, None) when there is no such tail.
+    A tail that lies along the floor (the rats) is followed along its length; one that stands up (the cats) by
+    height."""
     lo, hi = bbox(points)
     L = hi.y - lo.y
     n = 90
     step = L / n
     bins = [[] for _ in range(n)]
-    for p in points:
-        bins[min(int((p.y - lo.y) / step), n - 1)].append(p)
-    width = [(max(abs(q.x - (lo.x + hi.x) / 2) for q in b) if b else 0.0) for b in bins]
-    height = [((max(q.z for q in b) - min(q.z for q in b)) if b else 0.0) for b in bins]
-    wmax, hmax = max(width), max(height)
-    out = []
+    for k, p in enumerate(points):
+        bins[min(int((p.y - lo.y) / step), n - 1)].append(k)
+    mid = (lo.x + hi.x) / 2
+    width = [(max(abs(points[k].x - mid) for k in b) if b else 0.0) for b in bins]
+    wmax = max(width)
+    first = n
     for i in range(n - 1, -1, -1):
-        if not bins[i]:
-            continue
-        if width[i] > wmax * 0.38 or height[i] > hmax * 0.38:
+        if bins[i] and width[i] > wmax * 0.42:
             break
-        b = bins[i]
-        out.append(Vector((sum(q.x for q in b) / len(b), lo.y + (i + 0.5) * step, sum(q.z for q in b) / len(b))))
-    out.reverse()
-    return out if len(out) >= 4 else None
+        first = i
+    idx = [k for b in bins[first:] for k in b]
+    if len(idx) < 12:
+        return None, None
+    zs = [points[k].z for k in idx]
+    ys = [points[k].y for k in idx]
+    up = (max(zs) - min(zs)) > (max(ys) - min(ys)) * 1.2
+    key = (lambda k: points[k].z) if up else (lambda k: points[k].y)
+    a, b = min(key(k) for k in idx), max(key(k) for k in idx)
+    m = 14
+    groups = [[] for _ in range(m)]
+    for k in idx:
+        groups[min(int((key(k) - a) / (b - a) * m), m - 1)].append(points[k])
+    line = [sum(g, Vector()) / len(g) for g in groups if g]
+    return (line, set(idx)) if len(line) >= 4 else (None, None)
 
 
 def line_at(line, f):
@@ -494,33 +515,38 @@ def _smooth(a, b, x):
     return t * t * (3 - 2 * t)
 
 
-def skin_tail(new, arm, rig, line):
-    """Each tail bone holds its own stretch of the mesh's tail (a blend at the joints), nothing else does; just in
-    front of the tail the rump leans on the tail's root bone."""
+def skin_tail(new, arm, rig, line, idx):
+    """Each tail bone holds its own stretch of the mesh's tail (a blend at the joints) and nothing but the tail."""
     bones = rig["tail"]
     n = len(bones)
-    y0, y1 = line[0].y, line[-1].y
-    span = y1 - y0
-    names = {g.index: g.name for g in new.vertex_groups}
     root = rig.get("tail_root")
-    m = span * 0.25
+    names = {g.index: g.name for g in new.vertex_groups}
+    cum = [0.0]
+    for a, b in zip(line, line[1:]):
+        cum.append(cum[-1] + (b - a).length)
+
+    def along(p):
+        best = (1e9, 0.0)
+        for i in range(len(line) - 1):
+            ab = line[i + 1] - line[i]
+            t = 0.0 if ab.length_squared < 1e-12 else max(0.0, min(1.0, (p - line[i]).dot(ab) / ab.length_squared))
+            d = (line[i] + ab * t - p).length
+            if d < best[0]:
+                best = (d, (cum[i] + ab.length * t) / cum[-1])
+        return best[1]
     cnt = 0
     for v in new.data.vertices:
-        co = new.matrix_world @ v.co
-        if co.y >= y0:
-            c = (co.y - y0) / span * n - 0.5
+        if v.index in idx:
+            c = along(new.matrix_world @ v.co) * n - 0.5
             i0 = int(math.floor(c))
             t = c - i0
-            ws = [(bones[max(0, min(n - 1, i0))], 1.0 - t), (bones[max(0, min(n - 1, i0 + 1))], t)]
-            _set_weights(new, v.index, ws)
+            _set_weights(new, v.index, [(bones[max(0, min(n - 1, i0))], 1.0 - t), (bones[max(0, min(n - 1, i0 + 1))], t)])
             cnt += 1
-        elif root and co.y > y0 - m:
-            # (only the skin round the root of the tail: within a tail's width and a half of its line)
-            r = (Vector((co.x, 0, co.z)) - Vector((line[0].x, 0, line[0].z))).length
-            b = _smooth(y0 - m, y0, co.y) * (1.0 - _smooth(m * 0.6, m * 1.4, r)) * 0.7
-            if b > 0.01:
-                ws = [(names[g.group], g.weight * (1.0 - b)) for g in v.groups if g.weight > 0]
-                _set_weights(new, v.index, ws + [(root, b)])
+        else:  # the rump: none of the tail's bones
+            ws = [(names[g.group], g.weight) for g in v.groups if g.weight > 0]
+            if any(bn in bones for bn, _ in ws):
+                rest = [(bn, w) for bn, w in ws if bn not in bones]
+                _set_weights(new, v.index, rest if rest else [(root, 1.0)])
     print("tail skin:", cnt, "vertices on", n, "bones")
 
 
@@ -597,6 +623,27 @@ def stub_legs(new, arm, rig, paws_at, H):
         _set_weights(new, v.index, out)
         changed += 1
     print("leg stubs:", changed, "vertices re-weighted")
+
+
+def loaf(arm, rig):
+    cfg = rig["loaf"]
+    still = set(cfg["still"]) | set(rig.get("tail", []))
+    for chain in rig["legs"].values():
+        still.update(chain)
+    for act in bpy.data.actions:
+        if act.name not in cfg["clips"]:
+            continue
+        for fc in _fcurves(act):
+            m = fc.data_path
+            if not m.startswith('pose.bones["') or m.split('"')[1] not in still:
+                continue
+            prop = m.rsplit(".", 1)[1]
+            val = (1.0 if fc.array_index == 0 else 0.0) if prop == "rotation_quaternion" else (1.0 if prop == "scale" else 0.0)
+            for k in fc.keyframe_points:
+                k.co[1] = val
+                k.handle_left[1] = val
+                k.handle_right[1] = val
+        print("loaf:", act.name)
 
 
 def smooth_weights(obj, iters):
