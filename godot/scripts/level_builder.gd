@@ -2676,6 +2676,7 @@ func _nest() -> void:
 	var roof := box("Roof", W(130, 697, 95), Vector3(2.6, 0.1, 1.76), earth, nest)
 	var heap := spawn("rooms/nest", W(90, 725), 0.0, nest)
 	collide(heap)
+	g.nest_heap = heap
 	# (round 17: the player's painted nest from Meshy carries its own colours — no wood grain laid over it)
 	# round 5: the nest's light had no source (a bare omni mid-air) and the burrow read flat.
 	# Now the light SPILLS THROUGH THE MOUSE HOLE from the kitchen: the lamp sits just inside
@@ -2760,9 +2761,7 @@ func _nest() -> void:
 	var patch := box("Cloth patch", W(150, 706, 2.3), Vector3(0.13, 0.006, 0.11), mat(Color(0.25, 0.38, 0.5)), nest, false)
 	patch.rotation.y = 0.9
 	for p in [[70, 715, 20, "sleep"], [105, 735, -60, "sleep"], [80, 745, 150, "idle"], [125, 705, 200, "sniff"]]:
-		var o := W(p[0], p[1], 60)
-		var hit := g.ray(o, o + Vector3.DOWN * 1.0)  # on top of the nest bedding, not inside it
-		var pup := spawn("characters/rat_pup", (hit.position if not hit.is_empty() else W(p[0], p[1], 2)) + Vector3.UP * 0.006, p[2], nest)
+		var pup := spawn("characters/rat_pup", g.on_nest(W(p[0], p[1], 0)), p[2], nest)  # on the bedding, not in it
 		if pup:
 			var cp := ClipPlayer.new(pup)
 			cp.play(p[3], 0.0)

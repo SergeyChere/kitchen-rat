@@ -48,6 +48,9 @@ var prompt := ""
 var noisy_near := ""  # the noisy thing right by her paws (the HUD noise chip turns orange)
 var fx: WorldFx
 var nest_pups: Array = []
+var nest_heap: Node3D  # the painted nest in the burrow (LevelBuilder)
+var _nest_grid := {}
+const NEST_CELL := 0.04
 var decor_parent: Node3D  # the burrow, where NestDecor hangs the finds
 var decor_new: Array = []  # finds brought home tonight, still to be given a spot
 var spotted := 0  # how many times someone came after her tonight
@@ -318,6 +321,56 @@ func _make_rat() -> void:
 	cam.sensitivity = 0.25 * Settings.sens
 	cam.invert_y = Settings.invert_y
 	cam.fov = Settings.fov
+
+
+## The top of the nest's bedding under p (worked out from its own mesh, not physics: the pups and the cutscenes
+## put things there while the level is still being built and the ray found nothing, so they sat on the floor,
+## inside the painted nest's bowl — the player: "the pups lie under the nest"); 0 off the nest.
+func nest_floor(p: Vector3) -> float:
+	if not is_instance_valid(nest_heap):
+		return 0.0
+	if _nest_grid.is_empty():
+		_build_nest_grid()
+	return float(_nest_grid.get(Vector2i(floori(p.x / NEST_CELL), floori(p.z / NEST_CELL)), 0.0))
+
+
+func on_nest(p: Vector3) -> Vector3:
+	return Vector3(p.x, maxf(p.y, nest_floor(p) + 0.004), p.z)
+
+
+## The nest's top surface on a 4 cm grid: every triangle's height at the cell centres it covers, the highest kept.
+func _build_nest_grid() -> void:
+	_nest_grid[Vector2i(1 << 29, 1 << 29)] = 0.0  # (built, even if there is nothing to find)
+	for mi in nest_heap.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		var xf := m.global_transform
+		for si in m.mesh.get_surface_count():
+			var arr := m.mesh.surface_get_arrays(si)
+			var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+			var w := PackedVector3Array()
+			w.resize(vs.size())
+			for i in vs.size():
+				w[i] = xf * vs[i]
+			var n := idx.size() if not idx.is_empty() else w.size()
+			for t in range(0, n - 2, 3):
+				var a: Vector3 = w[idx[t] if not idx.is_empty() else t]
+				var b: Vector3 = w[idx[t + 1] if not idx.is_empty() else t + 1]
+				var c: Vector3 = w[idx[t + 2] if not idx.is_empty() else t + 2]
+				var den := (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z)
+				if absf(den) < 1e-10:
+					continue
+				for cx in range(floori(minf(a.x, minf(b.x, c.x)) / NEST_CELL), floori(maxf(a.x, maxf(b.x, c.x)) / NEST_CELL) + 1):
+					for cz in range(floori(minf(a.z, minf(b.z, c.z)) / NEST_CELL), floori(maxf(a.z, maxf(b.z, c.z)) / NEST_CELL) + 1):
+						var px := (cx + 0.5) * NEST_CELL
+						var pz := (cz + 0.5) * NEST_CELL
+						var l1 := ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / den
+						var l2 := ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / den
+						var l3 := 1.0 - l1 - l2
+						if l1 < -0.001 or l2 < -0.001 or l3 < -0.001:
+							continue
+						var k := Vector2i(cx, cz)
+						_nest_grid[k] = maxf(float(_nest_grid.get(k, 0.0)), a.y * l1 + b.y * l2 + c.y * l3)
 
 
 func _make_agents() -> void:
@@ -1660,7 +1713,7 @@ func begin() -> void:
 	rat.teleport(p, PI)
 	cam.snap(PI)
 	for i in pups.size():
-		pups[i].global_position = Nights.world(150 + i * 20, 660)
+		pups[i].global_position = on_nest(Nights.world(150 + i * 20, 660))
 	state = "play"
 	rat.frozen = false
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -1740,11 +1793,11 @@ func _start_intro() -> void:
 	_cut_camera()
 	rat.scripted = true
 	rat.frozen = true
-	rat.global_position = Nights.world(150, 700, 1)
+	rat.global_position = on_nest(Nights.world(150, 700, 1))
 	rat.rotation.y = Nights.yaw_to(Vector3(0.5, 0, 1))
 	rat.anim.play("sleep")
 	for i in pups.size():
-		pups[i].global_position = Nights.world(120 + i * 22, 735)
+		pups[i].global_position = on_nest(Nights.world(120 + i * 22, 735))
 	fade = 1.0
 	_fade_to = 0.0
 	Sfx.music_night(night.get("music", {}))
@@ -2224,7 +2277,7 @@ func _tick_outro(dt: float) -> void:
 		rat.anim.play("idle")
 		for p in nest_pups: p.visible = true
 		for i in pups.size():
-			pups[i].global_position = Nights.world(110 + i * 25, 690)
+			pups[i].global_position = on_nest(Nights.world(110 + i * 25, 690))
 			pups[i].mode = Pup.Mode.STAY
 			pups[i].target = pups[i].global_position
 		_fade_to = 0.0

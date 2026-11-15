@@ -127,6 +127,7 @@ func _step(t: Vector3, spd: float, dt: float) -> bool:
 		var a := p + Vector3(dir.x * m, 0, 0)
 		var b := p + Vector3(0, 0, dir.z * m)
 		np = a if _free(a) else (b if _free(b) else p)
+	np.y = G.nest_floor(np)  # (over the nest's bedding, not through it)
 	global_position = np
 	if (np - p).length() > 0.0005:
 		rotation.y = lerp_angle(rotation.y, Nights.yaw_to(np - p), clampf(dt * 10.0, 0.0, 1.0))
