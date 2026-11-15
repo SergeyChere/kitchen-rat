@@ -1796,6 +1796,20 @@ func _furniture() -> void:
 		_sink_water(sink)
 	for j in 3:
 		apply_texture(furn_piece("furniture/counter_section", 36, 72 + 80 * (j + 0.5), 90.0, "counter", 80, 72), "wood")
+	# Round 19 (the player: "the worktop should be one piece"): one slab of wood over the whole run, north and
+	# west, in place of the pieces' own tops (it wraps them: 6 cm thick, 1 cm proud), with a hole for the basin.
+	var wt := mat_named("wood", Color8(0xd8, 0xa2, 0x58))
+	var top := _worktop + 0.01
+	_worktop = top
+	var z0 := top * 100.0 - 6.0
+	var hw := 33.0 * (sink.scale.x if sink else 1.0)  # the basin: half its width and depth, cm
+	var hd := 23.0 * (sink.scale.z if sink else 1.0)
+	for sl in [[0.0, sink_c - hw, 0.0, 76.0], [sink_c + hw, 830.0, 0.0, 76.0], [sink_c - hw, sink_c + hw, 0.0, 36.0 - hd],
+			[sink_c - hw, sink_c + hw, 36.0 + hd, 76.0], [0.0, 76.0, 76.0, 312.0]]:
+		var sx: float = sl[1] - sl[0]
+		var sy: float = sl[3] - sl[2]
+		var slab := box("Worktop", W((sl[0] + sl[1]) / 2.0, (sl[2] + sl[3]) / 2.0, z0 + 3.0), Vector3(sx / 100.0, 0.06, sy / 100.0), wt, furn)
+		slab.get_child(0).set_meta("surface", "counter")
 	# round 16 (asked): 15 cm out from the wall — a gap behind it to hide in
 	# (and 104 cm wide, off the east wall too: the way into the gap behind it is down the side by that wall —
 	# the worktop closes the other side)
