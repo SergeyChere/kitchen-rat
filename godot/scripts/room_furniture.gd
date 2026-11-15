@@ -52,12 +52,16 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 	var n := b.spawn(model, at, r, b.furn)
 	if n == null:
 		return null
-	if absf(absf(r) - 90.0) < 1.0:
-		b.fit(n, d, w)
+	var turned := absf(absf(r) - 90.0) < 1.0
+	var fw := d if turned else w  # the rect along the model's own x and z
+	var fd := w if turned else d
+	if SHAPE.has(model):
+		_fit_keep(n, fw, fd, height, SHAPE[model])
+		_back_to_wall(n, at, x, y, w, d)
 	else:
-		b.fit(n, w, d)
-	if height > 0.0:
-		_fit_height(n, height)
+		b.fit(n, fw, fd)
+		if height > 0.0:
+			_fit_height(n, height)
 	b.collide(n, surface)
 	if tex != "":
 		# demo polish: a real surface for the model (fabric sofa, cardboard box, ...), tinted by the
@@ -65,6 +69,48 @@ func place(model: String, f: Dictionary, surface: String, height := 0.0, rot = n
 		var tint := LevelBuilder.hex(int(f.get("color", 0xffffff))) if f.has("color") else Color.WHITE
 		b.apply_texture(n, tex, tint)
 	return n
+
+
+## Round 22 (the player: "the TV stand is stretched along its length, the tall cabinet squeezed in width"): the
+## painted models keep their own proportions. The height stays as fitted (her jumps depend on it); width and depth
+## follow the rect only so far — [along its own x, along its own z] times its own proportion at most — and a piece
+## that comes out bigger than its rect keeps its back to the wall and stands further into the room.
+const SHAPE := {
+	"furniture/tv_stand": [1.08, 1.35],
+	"furniture/bookcase": [1.15, 1.3],
+	"furniture/sofa": [1.3, 1.3],
+	"furniture/coffee_table": [1.3, 1.3],
+	"furniture/armchair": [1.2, 1.2],
+	"furniture/sideboard": [1.2, 1.3],
+	"furniture/low_shelf": [1.25, 1.35],
+	"furniture/washer": [1.1, 1.35],
+	"furniture/dryer": [1.1, 1.35],
+	"furniture/boiler": [1.3, 1.1],
+	"furniture/desk": [1.3, 1.3],
+	"furniture/bed_kid": [1.2, 1.2],
+	"furniture/laundry_basket": [1.15, 1.15],
+	"furniture/beanbag": [1.1, 1.1],
+}
+
+
+func _fit_keep(n: Node3D, fw: float, fd: float, height: float, lim: Array) -> void:
+	b.fit_keep(n, fw, fd, height, lim)
+
+
+## A piece that came out bigger than its rect: its back stays against the wall, and nothing goes through a wall.
+func _back_to_wall(n: Node3D, at: Vector3, x: float, y: float, w: float, d: float) -> void:
+	var bb := LevelBuilder.world_aabb(n)
+	var shift := Vector3.ZERO
+	match side(x, y, w, d):
+		"n": shift.z = maxf(0.0, (at.z - d / 200.0) - bb.position.z)
+		"s": shift.z = minf(0.0, (at.z + d / 200.0) - bb.end.z)
+		"w": shift.x = maxf(0.0, (at.x - w / 200.0) - bb.position.x)
+		"e": shift.x = minf(0.0, (at.x + w / 200.0) - bb.end.x)
+	var hx := Nights.ROOM_W / 200.0 - 0.07
+	var hz := Nights.ROOM_D / 200.0 - 0.07
+	shift.x += maxf(0.0, -hx - (bb.position.x + shift.x)) + minf(0.0, hx - (bb.end.x + shift.x))
+	shift.z += maxf(0.0, -hz - (bb.position.z + shift.z)) + minf(0.0, hz - (bb.end.z + shift.z))
+	n.global_position += shift
 
 
 ## Round 16 (asked: "move the fridge, the washing machines and so on away from the wall, so the rat can hide
@@ -487,7 +533,7 @@ func build(list: Array) -> void:
 			"cabinetTall":
 				# modelled long along its own Z, front toward +X: as is against the west wall
 				var n := b.spawn("furniture/cabinet_tall", W(cx, cy) + _gap_behind(x, y, w, d), 0.0 if x < 480.0 else 180.0, b.furn)
-				b.fit(n, w, d)
+				_fit_keep(n, w, d, 0.0, [1.3, 1.08])  # (its depth is its own x, its width along the wall its z)
 				b.collide(n)
 			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)

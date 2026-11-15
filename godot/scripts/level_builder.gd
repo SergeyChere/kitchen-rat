@@ -543,6 +543,19 @@ func fit(n: Node3D, w: float, d: float, h := 0.0) -> void:
 	n.scale = s
 
 
+## Round 22: like fit, but a painted model keeps its own proportions within lim = [along x, along z]: its height
+## stays (or becomes h), its width and depth follow the rect at most that many times their own proportion.
+func fit_keep(n: Node3D, w: float, d: float, h: float, lim: Array) -> void:
+	var bb := aabb_of(n)
+	if bb.size.x < 0.0001 or bb.size.y < 0.0001 or bb.size.z < 0.0001:
+		fit(n, w, d, h)
+		return
+	var sy := n.scale.y if h <= 0.0 else h / 100.0 / bb.size.y
+	var ax: float = lim[0]
+	var az: float = lim[1]
+	n.scale = Vector3(clampf(w / 100.0 / bb.size.x, sy / ax, sy * ax), sy, clampf(d / 100.0 / bb.size.z, sy / az, sy * az))
+
+
 ## Static collision from the meshes, plus an optional surface id ("chair", "table"…) the rat can stand on.
 ## Furniture and props (under furn / decor) are split into their parts (legs, top, seat…): every part that is
 ## box-like (fills at least 65% of its bounding box) gets a solid box, the rest (bowls, curved things) a two-sided
@@ -658,7 +671,10 @@ func furn_piece(path: String, x: float, y: float, rot: float, surface: String, w
 	var n := spawn(path, W(x, y), rot, furn)
 	if n == null:
 		return null
-	fit(n, w, d, h)
+	if RoomFurniture.SHAPE.has(path) and w > 0.0 and d > 0.0:
+		fit_keep(n, w, d, h, RoomFurniture.SHAPE[path])
+	else:
+		fit(n, w, d, h)
 	if surface in ["fridge", "cabinet"]:
 		collide_box(n, surface)  # closed boxes: no way inside, a flat top to walk on
 	else:
@@ -1896,8 +1912,13 @@ func _nest_corner() -> void:
 		return true
 	if free.call(30, 455, 60):
 		# (the painted cabinet, like room_furniture's cabinetTall, faces its own +X: unturned against the west
-		# wall it faces the room; 55 deep, 80 along the wall — its own proportions, not squeezed)
-		furn_piece("furniture/cabinet_tall", 30, 455, 0.0, "cabinet", 55, 80)
+		# wall it faces the room. Round 22, "still squeezed in width": 55 deep, and as wide along the wall as its own
+		# proportions make it at its height)
+		var cab := spawn("furniture/cabinet_tall", W(30, 455), 0.0, furn)
+		if cab:
+			var cb := aabb_of(cab)
+			cab.scale = Vector3(0.55 / maxf(cb.size.x, 0.001), 1.0, 1.0)
+			collide_box(cab, "cabinet")
 	if free.call(42, 562, 40):
 		collide(spawn("furniture/plant", W(42, 562), 0.0, decor))
 	if free.call(112, 566, 35):

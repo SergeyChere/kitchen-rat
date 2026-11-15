@@ -398,6 +398,60 @@ func _run(host: Node) -> void:
 		await _juice(host)
 		host.get_tree().quit()
 		return
+	if name == "stretch":  # dev: how far each piece of furniture is stretched away from its own proportions
+		await _wait(host, 0.2)
+		for n in g._builder.furn.get_children():
+			if not n is Node3D:
+				continue
+			var sc := (n as Node3D).scale
+			var y := maxf(sc.y, 0.0001)
+			var tag := ""
+			if absf(sc.x / y - 1.0) > 0.15 or absf(sc.z / y - 1.0) > 0.15:
+				tag = "  <-- stretched"
+			print("stretch %-26s x %.2f z %.2f (of y)%s" % [n.name, sc.x / y, sc.z / y, tag])
+		host.get_tree().quit()
+		return
+	if name == "fuzz":  # dev: drive her at the furniture with random keys; report where she sinks in or sticks
+		await _fuzz(host)
+		host.get_tree().quit()
+		return
+	if name == "slab":  # dev: rays up and down through the kitchen table's top
+		await _wait(host, 0.3)
+		var c := Nights.world(720.0, 445.0, 0.0)
+		for h in [0.70, 0.74, 0.76, 0.77, 0.78, 0.79, 0.80, 0.82]:
+			var p := Vector3(c.x, h, c.z)
+			var q := PhysicsRayQueryParameters3D.create(p, p + Vector3.UP * 1.0, 1)
+			q.hit_back_faces = true
+			var up := g.get_world_3d().direct_space_state.intersect_ray(q)
+			var q2 := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 1.0, p, 1)
+			var down := g.get_world_3d().direct_space_state.intersect_ray(q2)
+			print("slab h %.2f: up %s n %s | from above %s free %s" % [h, "-" if up.is_empty() else "%.3f" % up.position.y, "-" if up.is_empty() else str(up.normal), "-" if down.is_empty() else "%.3f" % down.position.y, g.sphere_free(p, 0.01)])
+		host.get_tree().quit()
+		return
+	if name == "colliders":  # dev: what collision each piece of furniture got, and hollow insides she could end up in
+		await _wait(host, 0.3)
+		for n in g._builder.furn.get_children():
+			var boxes := 0
+			var tris := 0
+			for cs in n.find_children("*", "CollisionShape3D", true, false):
+				if cs.shape is BoxShape3D: boxes += 1
+				elif cs.shape is ConcavePolygonShape3D: tris += (cs.shape as ConcavePolygonShape3D).get_faces().size() / 3
+			var bb := LevelBuilder.world_aabb(n)
+			var inside := 0
+			var total := 0
+			for ix in 8:
+				for iz in 8:
+					for iy in 6:
+						var p := bb.position + Vector3((ix + 0.5) / 8.0 * bb.size.x, (iy + 0.5) / 6.0 * bb.size.y, (iz + 0.5) / 8.0 * bb.size.z)
+						total += 1
+						var q := PhysicsRayQueryParameters3D.create(p, p + Vector3.UP * 3.0, 1)
+						q.hit_back_faces = true
+						var hit := g.get_world_3d().direct_space_state.intersect_ray(q)
+						if not hit.is_empty() and hit.normal.y > 0.3:
+							inside += 1
+			print("coll %-28s boxes %3d  tris %5d  size %s  hollow %d/%d" % [n.name, boxes, tris, bb.size, inside, total])
+		host.get_tree().quit()
+		return
 	if name == "tops":  # dev: TOPS="x,y;x,y" prints what is on top under each spot (room cm)
 		await _wait(host, 0.3)
 		for spot in OS.get_environment("TOPS").split(";"):
@@ -1123,6 +1177,108 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Dev: random runs at the furniture. Every run starts on free floor next to a piece and holds random keys for a few
+## seconds; a frame where her body is sunk into something for 0.6 s, or held keys that move her nowhere for 1.5 s,
+## is reported with where she was and what she was touching.
+func _fuzz(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 9999.0
+	await _wait(host, 0.4)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(OS.get_environment("SEED")) if OS.get_environment("SEED") != "" else 7
+	var pieces: Array = []
+	for n in g._builder.furn.get_children():
+		var bb := LevelBuilder.world_aabb(n)
+		if bb.size.length() > 0.2 and bb.size.length() < 6.0:
+			pieces.append([n, bb])
+	var runs := int(OS.get_environment("RUNS")) if OS.get_environment("RUNS") != "" else 60
+	var sunk_n := 0
+	var stuck_n := 0
+	for run in runs:
+		var pick: Array = pieces[rng.randi() % pieces.size()]
+		var bb: AABB = pick[1]
+		var start := Vector3.INF
+		for tries in 30:
+			var side := rng.randi() % 4
+			var t := rng.randf()
+			var p := Vector3.ZERO
+			match side:
+				0: p = Vector3(lerpf(bb.position.x, bb.end.x, t), 0.0, bb.position.z - rng.randf_range(0.12, 0.5))
+				1: p = Vector3(lerpf(bb.position.x, bb.end.x, t), 0.0, bb.end.z + rng.randf_range(0.12, 0.5))
+				2: p = Vector3(bb.position.x - rng.randf_range(0.12, 0.5), 0.0, lerpf(bb.position.z, bb.end.z, t))
+				3: p = Vector3(bb.end.x + rng.randf_range(0.12, 0.5), 0.0, lerpf(bb.position.z, bb.end.z, t))
+			if absf(p.x) < Nights.ROOM_W / 200.0 - 0.15 and absf(p.z) < Nights.ROOM_D / 200.0 - 0.15 and g.sphere_free(p + Vector3.UP * 0.08, 0.06):
+				start = p
+				break
+		if start == Vector3.INF:
+			continue
+		var to := bb.get_center() - start
+		to.y = 0.0
+		r.teleport(start, Nights.yaw_to(to.normalized()))
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.15)
+		var keys := ["forward"]
+		var sunk_t := 0.0
+		var last := r.global_position
+		var still_t := 0.0
+		var reported := false
+		for f in 200:  # ~3.3 s
+			if f % 20 == 0:
+				for k in ["forward", "left", "right", "run", "back"]:
+					Input.action_release(k)
+				keys = ["forward"]
+				if rng.randf() < 0.35: keys.append("left" if rng.randf() < 0.5 else "right")
+				if rng.randf() < 0.3: keys.append("run")
+				if rng.randf() < 0.1: keys = ["back"]
+				for k in keys:
+					Input.action_press(k)
+			if rng.randf() < 0.04:
+				Input.action_press("jump")
+			elif Input.is_action_pressed("jump") and rng.randf() < 0.3:
+				Input.action_release("jump")
+			var was_jumping := r.jumping
+			var p0 := r.global_position
+			var s0 := r.surface_id
+			await host.get_tree().physics_frame
+			if str(run) in OS.get_environment("TRACE").split(","):
+				if r.jumping and not was_jumping:
+					print("  trace f%d jump %s from %s to %s" % [f, r._kind, r._from, r._to])
+				elif not r.jumping and r.global_position.distance_to(p0) > 0.05:
+					print("  trace f%d JUMPED %s -> %s (not a jump)" % [f, p0, r.global_position])
+				if r.surface_id != s0:
+					print("  trace f%d surface %s -> %s at %s" % [f, s0, r.surface_id, r.global_position])
+				if r.overlapping() and not r.jumping and f % 10 == 0:
+					print("  trace f%d sunk at %s vel %s floor %s" % [f, r.global_position, r.velocity, r.is_on_floor()])
+			var sunk := r.overlapping() and not r.jumping
+			sunk_t = sunk_t + 1.0 / 60.0 if sunk else 0.0
+			var moved := r.global_position.distance_to(last)
+			last = r.global_position
+			still_t = still_t + 1.0 / 60.0 if (moved < 0.0015 and not r.jumping) else 0.0
+			if not reported and (sunk_t > 0.6 or still_t > 1.5):
+				reported = true
+				var what := ""
+				var q := PhysicsShapeQueryParameters3D.new()
+				var sh := SphereShape3D.new()
+				sh.radius = 0.07
+				q.shape = sh
+				q.transform = Transform3D(Basis(), r.global_position + Vector3.UP * 0.06)
+				q.exclude = [r.get_rid()]
+				for hit in g.get_world_3d().direct_space_state.intersect_shape(q, 4):
+					var c: Node = hit.collider
+					var up: Node = c
+					while up and up.get_parent() != g._builder.furn and up.get_parent() != null:
+						up = up.get_parent()
+					what += "%s(%s) " % [up.name if up else "?", c.get_class()]
+				if sunk_t > 0.6:
+					sunk_n += 1
+				else:
+					stuck_n += 1
+				print("fuzz %s run %d near %s at %s y %.3f surf %s keys %s touching %s" % ["SUNK" if sunk_t > 0.6 else "STUCK", run, pick[0].name, r.global_position, r.global_position.y, r.surface_id, keys, what])
+		for k in ["forward", "left", "right", "run", "back", "jump"]:
+			Input.action_release(k)
+	print("fuzz done: %d runs, %d sunk, %d stuck" % [runs, sunk_n, stuck_n])
 
 
 ## Round 21, night 8: G by the spoon's bowl drops the chicken leg in it; F at the handle flings it off the table in an
