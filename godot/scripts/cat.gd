@@ -2,11 +2,12 @@ class_name CatAI
 extends Agent
 ## The cat, ported from the prototype's updateCat. Modes:
 ## away · sleep (a sleep meter that noise lowers; half awake it lifts its head and looks) · eat → to bed ·
-## wander / idle · investigate (a noise) · search · chase · watch (the rat is up high: it waits below).
+## wander / idle · investigate (a noise) · search · chase · watch (the rat is up high: it waits below) · play (a ball of
+## yarn rolled past it: it trots after it and bats it about, seeing only what is right under its nose).
 ## It can't climb (only at 3 stars of the wanted level it jumps up onto a table, chair or counter after her), can't
 ## get under furniture, and loses you in hiding spots. Noises: the louder and the closer, the more they alert it.
 
-enum Mode { AWAY, SLEEP, EAT, TO_BED, WANDER, IDLE, INVESTIGATE, SEARCH, CHASE, WATCH }
+enum Mode { AWAY, SLEEP, EAT, TO_BED, WANDER, IDLE, INVESTIGATE, SEARCH, CHASE, WATCH, PLAY }
 
 var mode := Mode.AWAY
 ## The painted cat sleeps as a loaf: its clips keep the body as it stands, and the model is sunk until the belly is
@@ -39,6 +40,11 @@ var _jto := Vector3.ZERO
 var _top := false  # up on a table / counter after the rat
 var _top_t := 0.0
 var _jump_cd := 0.0
+var yarn: YarnBall  # what it plays with (Mode.PLAY)
+var _play := 0.0
+var _bat := 0.0
+var _swipe := 0.0
+var _play_cd := 0.0
 
 
 func awake() -> bool: return mode != Mode.AWAY and mode != Mode.SLEEP
@@ -68,7 +74,10 @@ func setup(n: Dictionary) -> void:
 
 
 func _sense() -> float: return float(night.get("catSense", 1.0))
-func _range() -> float: return ((1.5 + G.stars * 0.1) if (mode == Mode.IDLE and _sit > 0.5) else (2.6 + G.stars * 0.15)) * _sense()
+func _range() -> float:
+	if mode == Mode.PLAY:
+		return 0.5  # busy: it sees only what is right under its nose
+	return ((1.5 + G.stars * 0.1) if (mode == Mode.IDLE and _sit > 0.5) else (2.6 + G.stars * 0.15)) * _sense()
 func _rat_hidden() -> bool: return rat.hidden() or rat.in_nest
 
 
@@ -86,7 +95,7 @@ func hear(at: Vector3, radius: float, big: bool, amt: float, from_knock: bool) -
 			wake_up(at)
 		return
 	var heard := radius * _sense()
-	if d >= heard or mode == Mode.CHASE or mode == Mode.WATCH:
+	if d >= heard or mode == Mode.CHASE or mode == Mode.WATCH or (mode == Mode.PLAY and not big):
 		return
 	# how much it heard: louder (amt, big) and closer count more; a faint far squeak only turns its head
 	var k := (1.0 - d / heard) * clampf(amt, 0.1, 1.0) * (1.6 if big else 1.0)
@@ -139,6 +148,50 @@ func bonk_at_hole() -> void:
 	G.bubble_on("Mrrowf!", self, 0.56, 1.6)
 	Sfx.play("thud", global_position + Vector3.UP * 0.2)
 	Sfx.play("meow_angry", global_position + Vector3.UP * 0.3, -6.0)
+
+
+## A ball of yarn rolled past it (YarnBall): it forgets the rest and plays. Not asleep, not mid-chase, not up on a
+## table, not right after it got bored of it.
+func play_with(ball: YarnBall) -> bool:
+	if mode == Mode.PLAY:
+		return yarn == ball
+	if not awake() or mode in [Mode.EAT, Mode.TO_BED, Mode.CHASE, Mode.WATCH] or _play_cd > 0.0 or dazed > 0.0 \
+			or _jt >= 0.0 or _top:
+		return false
+	mode = Mode.PLAY
+	yarn = ball
+	_play = 9.0; _bat = 0.5; _repath = 0.0; _sit = 0.0
+	alert = minf(alert, 0.2)
+	G.bubble_on("Mrrp? Yarn!", self, 0.5, 1.4)
+	Sfx.play("meow_q", global_position + Vector3.UP * 0.3, 0.0, 1.2)
+	return true
+
+
+func _tick_play(dt: float) -> void:
+	_play -= dt
+	_swipe -= dt
+	if not is_instance_valid(yarn) or _play <= 0.0:
+		mode = Mode.WANDER; path.clear(); alert = 0.0; _play_cd = 6.0; yarn = null
+		G.bubble_on("Mrr.", self, 0.5, 1.0)
+		return
+	var to := yarn.global_position - global_position
+	to.y = 0.0
+	if to.length() > 0.24:
+		_repath -= dt
+		if _repath <= 0.0:
+			_repath = 0.3
+			path_to(yarn.global_position)
+		follow(1.25, dt)  # trotting after it
+		return
+	path.clear()
+	turn(to, dt * 6.0)
+	_bat -= dt
+	if _bat <= 0.0:
+		_bat = randf_range(0.9, 1.6)
+		_swipe = 0.45
+		yarn.bat(global_position)
+		if randf() < 0.4:
+			G.bubble_on("*bat*" if randf() < 0.5 else "Mrrp!", self, 0.45, 0.8)
 
 
 func after_catch() -> void:
@@ -285,6 +338,7 @@ func _process(dt: float) -> void:
 		return
 
 	_jump_cd -= dt
+	_play_cd = maxf(_play_cd - dt, 0.0)
 	if _jt >= 0.0 or _top:
 		_tick_top(dt, dist)
 		return
@@ -353,6 +407,8 @@ func _process(dt: float) -> void:
 			_sit = maxf(0.0, _sit - dt * 2.0)
 			if _search <= 0.0:
 				mode = Mode.WANDER; alert = minf(alert, 0.2); path.clear()
+		Mode.PLAY:
+			_tick_play(dt)
 		Mode.IDLE:
 			_idle -= dt
 			_sit = minf(1.0, _sit + dt * 2.0) if _idle > 1.2 else maxf(0.0, _sit - dt * 2.0)
@@ -370,7 +426,8 @@ func _process(dt: float) -> void:
 	if mode == Mode.CHASE:
 		G.run.chased = true
 
-	if move_anim(): pass
+	if mode == Mode.PLAY and _swipe > 0.0: play("pounce", 0.08)
+	elif move_anim(): pass
 	elif mode == Mode.SEARCH: play("look_around")
 	else: play("idle_sit", 0.3)
 

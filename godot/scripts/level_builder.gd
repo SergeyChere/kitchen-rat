@@ -2495,6 +2495,11 @@ func _toys() -> void:
 			body.add_child(cs)
 			g.knockables.append(body)
 		ti += 1
+	for y in night.get("yarn", []):  # round 21: a ball of yarn for the cat to play with (YarnBall)
+		var ball := YarnBall.new()
+		ball.name = "Yarn ball"
+		decor.add_child(ball)
+		ball.setup(self, W(float(y.x), float(y.y)), Color(str(y.get("c", "#c8465a"))))
 
 
 ## Round 20: helium balloons tied to chair legs — the party night's gadget (HeliumBalloon).

@@ -52,7 +52,7 @@ jobs:
         run: |
           # Some checks are timed against real frames (coyote time, jump buffer) and miss now and then on a busy
           # runner: a test gets a second try, and only fails the build when it fails twice.
-          for nt in 1:bugs 1:rules 1:physics 1:juice 1:sink 1:under 1:walk 1:climb 1:upper 13:toycar 14:balloon; do
+          for nt in 1:bugs 1:rules 1:physics 1:juice 1:sink 1:under 1:walk 1:climb 1:upper 3:yarn 13:toycar 14:balloon; do
             n=${nt%%:*}; t=${nt##*:}
             ok=0
             for try in 1 2; do

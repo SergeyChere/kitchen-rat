@@ -398,6 +398,19 @@ func _run(host: Node) -> void:
 		await _juice(host)
 		host.get_tree().quit()
 		return
+	if name == "tops":  # dev: TOPS="x,y;x,y" prints what is on top under each spot (room cm)
+		await _wait(host, 0.3)
+		for spot in OS.get_environment("TOPS").split(";"):
+			var v := spot.split(",")
+			var p := Nights.world(float(v[0]), float(v[1]), 220.0)
+			var hit := g.ray(p, p + Vector3.DOWN * 3.0)
+			print("top %s: %s" % [spot, "-" if hit.is_empty() else "%.1f cm on %s" % [hit.position.y * 100.0, g.surface_of(hit.collider)]])
+		host.get_tree().quit()
+		return
+	if name == "yarn":  # night 3: the cat plays with a rolled ball of yarn
+		await _yarn(host)
+		host.get_tree().quit()
+		return
 	if name == "toycar":  # night 13: drive the wind-up car into the block tower
 		await _toycar(host)
 		host.get_tree().quit()
@@ -1101,6 +1114,60 @@ func _juice(host: Node) -> void:
 	_check("into the nest with the cat right behind: a near miss, the cat dazed", g.near_misses == nm0 + 1 and c.dazed > 0.0, "misses %d dazed %.2f mode %d" % [g.near_misses - nm0, c.dazed, c.mode])
 	await _wait(host, 2.8)
 	_check("the dazed cat comes round and stops chasing", c.dazed <= 0.0 and c.mode != CatAI.Mode.CHASE, "dazed %.2f mode %d" % [c.dazed, c.mode])
+
+
+## Round 21, night 3: running into the ball of yarn rolls it; the cat sees it rolling and plays — trots to it, bats it
+## about — and while it plays it doesn't see her a metre away; after a while it gets bored of it.
+func _yarn(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 999.0
+	await _wait(host, 0.5)
+	var ball: YarnBall = null
+	for n in g.find_children("*", "YarnBall", true, false):
+		ball = n
+		break
+	_check("night 3 has a ball of yarn", ball != null)
+	if ball == null:
+		return
+	var cat := g.cat
+	var b0 := ball.global_position
+	cat.global_position = Vector3(b0.x + 1.6, 0.0, b0.z)
+	cat.mode = CatAI.Mode.IDLE
+	cat._idle = 60.0
+	cat.alert = 0.0
+	r.teleport(Vector3(b0.x - 0.26, 0.0, b0.z), Nights.yaw_to(Vector3.RIGHT))
+	g.cam.snap(r.rotation.y)
+	await _wait(host, 0.3)
+	Input.action_press("run")
+	Input.action_press("forward")
+	await _wait(host, 0.35)
+	Input.action_release("forward")
+	Input.action_release("run")
+	await _wait(host, 0.3)
+	_check("running into it rolls the yarn", ball.global_position.distance_to(b0) > 0.15, "moved %.2f" % ball.global_position.distance_to(b0))
+	await _wait(host, 0.4)
+	_check("the cat sees it rolling and goes to play", cat.mode == CatAI.Mode.PLAY and g.tasks.flag_value("yarn") > 0, "mode %d flag %d" % [cat.mode, g.tasks.flag_value("yarn")])
+	r.teleport(g.hole_point() + Vector3(0.0, 0.0, -0.3), 0.0)
+	var batted := false
+	for i in 80:
+		await _wait(host, 0.1)
+		if cat.global_position.distance_to(ball.global_position) < 0.32 and ball.linear_velocity.length() > 0.3:
+			batted = true
+			break
+	_check("it trots to the ball and bats it about", batted, "d %.2f" % cat.global_position.distance_to(ball.global_position))
+	g.grace_t = 0.0
+	var look := ball.global_position - cat.global_position
+	look.y = 0.0
+	r.teleport(cat.global_position + look.normalized() * 1.0, 0.0)
+	await _wait(host, 0.7)
+	_check("at play it doesn't see her a metre away", cat.mode == CatAI.Mode.PLAY and not cat.sees and cat.alert < 0.5, "mode %d sees %s alert %.2f" % [cat.mode, cat.sees, cat.alert])
+	g.grace_t = 999.0
+	r.teleport(g.hole_point() + Vector3(0.0, 0.0, -0.3), 0.0)
+	for i in 120:
+		await _wait(host, 0.1)
+		if cat.mode != CatAI.Mode.PLAY:
+			break
+	_check("after a while it gets bored and wanders off", cat.mode != CatAI.Mode.PLAY, "mode %d" % cat.mode)
 
 
 ## Round 20, night 13: F beside the toy car hops her in, W drives it, it topples the block tower, Space hops out.

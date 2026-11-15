@@ -197,6 +197,14 @@
     "reveal": -1
    },
    {
+    "text": "Roll the ball of yarn to the cat",
+    "hint": "Run into the yarn behind the sofa and it rolls. A cat at play only sees what’s right under its nose: that’s your moment.",
+    "type": "flag",
+    "arg": "yarn",
+    "n": 0,
+    "reveal": -1
+   },
+   {
     "text": "Collect 4 cheeses from around the room",
     "hint": "One on the TV stand, one on the coffee table, one on the footstool and one behind the armchair.",
     "type": "pickN",
@@ -483,5 +491,12 @@
     "M"
    ]
   ]
- }
+ },
+ "yarn": [
+  {
+   "x": 330,
+   "y": 490,
+   "c": "#c8465a"
+  }
+ ]
 }
