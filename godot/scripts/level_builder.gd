@@ -1893,7 +1893,9 @@ func _nest_corner() -> void:
 				return false
 		return true
 	if free.call(30, 455, 60):
-		furn_piece("furniture/cabinet_tall", 30, 455, 90.0, "cabinet", 60, 45)
+		# (the painted cabinet, like room_furniture's cabinetTall, faces its own +X: unturned against the west
+		# wall it faces the room; 55 deep, 80 along the wall — its own proportions, not squeezed)
+		furn_piece("furniture/cabinet_tall", 30, 455, 0.0, "cabinet", 55, 80)
 	if free.call(42, 562, 40):
 		collide(spawn("furniture/plant", W(42, 562), 0.0, decor))
 	if free.call(112, 566, 35):
