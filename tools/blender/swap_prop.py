@@ -5,6 +5,8 @@
     ... --upright   (a candle that came in leaning: stood up along its long axis)
     ... --flat      (food that came in tilted: laid on its broadest side)
     ... --height 0.92  (an exact height in metres)
+    ... --crisp     (furniture: flat faces kept flat, hard edges kept hard, the paint baked onto a plain unwrap)
+    ... --tex 1024  (texture size, 512 if not given)
     ... --turn 90   (turn it by hand, degrees about the up axis; 0 = as it came, no automatic turn)
 
 The old model (godot/assets/models/<name>.glb, its first copy kept in art/props/base/) gives the size: the new one
@@ -33,7 +35,56 @@ def bounds(objs):
     return lo, hi
 
 
-def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, height=0.0, turn=None):
+def rebake(lo, hi, tex):
+    """Meshy's texture is a mosaic of thousands of tiny islands packed edge to edge: scaled down (or seen from afar,
+    through the mipmaps) neighbours of other colours bleed into each other, and the model is speckled along every
+    seam. So the cut-down model gets a new, plain unwrap (a few big islands with a margin round each) and the paint
+    is baked across from the model as it came."""
+    sc = bpy.context.scene
+    bpy.ops.object.select_all(action="DESELECT")
+    lo.select_set(True)
+    bpy.context.view_layer.objects.active = lo
+    while lo.data.uv_layers:
+        lo.data.uv_layers.remove(lo.data.uv_layers[0])
+    lo.data.uv_layers.new(name="UVMap")
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.006)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    img = bpy.data.images.new("Paint", tex, tex, alpha=False)
+    mat = bpy.data.materials.new("Paint")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    node = nt.nodes.new("ShaderNodeTexImage")
+    node.image = img
+    nt.nodes.active = node
+    lo.data.materials.clear()
+    lo.data.materials.append(mat)
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 1
+    sc.render.bake.use_selected_to_active = True
+    sc.render.bake.margin = 12
+    sc.render.bake.margin_type = "EXTEND"
+    size = max(lo.dimensions)
+    sc.render.bake.cage_extrusion = size * 0.02
+    sc.render.bake.max_ray_distance = size * 0.06
+    hi.select_set(True)
+    lo.select_set(True)
+    bpy.context.view_layer.objects.active = lo
+    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
+    img.pack()
+    nt.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Metallic"].default_value = 0.0
+    bsdf.inputs["Roughness"].default_value = 0.9
+    bpy.data.objects.remove(hi)
+    bpy.ops.object.select_all(action="DESELECT")
+    lo.select_set(True)
+    bpy.context.view_layer.objects.active = lo
+
+
+def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, height=0.0, turn=None, crisp=False, tex=512):
     path = os.path.join(MODELS, name + ".glb")
     keep = os.path.join(BASE, name + ".glb")
     if os.path.exists(path) and not os.path.exists(keep):
@@ -78,12 +129,32 @@ def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, heig
             ax = -ax
         me.data.transform(ax.rotation_difference(Vector((0, 0, 1))).to_matrix().to_4x4())
         me.data.update()
+    hi = None
+    if crisp:  # the model as it came, kept aside: its paint is baked onto the cut-down one below
+        hi = me.copy()
+        hi.data = me.data.copy()
+        bpy.context.scene.collection.objects.link(hi)
+        # (glTF splits the vertices along every seam of that mosaic: welded again, so the surface is one skin to
+        # cut down and to unwrap)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=0.00002)
+        bpy.ops.object.mode_set(mode="OBJECT")
     t0 = sum(len(p.vertices) - 2 for p in me.data.polygons)
     if t0 > tris:
-        d = me.modifiers.new("cut", "DECIMATE")
-        d.ratio = tris / t0
-        d.use_collapse_triangulate = True
-        bpy.ops.object.modifier_apply(modifier="cut")
+        if crisp:  # furniture: flat faces first melted into single faces (they stay flat), then the rest collapsed
+            d = me.modifiers.new("flat", "DECIMATE")
+            d.decimate_type = "DISSOLVE"
+            d.angle_limit = 0.07
+            bpy.ops.object.modifier_apply(modifier="flat")
+            t = me.modifiers.new("tri", "TRIANGULATE")
+            bpy.ops.object.modifier_apply(modifier="tri")
+            t0 = len(me.data.polygons)
+        if t0 > tris:
+            d = me.modifiers.new("cut", "DECIMATE")
+            d.ratio = tris / t0
+            d.use_collapse_triangulate = True
+            bpy.ops.object.modifier_apply(modifier="cut")
     for m in me.data.materials:
         bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None) if m and m.use_nodes else None
         if bsdf:
@@ -92,13 +163,17 @@ def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, heig
                     m.node_tree.links.remove(link)
             bsdf.inputs["Metallic"].default_value = 0.0
             bsdf.inputs["Roughness"].default_value = 0.9
+    for p in me.data.polygons:
+        p.use_smooth = True
+    if crisp:
+        # edges sharper than 40 degrees stay edges (a cabinet's corners), the rest shades smooth
+        me.data.set_sharp_from_angle(angle=0.7)
+        rebake(me, hi, tex)
     for img in list(bpy.data.images):
         if img.users == 0:
             bpy.data.images.remove(img)
-        elif img.size[0] > 512:
-            img.scale(512, 512)
-    for p in me.data.polygons:
-        p.use_smooth = True
+        elif img.size[0] > tex:
+            img.scale(tex, tex)
     nlo, nhi = bounds([me])
     o, n = ohi - olo, nhi - nlo
     if turn is not None:  # turned by hand (0: as it came — its front already the old one's way)
@@ -128,7 +203,8 @@ def main(name, src, tris, keep_height, size=0.0, upright=False, flat=False, heig
     me.location = Vector((oc.x - nc.x, oc.y - nc.y, olo.z - nlo.z))
     bpy.ops.object.transform_apply(location=True)
     me.name = os.path.basename(name)
-    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_yup=True)
+    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_yup=True,
+                              export_image_format="JPEG", export_jpeg_quality=90)
     print("swapped", name, "tris", sum(len(p.vertices) - 2 for p in me.data.polygons), "size", tuple(round(x, 3) for x in (nhi - nlo) * 1.0))
 
 
@@ -138,4 +214,5 @@ if __name__ == "__main__":
     size = float(a[a.index("--size") + 1]) if "--size" in a else 0.0
     main(a[0], a[1], tris, "--keep-height" in a, size, "--upright" in a, "--flat" in a,
          float(a[a.index("--height") + 1]) if "--height" in a else 0.0,
-         float(a[a.index("--turn") + 1]) if "--turn" in a else None)
+         float(a[a.index("--turn") + 1]) if "--turn" in a else None, "--crisp" in a,
+         int(a[a.index("--tex") + 1]) if "--tex" in a else 512)

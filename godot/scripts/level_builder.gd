@@ -332,6 +332,12 @@ func _catchlights(m: MeshInstance3D, sk: Skeleton3D) -> void:
 	att.add_child(blink)
 
 
+## A Meshy model's own painted texture (as Godot names it when it takes it out of the .glb).
+static func is_paint(tex: Texture2D) -> bool:
+	var path := str(tex.resource_path)
+	return path.contains("_Image_") or path.contains("_Paint")
+
+
 func toonify(n: Node) -> void:
 	if _outline == null:
 		_outline = _outline_mat(OUTLINE)
@@ -372,7 +378,7 @@ func toonify(n: Node) -> void:
 					# round 14: tail, ears and paws are a clear painted pink, not a near-white that the lamps bleach
 					if mat.resource_name == "Pink" and sk.find_bone("Tail1") >= 0:
 						t.albedo_color = Color(0.83, 0.56, 0.55)
-				if not m.skin and t.albedo_texture != null and str(t.albedo_texture.resource_path).contains("_Image_"):
+				if not m.skin and t.albedo_texture != null and is_paint(t.albedo_texture):
 					t.albedo_color = Color(0.74, 0.71, 0.68)  # a painted (Meshy) prop: its pale paint bleached to white
 				# Round 14, watercolour: every plain painted thing (not the characters — their skin moves) gets the
 				# wash laid over its own colour: patches of brushwork and drying lines instead of a flat fill.
@@ -388,7 +394,10 @@ func toonify(n: Node) -> void:
 						t.uv1_scale = Vector3.ONE * (sc / 0.9)
 						t.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 				var fine := mat.resource_name.begins_with("Whisker") or mat.resource_name.begins_with("Eye")  # too thin for an outline
-				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine:
+				var painted_prop: bool = not m.skin and t.albedo_texture != null and is_paint(t.albedo_texture)
+				# (round 19: no ink shell round a painted prop — its paint has its own lines, and the shell broke into
+				# dashes along its hard edges)
+				if t.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not fine and not painted_prop:
 					t.next_pass = _outline if grow == OUTLINE else _outline_mat(grow)
 					var furry := 0.0  # fur length in metres: the rat's and the cat's coats
 					if sk and mat.resource_name in ["Grey", "White"] and Settings.quality != "low" and not OS.has_environment("NOFUR"):
