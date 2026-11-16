@@ -1416,28 +1416,32 @@ func add_working_clock(at: Vector3, rot_deg: float) -> void:
 ## patch on the floor. They only exist where the light is, so the beam reads as a volume of air.
 func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> void:
 	var length := from.y / -dir.y  # down to the floor
-	var p := CPUParticles3D.new()
+	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
+	var p := GPUParticles3D.new()
 	p.name = "Dust motes"
 	p.amount = 120
 	p.lifetime = 11.0
 	p.preprocess = 11.0
-	p.randomness = 1.0
 	p.local_coords = true
-	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(width * 0.42, height * 0.36, length * 0.46)
-	p.direction = Vector3(0.3, -1.0, 0.2)
-	p.spread = 180.0
-	p.gravity = Vector3(0, -0.003, 0)
-	p.initial_velocity_min = 0.004
-	p.initial_velocity_max = 0.022
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.3
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(width * 0.42, height * 0.36, length * 0.46)
+	pm.direction = Vector3(0.3, -1.0, 0.2)
+	pm.spread = 180.0
+	pm.gravity = Vector3(0, -0.003, 0)
+	pm.initial_velocity_min = 0.004
+	pm.initial_velocity_max = 0.022
+	pm.scale_min = 0.5
+	pm.scale_max = 1.3
 	var ramp := Gradient.new()  # each speck swims into the light and out of it again
 	ramp.set_color(0, Color(1, 1, 1, 0))
 	ramp.set_color(1, Color(1, 1, 1, 0))
 	ramp.add_point(0.25, Color(1, 1, 1, 1))
 	ramp.add_point(0.7, Color(1, 1, 1, 0.8))
-	p.color_ramp = ramp
+	var ramp_tex := GradientTexture1D.new()
+	ramp_tex.gradient = ramp
+	pm.color_ramp = ramp_tex
+	p.process_material = pm
 	var dot := GradientTexture2D.new()
 	var dg := Gradient.new()
 	dg.set_color(0, Color(1, 1, 1, 1))
@@ -1463,7 +1467,7 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	var q := QuadMesh.new()
 	q.size = Vector2(0.015, 0.015)
 	q.material = m
-	p.mesh = q
+	p.draw_pass_1 = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(p)
 	# the box lies along the beam: its long axis (z) is the moon's direction

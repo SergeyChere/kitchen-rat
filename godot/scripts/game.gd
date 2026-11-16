@@ -2400,20 +2400,32 @@ func _pause_panel() -> void:
 	UI.focus_first(box)
 
 
-## Effects for the cel-shaded look (Compatibility renderer: runs on any graphics card): only a soft glow
-## on lamps and bright spots at medium and high. No realistic ambient occlusion or global illumination: they muddy the
-## clean flat colours.
+## Effects for the watercolour look (Forward+ renderer): a soft glow on lamps and bright spots at medium and
+## high, gentle screen-space ambient occlusion for contact depth at medium and up, and screen-space indirect
+## light — the warm bounce off floors and walls — on high. Kept subtle on purpose: they shade the painting,
+## they don't repaint it. SDFGI and volumetric fog stay off: too heavy for a laptop, and the fog is faked already.
 func apply_fx() -> void:
 	if env == null:
 		return
-	var on := Settings.quality != "low"
-	env.glow_enabled = on
+	var med := Settings.quality != "low"
+	var high := Settings.quality == "high"
+	env.glow_enabled = med
 	env.glow_intensity = 0.6
 	env.glow_bloom = 0.06
 	env.glow_hdr_threshold = 1.0
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	env.ssao_enabled = false
-	env.ssil_enabled = false
+	env.ssao_enabled = med
+	env.ssao_radius = 0.5
+	env.ssao_intensity = 1.0
+	env.ssao_power = 1.0
+	env.ssao_detail = 0.5
+	env.ssao_horizon = 0.06
+	env.ssao_sharpness = 0.2
+	env.ssil_enabled = high
+	env.ssil_radius = 1.0
+	env.ssil_intensity = 0.8
+	env.ssil_sharpness = 0.05
+	env.ssil_normal_rejection = 0.5
 	env.sdfgi_enabled = false
 	env.volumetric_fog_enabled = false
 	env.fog_enabled = true

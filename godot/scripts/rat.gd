@@ -108,35 +108,42 @@ func _ready() -> void:
 
 # ---------- squash & stretch, dust (from Kenney's Starter Kit 3D Platformer, MIT) ----------
 
-var _dust_trail: CPUParticles3D
+var _dust_trail: GPUParticles3D
 
 
-func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
-	var e := CPUParticles3D.new()
+func _dust_emitter(amount: int, burst: bool) -> GPUParticles3D:
+	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
+	var e := GPUParticles3D.new()
 	e.amount = amount
 	e.lifetime = 0.55 if burst else 0.45
 	e.one_shot = burst
 	e.explosiveness = 0.95 if burst else 0.0
 	e.emitting = false
 	e.local_coords = false
-	e.direction = Vector3.UP
-	e.spread = 80.0 if burst else 40.0
-	e.initial_velocity_min = 0.08 if burst else 0.02
-	e.initial_velocity_max = 0.22 if burst else 0.06
-	e.gravity = Vector3(0, -0.05, 0)
-	e.damping_min = 0.4
-	e.damping_max = 0.8
-	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	e.emission_sphere_radius = 0.03 if burst else 0.015
-	e.scale_amount_min = 0.6
-	e.scale_amount_max = 1.2
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 80.0 if burst else 40.0
+	pm.initial_velocity_min = 0.08 if burst else 0.02
+	pm.initial_velocity_max = 0.22 if burst else 0.06
+	pm.gravity = Vector3(0, -0.05, 0)
+	pm.damping_min = 0.4
+	pm.damping_max = 0.8
+	pm.scale_min = 0.6
+	pm.scale_max = 1.2
 	var c := Curve.new()
 	c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.3))
-	e.scale_amount_curve = c
+	var scale_tex := CurveTexture.new()
+	scale_tex.curve = c
+	pm.scale_curve = scale_tex
 	var g := Gradient.new()
 	g.set_color(0, Color(0.78, 0.74, 0.68, 0.45 if burst else 0.25))
 	g.set_color(1, Color(0.78, 0.74, 0.68, 0.0))
-	e.color_ramp = g
+	var ramp_tex := GradientTexture1D.new()
+	ramp_tex.gradient = g
+	pm.color_ramp = ramp_tex
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.03 if burst else 0.015
+	e.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(0.035, 0.035)
 	var m := StandardMaterial3D.new()
@@ -151,7 +158,7 @@ func _dust_emitter(amount: int, burst: bool) -> CPUParticles3D:
 			img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - r, 0.0, 1.0) ** 1.5))
 	m.albedo_texture = ImageTexture.create_from_image(img)
 	q.material = m
-	e.mesh = q
+	e.draw_pass_1 = q
 	add_child(e)
 	e.position = Vector3(0, 0.01, 0)
 	return e

@@ -332,23 +332,27 @@ func _fire(at: Vector3, len_cm: float, wall := "n") -> void:
 		mi.position = Vector3(float(fl[0]) * span * 0.85, 0.02 + 0.15 * hgt, 0.045 + (float(fl[2]) - 0.5) * 0.03)
 	for mi in grp.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# sparks rising out of it now and then
-	var e := CPUParticles3D.new()
+	# sparks rising out of it now and then (GPU particles, Forward+: the CPU ones never rendered on the player's machine)
+	var e := GPUParticles3D.new()
 	e.name = "Sparks"
 	e.amount = 10
 	e.lifetime = 1.3
 	e.local_coords = false
-	e.direction = Vector3.UP
-	e.spread = 18.0
-	e.gravity = Vector3(0, 0.15, 0)
-	e.initial_velocity_min = 0.25
-	e.initial_velocity_max = 0.5
-	e.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	e.emission_box_extents = Vector3(span * 0.4, 0.02, 0.05)
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 18.0
+	pm.gravity = Vector3(0, 0.15, 0)
+	pm.initial_velocity_min = 0.25
+	pm.initial_velocity_max = 0.5
 	var gr := Gradient.new()
 	gr.set_color(0, Color(1.0, 0.85, 0.4, 1.0))
 	gr.set_color(1, Color(1.0, 0.3, 0.05, 0.0))
-	e.color_ramp = gr
+	var ramp_tex := GradientTexture1D.new()
+	ramp_tex.gradient = gr
+	pm.color_ramp = ramp_tex
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(span * 0.4, 0.02, 0.05)
+	e.process_material = pm
 	var q2 := QuadMesh.new()
 	q2.size = Vector2(0.012, 0.012)
 	var m2 := StandardMaterial3D.new()
@@ -359,7 +363,7 @@ func _fire(at: Vector3, len_cm: float, wall := "n") -> void:
 	m2.vertex_color_use_as_albedo = true
 	m2.albedo_texture = _soft_disc()
 	q2.material = m2
-	e.mesh = q2
+	e.draw_pass_1 = q2
 	grp.add_child(e)
 	e.position = Vector3(0, 0.1, 0)
 

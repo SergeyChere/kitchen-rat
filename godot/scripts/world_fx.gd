@@ -67,19 +67,22 @@ static func _make_star() -> ImageTexture:
 
 
 func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: float, life: float, gravity := -0.6) -> void:
-	var p := CPUParticles3D.new()
+	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
+	var p := GPUParticles3D.new()
 	p.one_shot = true
 	p.emitting = false
 	p.amount = n
 	p.lifetime = life
 	p.explosiveness = 0.95
-	p.direction = Vector3.UP
-	p.spread = 80.0
-	p.initial_velocity_min = speed * 0.5
-	p.initial_velocity_max = speed
-	p.gravity = Vector3(0, gravity, 0)
-	p.scale_amount_min = 0.6
-	p.scale_amount_max = 1.0
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 80.0
+	pm.initial_velocity_min = speed * 0.5
+	pm.initial_velocity_max = speed
+	pm.gravity = Vector3(0, gravity, 0)
+	pm.scale_min = 0.6
+	pm.scale_max = 1.0
+	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)  # sized on the mesh: particle scale isn't applied to billboards on every renderer
 	var m := StandardMaterial3D.new()
@@ -89,11 +92,13 @@ func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: 
 	m.albedo_texture = _make_dot()
 	m.vertex_color_use_as_albedo = true
 	q.material = m
-	p.mesh = q
+	p.draw_pass_1 = q
 	var grad := Gradient.new()
 	grad.set_color(0, col)
 	grad.set_color(1, Color(col.r, col.g, col.b, 0.0))
-	p.color_ramp = grad
+	var ramp_tex := GradientTexture1D.new()
+	ramp_tex.gradient = grad
+	pm.color_ramp = ramp_tex
 	add_child(p)
 	p.global_position = at + Vector3.UP * up
 	p.emitting = true
