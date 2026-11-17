@@ -2,7 +2,8 @@ class_name FollowCamera
 extends Node3D
 ## Third-person orbit camera close to the floor. Mouse looks around, the wheel changes the field of view, walls push it
 ## in (SpringArm3D; when that brings it right up to her, the rat is hidden instead of filling the screen). V switches to
-## the rat's-eye view (from her head).
+## the rat's-eye view (from her head). In the burrow (round 24) the camera pulls in close and looks down at the floor,
+## so the pocket and the way out stay in view instead of the lens jamming against the earth walls.
 
 var target: Node3D
 var distance := 0.75
@@ -29,6 +30,7 @@ var dof: Dof
 var _ground_y := INF
 var _sniff_k := 0.0  # 0…1 while she sniffs: a little closer and calmer
 var _hide_k := 0.0  # 0…1 while she hides: the camera sinks to the floor, peeking out with her
+var _nest_k := 0.0  # 0…1 while she's in the burrow: a close, high, downward view of the pocket
 var _pivot_y := INF
 var _run_k := 0.0    # 0…1 how fast she runs: a wider, trailing view
 var _sneak_k := 0.0  # 0…1 sneaking: closer and calmer
@@ -95,6 +97,7 @@ func _process(_dt: float) -> void:
 	var rr := target as Rat
 	_sniff_k = move_toward(_sniff_k, 1.0 if rr and rr.sniffing else 0.0, _dt * 3.0)
 	_hide_k = move_toward(_hide_k, 1.0 if rr and rr.hidden() else 0.0, _dt * 2.5)
+	_nest_k = move_toward(_nest_k, 1.0 if rr and rr.in_nest else 0.0, _dt * 2.5)
 	# speed in the camera: a running rat gets a wider, trailing view; sneaking pulls it in close and calm
 	var fast := 0.0
 	if rr and rr.running and rr.moving():
@@ -117,19 +120,25 @@ func _process(_dt: float) -> void:
 		var grounded := rat == null or rat.is_on_floor() or rat.jumping or rat.carrier != null
 		if _ground_y == INF or grounded or ty < _ground_y:
 			_ground_y = ty
-		var want_y := _ground_y + lerpf(lerpf(height, 0.045, _hide_k), 0.07, high)
+		var base_h := lerpf(lerpf(height, 0.045, _hide_k), 0.07, high)
+		var want_y := _ground_y + lerpf(base_h, 0.3, _nest_k)  # in the burrow: a higher pivot, looking down
 		_pivot_y = want_y if _pivot_y == INF else lerpf(_pivot_y, want_y, clampf(_dt * 8.0, 0.0, 1.0))
 		global_position = Vector3(target.global_position.x, _pivot_y, target.global_position.z)
 		global_position.y = minf(global_position.y, Rat.CEILING - 0.12)
-		arm.spring_length = lerpf(distance, 0.5, high) * lerpf(1.0, 0.8, _sniff_k) * lerpf(1.0, 0.6, _hide_k) * (1.0 + 0.14 * _run_k) * (1.0 - 0.12 * _sneak_k)
+		arm.spring_length = lerpf(distance, 0.5, high) * lerpf(1.0, 0.8, _sniff_k) * lerpf(1.0, 0.6, _hide_k) * lerpf(1.0, 0.6, _nest_k) * (1.0 + 0.14 * _run_k) * (1.0 - 0.12 * _sneak_k)
 		if _hide_k > 0.0 and high <= 0.0:
 			rotation.x = deg_to_rad(lerpf(pitch, clampf(pitch, -12.0, 6.0), _hide_k))  # a level, floor-high look
 		if high > 0.0:
 			rotation.x = deg_to_rad(clampf(pitch, -35.0, lerpf(hi, -2.0, high)))
+		if _nest_k > 0.0:
+			rotation.x = deg_to_rad(lerpf(pitch, -32.0, _nest_k))  # in the burrow: down at the floor and the hole
 		cam.near = 0.02
 	if rat and rat.model:
 		# hidden in the rat's-eye view, and when a wall has pushed the camera right up to her
-		rat.model.visible = not first_person and cam.global_position.distance_to(global_position) > 0.2
+		# (in the burrow the arm is short already, so the threshold drops: hiding her there
+		# leaves the player steering a camera with no rat in it)
+		var hide_d := 0.1 if _nest_k > 0.5 else 0.2
+		rat.model.visible = not first_person and cam.global_position.distance_to(global_position) > hide_d
 	_tick_shake(_dt)
 	if dof:
 		dof.tick(cam.global_position.distance_to(global_position), not first_person)

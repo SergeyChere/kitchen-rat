@@ -1371,6 +1371,8 @@ func _tick_world(dt: float) -> void:
 	var rp := rat.global_position
 	if _tunnel_from() >= 0:
 		prompt = "%s — crawl through the wall" % Keys.label("jump")
+	elif rat.in_nest:
+		prompt = "The green light marks the way out"
 	if _wash_t > 0.0:
 		_wash_t -= dt
 		if _wash_zone and randf() < dt * 3.0:
@@ -1937,6 +1939,7 @@ func _warm_up() -> void:
 		var burst_at := Nights.world(240, 300, 25) + Vector3(0, 0.2, -1.0)
 		fx.dust(burst_at, true, WARM_LAYER)
 		fx.sparkle(burst_at, true, WARM_LAYER)
+		fx.warm_ring(burst_at)  # round 24: the dust rings use ring emission — another shader variant
 	var spots := [Nights.world(240, 300, 25), Nights.world(720, 300, 25), Nights.world(480, 300, 130), Nights.world(150, 640, 40)]
 	for p in spots:
 		for k in 6:

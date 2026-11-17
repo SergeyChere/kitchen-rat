@@ -3,19 +3,25 @@ extends Node3D
 ## Readability effects on the floor, like the prototype:
 ##  · hiding spots: a dashed green outline that brightens as the rat gets close (and glows while she's inside),
 ##  · the cat's view cone (pale), clipped by furniture,
-##  · noise rings that spread from every sound.
+##  · noise rings made of dust that spread from every sound (round 24: the torus is gone — a ring of
+##    dust reads as a sound in the world, not as a UI circle).
 
 var g: Game
 var _steam_t := 0.0
 var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
-var _rings: Array = []  # [MeshInstance3D, t, life, max_r, mote timer]
+var _rings: Array = []  # [GPUParticles3D, t, life, max_r, base alpha]
+var _ring_pool: Array = []  # round 24: continuous ring emitters, reused — a ring lives up to a
+	# second, so several can be alive at once (running steps come every 0.35 s)
 var _glints: Array = []  # [Sprite3D, node it marks, phase]
 var _puffs: Array = []  # round 23: a pool of one-shot dust emitters, reused round-robin —
-	# a running step and a spreading ring each puff dust, and creating a node per puff
-	# (up to ~30 a second) would stutter the game
+	# a running step puffs dust, and creating a node per puff (up to ~13 a second)
+	# would stutter the game
 var _puff_i := 0
 var _beacon: MeshInstance3D  # a green column of light over the nest hole while she carries food
+var _beacon_in: MeshInstance3D  # round 24: the same green column INSIDE the burrow, over the hole —
+	# from inside, the way out was invisible (the camera jams against the pocket walls)
+var _hole_ring: MeshInstance3D  # round 24: a green ring on the burrow floor at the hole's mouth
 static var _tex: ImageTexture
 static var _star: ImageTexture
 static var _dot: ImageTexture
@@ -177,10 +183,106 @@ func step_dust(at: Vector3) -> void:
 	_puff_at(at + Vector3.UP * 0.02)
 
 
-## The spreading ring stirs the dust where its edge passes.
-func ring_mote(at: Vector3, rad: float) -> void:
-	var a := randf() * TAU
-	_puff_at(Vector3(at.x + cos(a) * rad, at.y + 0.01, at.z + sin(a) * rad))
+## The noise rings, round 24: each is a pool emitter whose emission ring grows while the ring
+## lives — dust appears at the moving edge and hangs a moment behind it, so the ring reads as a
+## circle of stirred dust. The emitter's AABB is set by hand: particles spawn up to 6 m from the
+## emitter's origin, and the default bounds would cull the ring whenever its centre left the view.
+func _make_ring_pool() -> void:
+	for i in 6:
+		var e := GPUParticles3D.new()
+		e.amount = 256  # a 3 m ring is 19 m round: fewer than this reads as stray specks, not a ring
+		e.lifetime = 0.6  # the trail behind the edge stays a moment, so the ring has a body
+		e.one_shot = false
+		e.explosiveness = 0.0
+		e.emitting = false
+		e.custom_aabb = AABB(Vector3(-6.5, -0.5, -6.5), Vector3(13, 2.5, 13))
+		var pm := ParticleProcessMaterial.new()
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+		pm.emission_ring_axis = Vector3.UP
+		pm.emission_ring_height = 0.02
+		pm.emission_ring_radius = 0.05
+		pm.emission_ring_inner_radius = 0.0
+		pm.direction = Vector3.UP
+		pm.spread = 60.0
+		pm.initial_velocity_min = 0.05
+		pm.initial_velocity_max = 0.2
+		pm.gravity = Vector3(0, -0.15, 0)
+		pm.damping_min = 0.6
+		pm.damping_max = 1.0
+		pm.scale_min = 0.6
+		pm.scale_max = 1.2
+		var c := Curve.new()
+		c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.8))
+		var scale_tex := CurveTexture.new()
+		scale_tex.curve = c
+		pm.scale_curve = scale_tex
+		var grad := Gradient.new()
+		grad.set_color(0, Color(0.8, 0.76, 0.7, 0.8))
+		grad.set_color(1, Color(0.8, 0.76, 0.7, 0.0))
+		var ramp_tex := GradientTexture1D.new()
+		ramp_tex.gradient = grad
+		pm.color_ramp = ramp_tex
+		e.process_material = pm
+		var q := QuadMesh.new()
+		q.size = Vector2(0.07, 0.07)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.albedo_texture = _make_dot()
+		m.vertex_color_use_as_albedo = true
+		q.material = m
+		e.draw_pass_1 = q
+		add_child(e)
+		_ring_pool.append(e)
+
+
+func _free_ring() -> GPUParticles3D:
+	for e in _ring_pool:
+		if not (e as GPUParticles3D).emitting:
+			return e
+	# all six alive (a loud crash mid-sprint): steal the oldest ring rather than drop the new sound
+	if not _rings.is_empty():
+		var old: GPUParticles3D = _rings[0][0]
+		_rings.remove_at(0)
+		return old
+	return _ring_pool[0] if not _ring_pool.is_empty() else null
+
+
+func _start_ring(e: GPUParticles3D, at: Vector3, radius: float, life: float, alpha: float, tint: Color) -> void:
+	var pm := e.process_material as ParticleProcessMaterial
+	pm.emission_ring_radius = 0.05
+	pm.emission_ring_inner_radius = 0.0
+	pm.color = Color(tint.r, tint.g, tint.b, alpha)
+	e.global_position = Vector3(at.x, maxf(at.y, 0.0) + 0.01, at.z)
+	e.restart()
+	e.emitting = true
+	_rings.append([e, 0.0, life, clampf(radius, 0.5, 6.0), alpha])
+
+
+func ring(at: Vector3, radius: float, big: bool) -> void:
+	var e := _free_ring()
+	if e == null:
+		return
+	# loud sounds keep their golden tint (the old torus was gold for loud, pale for quiet)
+	var tint := Color(0.95, 0.76, 0.3) if big else Color(0.93, 0.9, 0.85)
+	_start_ring(e, at, radius, 1.0 if big else 0.6, 1.0, tint)
+	if big:  # a loud sound: a fainter echo ring trails a beat behind the first
+		var e2 := _free_ring()
+		if e2 != null and e2 != e:
+			_start_ring(e2, at, radius * 0.7, 1.0, 0.5, tint)
+			_rings[_rings.size() - 1][1] = -0.15  # starts a beat late
+			e2.emitting = false  # …and stays dark until its beat
+
+
+## One ring where only the warm-up camera looks, so the ring shader (a different variant from the
+## point bursts: ring emission) compiles before play, not as a hitch on the first sound.
+func warm_ring(at: Vector3) -> void:
+	var e := _free_ring()
+	if e == null:
+		return
+	e.layers = Game.WARM_LAYER
+	_start_ring(e, at, 1.5, 0.6, 1.0, Color(0.93, 0.9, 0.85))
 
 
 ## Sparkles when she picks something up.
@@ -236,6 +338,47 @@ func _make_beacon() -> void:
 	_beacon.global_position = g.hole + Vector3(0, 1.2, -0.05)
 
 
+## The way out, seen from inside the burrow: a green column over the hole's mouth (the pocket's
+## roof is 0.95 m, so this one is short) and a green ring on the floor where the hole is.
+func _make_beacon_in() -> void:
+	_beacon_in = MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.07
+	cyl.bottom_radius = 0.07
+	cyl.height = 0.9
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	_beacon_in.mesh = cyl
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_texture = _fade_tex()
+	m.albedo_color = Color(0.35, 1.0, 0.45, 0.5)
+	_beacon_in.material_override = m
+	_beacon_in.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beacon_in.visible = false
+	add_child(_beacon_in)
+	_beacon_in.global_position = g.hole + Vector3(0, 0.45, 0.32)
+	_hole_ring = MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.1
+	tm.outer_radius = 0.14
+	tm.rings = 32
+	_hole_ring.mesh = tm
+	var rm := StandardMaterial3D.new()
+	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rm.albedo_color = Color(0.55, 1.0, 0.4, 0.6)
+	_hole_ring.material_override = rm
+	_hole_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_hole_ring.visible = false
+	_hole_ring.scale = Vector3(1, 0.05, 1)
+	add_child(_hole_ring)
+	_hole_ring.global_position = g.hole + Vector3(0, 0.01, 0.3)
+
+
 ## Bright at the bottom, fading out upward (the cylinder's V runs top to bottom).
 static func _fade_tex() -> ImageTexture:
 	var img := Image.create(4, 64, false, Image.FORMAT_RGBA8)
@@ -248,8 +391,10 @@ static func _fade_tex() -> ImageTexture:
 
 func _ready() -> void:
 	_make_beacon()  # (the dust in the moonlight lives in LevelBuilder._dust_motes now: along the whole shaft)
+	_make_beacon_in()
 	_make_glints()
 	_make_puff_pool()
+	_make_ring_pool()
 	for z in g.zones:
 		if z is HideSpot:
 			var mi := MeshInstance3D.new()
@@ -280,34 +425,6 @@ func _ready() -> void:
 	_cone.material_override = cm
 	_cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_cone)
-
-
-func _ring_mesh(at: Vector3, col: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var t := TorusMesh.new()
-	t.inner_radius = 0.93
-	t.outer_radius = 1.0
-	t.rings = 48
-	t.ring_segments = 3
-	mi.mesh = t
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = col
-	mi.material_override = m
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
-	mi.global_position = Vector3(at.x, maxf(at.y, 0.0) + 0.01, at.z)
-	mi.scale = Vector3(0.001, 0.02, 0.001)
-	return mi
-
-
-func ring(at: Vector3, radius: float, big: bool) -> void:
-	var col := Color(0.95, 0.76, 0.3, 0.6) if big else Color(0.93, 0.9, 0.85, 0.45)
-	_rings.append([_ring_mesh(at, col), 0.0, 1.0 if big else 0.6, clampf(radius, 0.5, 6.0), 0.0])
-	if big:  # a loud sound: a fainter echo ring trails a beat behind the first
-		var echo_col := Color(col.r, col.g, col.b, col.a * 0.5)
-		_rings.append([_ring_mesh(at, echo_col), -0.15, 1.0, clampf(radius, 0.5, 6.0) * 0.7, 0.0])
 
 
 ## A small glowing mark over food she has sniffed out, for a few seconds.
@@ -350,6 +467,12 @@ func _process(dt: float) -> void:
 		_beacon.visible = not g.rat.carried.is_empty() and not g.rat.in_nest
 		if _beacon.visible:
 			(_beacon.material_override as StandardMaterial3D).albedo_color.a = 0.45 + 0.15 * sin(Time.get_ticks_msec() / 250.0)
+	if _beacon_in:
+		_beacon_in.visible = g.rat.in_nest
+		if _beacon_in.visible:
+			(_beacon_in.material_override as StandardMaterial3D).albedo_color.a = 0.4 + 0.12 * sin(Time.get_ticks_msec() / 250.0)
+	if _hole_ring:
+		_hole_ring.visible = g.rat.in_nest
 	var rp := g.rat.global_position
 	var playing := g.state == "play" or g.state == "pause"
 	for e in _marks:
@@ -379,22 +502,23 @@ func _process(dt: float) -> void:
 		var r: Array = _rings[i]
 		r[1] += dt
 		var k: float = r[1] / r[2]
-		var mi: MeshInstance3D = r[0]
+		var e: GPUParticles3D = r[0]
 		if k >= 1.0:
-			mi.queue_free()
+			e.emitting = false  # already-spawned dust finishes its own life and fades
+			e.layers = 1  # a warm-up ring goes back to the world's layers
 			_rings.remove_at(i)
 			continue
-		if k <= 0.0:  # an echo ring waiting its beat: invisible until it starts
-			mi.scale = Vector3(0.001, 0.02, 0.001)
-			(mi.material_override as StandardMaterial3D).albedo_color.a = 0.0
+		if k <= 0.0:  # an echo ring waiting its beat: dark until it starts
 			continue
+		if not e.emitting:
+			e.emitting = true  # the echo's beat has arrived
 		var rad: float = lerpf(0.05, r[3], 1.0 - pow(1.0 - k, 2.0))
-		mi.scale = Vector3(rad, 0.02, rad)
-		(mi.material_override as StandardMaterial3D).albedo_color.a = (1.0 - k) * 0.55
-		r[4] = float(r[4]) - dt
-		if r[4] <= 0.0:
-			r[4] = 0.14  # the ring's edge stirs the dust as it passes
-			ring_mote(mi.global_position, rad)
+		var pm := e.process_material as ParticleProcessMaterial
+		pm.emission_ring_radius = rad
+		pm.emission_ring_inner_radius = maxf(0.0, rad - 0.07)
+		var c := pm.color
+		pm.color = Color(c.r, c.g, c.b, (1.0 - k * 0.5) * float(r[4]))  # the per-particle ramp already
+			# fades each mote; fading the whole ring to nothing as well left only the first instants visible
 
 
 func _draw_cone() -> void:
