@@ -177,11 +177,29 @@ func hide(kind: String, f: Dictionary, inset := 8.0) -> void:
 	b._hide(kind, float(f.x) + w / 2.0, float(f.y) + d / 2.0, maxf(16.0, w - inset * 2.0), maxf(16.0, d - inset * 2.0))
 
 
+## A hiding place sized to the piece as it actually stands, not its rect: a painted model keeps its own
+## proportions and can come out much smaller than the rect (the sofa: 2.44 m in a 3.6 m rect), and a
+## rect-sized zone would let her hide in open floor beside it.
+func hide_aabb(kind: String, n: Node3D, inset := 8.0) -> void:
+	if n == null:
+		return
+	var bb := LevelBuilder.world_aabb(n)
+	var cx := bb.get_center().x * 100.0 + Nights.ROOM_W / 2.0
+	var cy := bb.get_center().z * 100.0 + Nights.ROOM_D / 2.0
+	b._hide(kind, cx, cy, maxf(16.0, bb.size.x * 100.0 - inset * 2.0), maxf(16.0, bb.size.z * 100.0 - inset * 2.0))
+
+
 ## Under a sofa or an armchair there's only room for a crouching rat: an invisible slab 10 cm up stops her unless she
-## sneaks (crouched she is lower).
-func low_roof(f: Dictionary, inset: float) -> void:
-	var w := float(f.get("w", 32)); var d := float(f.get("h", 32))
-	var slab := b.box("Low clearance", W(float(f.x) + w / 2.0, float(f.y) + d / 2.0, 11.5), Vector3((w - inset * 2.0) / 100.0, 0.03, (d - inset * 2.0) / 100.0), b.mat(Color.BLACK), b.furn)
+## sneaks (crouched she is lower). Sized to the piece as it actually stands: the rect-sized slab stuck out past the
+## shrunken model and blocked every jump from the strips beside it (the hop's roof check and the jump scanner's
+## path check both hit it) — the gaps where she could not get onto the sofa at all.
+func low_roof_aabb(n: Node3D, inset: float) -> void:
+	if n == null:
+		return
+	var bb := LevelBuilder.world_aabb(n)
+	var c := Vector3(bb.get_center().x, 0.115, bb.get_center().z)
+	var s := Vector3(maxf(0.05, bb.size.x - inset * 2.0 / 100.0), 0.03, maxf(0.05, bb.size.z - inset * 2.0 / 100.0))
+	var slab := b.box("Low clearance", c, s, b.mat(Color.BLACK), b.furn)
 	slab.visible = false
 
 
@@ -455,8 +473,8 @@ func build(list: Array) -> void:
 						light(W(cx, cy, ht + 60), Color8(0xff, 0xb0, 0x60), 0.7, 3.0)
 				hide("table", f)
 			"coffeeTable":
-				place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
-				hide("table", f)
+				var ct := place("furniture/coffee_table", f, "table", 0.0, 0.0, "wood_dark")
+				hide_aabb("table", ct)
 				# round 5: something to hide AMONG under the coffee table, not bare floor
 				# (at the zone's edge — the middle stays clear for her)
 				b.collide(b.spawn("props/small_box", W(float(f.x) + 26.0, float(f.y) + float(f.h) / 2.0), 12.0, b.furn))
@@ -478,14 +496,14 @@ func build(list: Array) -> void:
 				b.collide(b.spawn("furniture/stool", W(x + 18, y + 18), 0.0, b.furn), "stool")
 				hide("stool", {"x": x, "y": y, "w": 36, "h": 36}, 3.0)
 			"lowShelf":
-				place("furniture/low_shelf", f, "lowShelf")
-				hide("shelf", f, 4.0)
+				var ls := place("furniture/low_shelf", f, "lowShelf")
+				hide_aabb("shelf", ls, 4.0)
 			"sofa", "armchair":
 				var face := str(f.get("face", "s"))
 				var r := 180.0 if face == "n" else (90.0 if face == "e" else (-90.0 if face == "w" else 0.0))
-				place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
-				hide("sofa", f, 12.0)
-				low_roof(f, 4.0)
+				var sn := place("furniture/sofa" if t == "sofa" else "furniture/armchair", f, "sofa", 0.0, r, "fabric")
+				hide_aabb("sofa", sn, 12.0)
+				low_roof_aabb(sn, 4.0)
 			"wall":
 				var wm := b.mat(LevelBuilder.hex(0x8a8a9a), "wall_" + str(g.night.get("pal", {}).get("wall", "stripes")))
 				b.box("Inner wall", W(cx, cy, 115), Vector3(w / 100.0, 2.3, d / 100.0), wm, b.furn)

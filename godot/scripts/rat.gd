@@ -27,9 +27,11 @@ const CARRY_CLIP := 0.08
 # exactly as measured — it is NOT softened.
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
-var max_jump_up := 0.54  # round 11: the tall wall climb is DELETED (the user's call) — one spring
+var max_jump_up := 0.56  # round 11: the tall wall climb is DELETED (the user's call) — one spring
 # is all she has; anything higher is reached over other furniture (chair 0.41 → counter
-# 0.92 is a 0.51 step; the pantry crates climb in 0.40 steps; a 0.52 stool tops the bench)
+# 0.92 is a 0.51 step; the pantry crates climb in 0.40 steps; a 0.52 stool tops the bench).
+# Round 23: 0.54 → 0.56 — the sofa's arms are 55 cm, and one centimetre short of them meant she
+# could not get onto the sofa from the gaps at its sides at all.
 var max_jump_reach := 0.9
 var capacity := 3
 
@@ -115,7 +117,7 @@ func _dust_emitter(amount: int, burst: bool) -> GPUParticles3D:
 	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
 	var e := GPUParticles3D.new()
 	e.amount = amount
-	e.lifetime = 0.55 if burst else 0.45
+	e.lifetime = 0.55 if burst else 0.75
 	e.one_shot = burst
 	e.explosiveness = 0.95 if burst else 0.0
 	e.emitting = false
@@ -123,20 +125,20 @@ func _dust_emitter(amount: int, burst: bool) -> GPUParticles3D:
 	var pm := ParticleProcessMaterial.new()
 	pm.direction = Vector3.UP
 	pm.spread = 80.0 if burst else 40.0
-	pm.initial_velocity_min = 0.08 if burst else 0.02
-	pm.initial_velocity_max = 0.22 if burst else 0.06
+	pm.initial_velocity_min = 0.08 if burst else 0.06
+	pm.initial_velocity_max = 0.22 if burst else 0.16
 	pm.gravity = Vector3(0, -0.05, 0)
 	pm.damping_min = 0.4
 	pm.damping_max = 0.8
 	pm.scale_min = 0.6
 	pm.scale_max = 1.2
 	var c := Curve.new()
-	c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.3))
+	c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.8))
 	var scale_tex := CurveTexture.new()
 	scale_tex.curve = c
 	pm.scale_curve = scale_tex
 	var g := Gradient.new()
-	g.set_color(0, Color(0.78, 0.74, 0.68, 0.45 if burst else 0.25))
+	g.set_color(0, Color(0.78, 0.74, 0.68, 0.45 if burst else 0.38))
 	g.set_color(1, Color(0.78, 0.74, 0.68, 0.0))
 	var ramp_tex := GradientTexture1D.new()
 	ramp_tex.gradient = g
@@ -145,7 +147,7 @@ func _dust_emitter(amount: int, burst: bool) -> GPUParticles3D:
 	pm.emission_sphere_radius = 0.03 if burst else 0.015
 	e.process_material = pm
 	var q := QuadMesh.new()
-	q.size = Vector2(0.035, 0.035)
+	q.size = Vector2(0.035, 0.035) if burst else Vector2(0.05, 0.05)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -165,7 +167,9 @@ func _dust_emitter(amount: int, burst: bool) -> GPUParticles3D:
 
 
 func _make_dust() -> void:
-	_dust_trail = _dust_emitter(14, false)
+	# round 23: a visible trail, not a whisper — 28 puffs that rise off her heels and
+	# hang in the air behind her, so a run reads as a run
+	_dust_trail = _dust_emitter(28, false)
 
 
 ## Stretch tall on take-off, squash flat on landing; the model eases back to its shape.
@@ -334,15 +338,20 @@ func _unwedge(d: Vector3, dt: float) -> void:
 		var v := Vector3(cos(a), 0.0, sin(a))
 		for r in [0.08, 0.14, 0.22, 0.32]:
 			var p: Vector3 = global_position + v * float(r)
-			if not gm.sphere_free(p + Vector3.UP * 0.07, 0.06) or not gm.sphere_free(p + Vector3.UP * 0.07 + dir * 0.09, 0.045) and not gm.sphere_free(p + Vector3.UP * 0.07 - dir * 0.09, 0.045):
+			# round 23: the ground is found first, and looked for a full drop below her — the old
+			# 15 cm ray could not rescue her from inside a table, 60 cm above the floor
+			var ground := _ray(p + Vector3.UP * 0.1, p + Vector3.DOWN * 1.3)
+			if ground.is_empty() or ground.normal.y < 0.75:
 				continue
-			var ground := _ray(p + Vector3.UP * 0.1, p + Vector3.DOWN * 0.15)
-			if ground.is_empty():
+			var gp: Vector3 = ground.position
+			if global_position.y - gp.y > 1.0 or gp.y > global_position.y + 0.1:
+				continue
+			if not gm.capsule_free(gp) or not gm.sphere_free(gp + Vector3.UP * 0.07 + dir * 0.09, 0.045) and not gm.sphere_free(gp + Vector3.UP * 0.07 - dir * 0.09, 0.045):
 				continue
 			var score: float = float(r) - v.dot(dir) * 0.1
 			if score < best_score:
 				best_score = score
-				best = ground.position
+				best = gp
 			break
 	if best != Vector3.INF:
 		global_position = best + Vector3.UP * 0.005
@@ -827,10 +836,12 @@ func _find_jump_target() -> void:
 			if not hit.is_empty():
 				var dy: float = hit.position.y - p0.y
 				if dy > 0.07 and dy <= max_jump_up and hit.normal.y > 0.75 and _clear(hit.position) and _path_clear(p0, hit.position):
-					_target = _inward(hit.position, f)
-					_edge = hit.position
-					_target_up = true
-					_has_target = true
+					var tgt := _inward(hit.position, f)
+					if _arc_clear(p0, tgt, hit.position, f):
+						_target = tgt
+						_edge = hit.position
+						_target_up = true
+						_has_target = true
 			dd += 0.04
 		if not _has_target and surface_id != "floor":
 			# round 12: while dragging she walks BACKWARDS, facing away from where
@@ -849,6 +860,7 @@ func _find_jump_target() -> void:
 						continue
 					if hit.normal.y > 0.75 and _clear(hit.position):
 						_target = hit.position
+						_edge = Vector3(p0.x + df.x * (dd - 0.06), p0.y, p0.z + df.z * (dd - 0.06))
 						_target_up = false
 						_has_target = true
 					break
@@ -864,7 +876,12 @@ func _inward(p: Vector3, f: Vector3) -> Vector3:
 
 
 func _clear(p: Vector3) -> bool:
-	return Game.I.sphere_free(p + Vector3.UP * 0.08, 0.05)
+	# round 23: her capsule, not a sphere — a sphere narrows toward its bottom and misses a
+	# low lip beside her feet (the worktop's back edge wedged her). Top slabs don't count
+	# here: their 4 cm margin is air beside the real top, and it vetoed the landing on the
+	# fridge top (the bread box's slab). The landing rescue still sees slabs, so a bad
+	# landing gets fixed on arrival.
+	return Game.I.capsule_free(p, true)
 
 
 func _path_clear(a: Vector3, b: Vector3) -> bool:
@@ -890,8 +907,8 @@ func _start_jump(to: Vector3, up: bool) -> void:
 	_to = to
 	_t = 0.0
 	_dur = clampf(0.3 + _from.distance_to(_to) * 0.35, 0.35, 0.8)
+	_climb_edge = _edge  # round 23: the down jump routes out past the edge before it falls (see _down_pos)
 	if up:
-		_climb_edge = _edge
 		_dur = clampf(0.36 + (_to.y - _from.y) * 0.4, 0.42, 0.66)  # round 4: snappier still — a spring, not a ride
 	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
 	if flat.length() > 0.01:
@@ -907,9 +924,13 @@ func _tick_jump(dt: float) -> void:
 	match _kind:
 		"up", "grab": p = _climb_pos(t)
 		"descend": p = _descend_pos(t)
+		"down": p = _down_pos(t)
 		_: p.y = _from.y + 0.1 * sin(t * PI) + dy * t * t
-	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops
-	if _kind == "down":
+	# a real flight down: something in the way (a chair back, a wall, a lamp) stops her and she drops.
+	# The leap out past the edge (t < 0.35) is not tested: the arc grazes the edge's own face by
+	# millimetres there (she stands 2 mm under the top she leaps from), and the test read that
+	# graze as a wall and stranded her at the edge (the kitchen-upper test died on it, round 23).
+	if _kind == "down" and t >= 0.35:
 		var hit := move_and_collide(p - global_position, true)
 		if hit and hit.get_normal().y < 0.5:
 			var away := hit.get_normal()
@@ -936,6 +957,27 @@ func _tick_jump(dt: float) -> void:
 	if t < 1.0:
 		return
 	jumping = false
+	# round 23: a jump that ended inside furniture (a cushion's slope, a trimesh edge) slips out to
+	# the nearest spot where she fits instead of hanging inside the textures
+	if Game.I != null and overlapping():
+		var rescued := false
+		for up in [0.02, 0.04, 0.06, 0.08, 0.10, 0.12]:
+			var p2: Vector3 = global_position + Vector3.UP * up
+			if Game.I.capsule_free(p2):
+				global_position = p2
+				rescued = true
+				break
+		if not rescued:
+			for k in 8:
+				var v := Vector3(cos(k * TAU / 8.0), 0.0, sin(k * TAU / 8.0))
+				for r in [0.06, 0.12]:
+					var p2: Vector3 = global_position + v * r
+					if Game.I.capsule_free(p2):
+						global_position = p2
+						rescued = true
+						break
+				if rescued:
+					break
 	if model:
 		model.rotation.x = 0.0
 		model.position = _model_home  # round 7: hand the model node back from the root-motion cancel
@@ -986,21 +1028,28 @@ func _keys(u: float, keys: Array) -> float:
 
 
 func _climb_pos(t: float) -> Vector3:
-	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
-	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
-	var edge_d := clampf(Vector3(_climb_edge.x - _from.x, 0, _climb_edge.z - _from.z).length(), 0.0, flat.length())
-	var base := _from + dirv * maxf(0.0, edge_d - 0.13)  # snout at the edge, hind paws under it
-	var dy := _to.y - _from.y
+	return _climb_arc(_from, _to, _climb_edge, t, global_transform.basis.z)
+
+
+## The climb path as a function of its endpoints, so the jump scanner can walk the same arc before
+## offering it: a climb whose arc passes through furniture is never offered (Space falls back to the
+## hop, which collides for real) instead of phasing through a table corner.
+func _climb_arc(from: Vector3, to: Vector3, edge: Vector3, t: float, facing: Vector3) -> Vector3:
+	var flat := Vector3(to.x - from.x, 0, to.z - from.z)
+	var dirv := flat.normalized() if flat.length() > 0.001 else facing
+	var edge_d := clampf(Vector3(edge.x - from.x, 0, edge.z - from.z).length(), 0.0, flat.length())
+	var base := from + dirv * maxf(0.0, edge_d - 0.13)  # snout at the edge, hind paws under it
+	var dy := to.y - from.y
 	var reach := minf(dy, 0.13)  # how far up she stretches before the hop
 	if t < 0.26:  # run in and rear up
 		var k := t / 0.26
-		var q := _from.lerp(base, smoothstep(0.0, 1.0, k))
-		q.y = _from.y + reach * 0.35 * smoothstep(0.4, 1.0, k)
+		var q := from.lerp(base, smoothstep(0.0, 1.0, k))
+		q.y = from.y + reach * 0.35 * smoothstep(0.4, 1.0, k)
 		return q
 	if t < 0.40:  # the crouch: she loads her hind legs, nose up the face — THEN springs
 		var k2 := (t - 0.26) / 0.14
 		var q := base
-		q.y = _from.y + reach * 0.35 - 0.026 * sin(k2 * PI * 0.5)
+		q.y = from.y + reach * 0.35 - 0.026 * sin(k2 * PI * 0.5)
 		return q
 	var u := (t - 0.40) / 0.60
 	var low := reach * 0.35 - 0.026
@@ -1008,10 +1057,40 @@ func _climb_pos(t: float) -> Vector3:
 	# and its fold and two-jump successors — is deleted on the user's call, and
 	# the scanner's cap (max_jump_up) means a face this code sees is never more
 	# than one spring tall. High places are reached over other furniture.
-	var q := base.lerp(_to, smoothstep(0.55, 1.0, u))
+	var q := base.lerp(to, smoothstep(0.55, 1.0, u))
 	var rs := _keys(u, [[0.0, 0.0], [0.45, 0.72], [1.0, 1.0]])
-	q.y = _from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
+	q.y = from.y + low + (dy - low) * rs + 0.02 * rs * (1.0 - smoothstep(0.7, 1.0, u))
 	return q
+
+
+## Is this climb physically possible? Two checks the old two-ray path test missed: headroom along
+## the rise (a shelf over the edge, the table above a chair), and solid floor around the landing —
+## a target grazing a corner has open air beside it, and the arc would cut the corner's side face.
+## Headroom is checked with vertical RAYS, not spheres: the top slabs reach 4 cm past the visual
+## edge (so she cannot slip off them), and a sphere rising beside the edge grazes that invisible
+## lip and vetoes a climb she makes easily — the chair jump died on a 5 mm graze (round 23).
+func _arc_clear(from: Vector3, to: Vector3, edge: Vector3, f: Vector3) -> bool:
+	for t in [0.45, 0.6, 0.75]:
+		var p := _climb_arc(from, to, edge, t, f)
+		# the ray starts above the target's level, never under it: rising toward a wide shelf
+		# the samples sit below the shelf itself, and a ray from there hits its underside
+		# and vetoes a climb she makes easily (the kitchen-upper test died on it, round 23)
+		var y0 := maxf(p.y, to.y + 0.02) + 0.05
+		# ...and it ends below the ceiling: a ray past 2.5 m hits the ceiling itself and vetoes
+		# every high climb (the cabinet tops at 2.14 died on it the same day, round 23)
+		var y1 := minf(y0 + 0.3, CEILING - 0.03)
+		if y1 > y0 + 0.02 and not _ray(Vector3(p.x, y0, p.z), Vector3(p.x, y1, p.z)).is_empty():
+			return false
+	var ty1 := minf(to.y + 0.35, CEILING - 0.03)
+	if ty1 > to.y + 0.07 and not _ray(to + Vector3.UP * 0.05, Vector3(to.x, ty1, to.z)).is_empty():
+		return false
+	var side := Vector3(-f.z, 0.0, f.x)
+	for off in [f * 0.07, -f * 0.07, side * 0.07, -side * 0.07]:
+		var o: Vector3 = to + off + Vector3.UP * 0.2
+		var hit := _ray(o, o + Vector3.DOWN * 0.4)
+		if hit.is_empty() or hit.normal.y < 0.75 or absf(hit.position.y - to.y) > 0.04:
+			return false
+	return true
 
 
 ## Climbing down: to the edge, nose down, and down the side onto the surface below.
@@ -1023,6 +1102,24 @@ func _descend_pos(t: float) -> Vector3:
 	var k := (t - 0.25) / 0.75
 	var q := Vector3(edge.x, _from.y, edge.z).lerp(_to, smoothstep(0.0, 1.0, k))
 	q.y = lerpf(_from.y, _to.y, smoothstep(0.0, 1.0, k))
+	return q
+
+
+## Jumping down: leap out past the edge first, then fall. The old parabola dropped straight down from
+## wherever she stood — from the middle of a tabletop that took her down THROUGH the table, where the
+## wall check never fired (a tabletop's normal points up) and she ended up trapped inside it.
+func _down_pos(t: float) -> Vector3:
+	var flat := Vector3(_to.x - _from.x, 0, _to.z - _from.z)
+	var dirv := flat.normalized() if flat.length() > 0.001 else global_transform.basis.z
+	var out := Vector3(_climb_edge.x, _from.y, _climb_edge.z) + dirv * 0.1
+	if t < 0.35:
+		var k := smoothstep(0.0, 1.0, t / 0.35)
+		var q := _from.lerp(out, k)
+		q.y = _from.y + 0.1 * sin(k * PI)  # a little leap, not a slide
+		return q
+	var k2 := (t - 0.35) / 0.65
+	var q := out.lerp(_to, smoothstep(0.0, 1.0, k2))
+	q.y = lerpf(_from.y, _to.y, k2 * k2)  # an accelerating fall
 	return q
 
 
@@ -1061,7 +1158,8 @@ func _try_ledge_grab() -> void:
 		# and nothing over her head on the way up (on a chair under the table she must not grab the top through it)
 		if dy > 0.1 and dy < 0.42 and hit.normal.y > 0.75 and hit.position.y < CEILING - 0.25 and _clear(hit.position) \
 				and _ray(p0 + Vector3.UP * 0.1, Vector3(p0.x, hit.position.y + 0.12, p0.z)).is_empty() \
-				and _ray(Vector3(p0.x, hit.position.y + 0.1, p0.z), hit.position + Vector3.UP * 0.1).is_empty():
+				and _ray(Vector3(p0.x, hit.position.y + 0.1, p0.z), hit.position + Vector3.UP * 0.1).is_empty() \
+				and _arc_clear(p0, _inward(hit.position, f), hit.position, f):
 			_grabbed = true
 			_edge = hit.position
 			_start_kind("grab", _inward(hit.position, f), hit.position, 0.5 + maxf(dy, 0.0) * 0.8)
@@ -1095,6 +1193,9 @@ func _try_descend(d: Vector3) -> bool:
 	var drop: float = p0.y - hit.position.y
 	if drop < 0.12 or drop > 1.0 or hit.normal.y < 0.75 or not _clear(hit.position):
 		return false
+	# round 23: drop clear of the face, not down its plane — the edge sits on the top's boundary,
+	# and her body (5.5 cm radius) would phase through the side on the way down
+	edge += f * 0.06
 	_start_kind("descend", hit.position, edge, 0.45 + drop * 0.8)
 	return true
 

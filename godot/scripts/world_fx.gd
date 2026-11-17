@@ -9,8 +9,12 @@ var g: Game
 var _steam_t := 0.0
 var _marks: Array = []  # [MeshInstance3D, HideSpot]
 var _cone: MeshInstance3D
-var _rings: Array = []  # [MeshInstance3D, t, life, max_r]
+var _rings: Array = []  # [MeshInstance3D, t, life, max_r, mote timer]
 var _glints: Array = []  # [Sprite3D, node it marks, phase]
+var _puffs: Array = []  # round 23: a pool of one-shot dust emitters, reused round-robin —
+	# a running step and a spreading ring each puff dust, and creating a node per puff
+	# (up to ~30 a second) would stutter the game
+var _puff_i := 0
 var _beacon: MeshInstance3D  # a green column of light over the nest hole while she carries food
 static var _tex: ImageTexture
 static var _star: ImageTexture
@@ -66,9 +70,11 @@ static func _make_star() -> ImageTexture:
 	return _star
 
 
-func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: float, life: float, gravity := -0.6) -> void:
+func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: float, life: float, gravity := -0.6, layer := 0) -> void:
 	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
 	var p := GPUParticles3D.new()
+	if layer != 0:
+		p.layers = layer  # the warm-up camera alone sees it: shader compiles before play, not as a hitch
 	p.one_shot = true
 	p.emitting = false
 	p.amount = n
@@ -106,13 +112,80 @@ func _particles(at: Vector3, n: int, col: Color, size: float, speed: float, up: 
 
 
 ## A puff of dust where she lands (bigger from higher up).
-func dust(at: Vector3, big: bool) -> void:
-	_particles(at, 14 if big else 7, Color(0.75, 0.7, 0.62, 0.55), 0.05 if big else 0.035, 0.5 if big else 0.3, 0.02, 0.7, -0.4)
+func dust(at: Vector3, big: bool, layer := 0) -> void:
+	_particles(at, 18 if big else 7, Color(0.75, 0.7, 0.62, 0.55), 0.05 if big else 0.035, 0.5 if big else 0.3, 0.02, 0.7, -0.4, layer)
+
+
+## The puff pool: small one-shot dust emitters, made once and restarted where needed.
+## (Same shader as the landing bursts, so the warm-up already compiled it.)
+func _make_puff_pool() -> void:
+	for i in 16:
+		var e := GPUParticles3D.new()
+		e.amount = 4
+		e.lifetime = 0.6
+		e.one_shot = true
+		e.explosiveness = 0.95
+		e.emitting = false
+		e.local_coords = false
+		var pm := ParticleProcessMaterial.new()
+		pm.direction = Vector3.UP
+		pm.spread = 60.0
+		pm.initial_velocity_min = 0.05
+		pm.initial_velocity_max = 0.15
+		pm.gravity = Vector3(0, -0.1, 0)
+		pm.damping_min = 0.5
+		pm.damping_max = 0.9
+		pm.scale_min = 0.6
+		pm.scale_max = 1.2
+		var c := Curve.new()
+		c.add_point(Vector2(0, 0.5)); c.add_point(Vector2(0.3, 1.0)); c.add_point(Vector2(1, 1.6))
+		var scale_tex := CurveTexture.new()
+		scale_tex.curve = c
+		pm.scale_curve = scale_tex
+		var grad := Gradient.new()
+		grad.set_color(0, Color(0.78, 0.74, 0.68, 0.4))
+		grad.set_color(1, Color(0.78, 0.74, 0.68, 0.0))
+		var ramp_tex := GradientTexture1D.new()
+		ramp_tex.gradient = grad
+		pm.color_ramp = ramp_tex
+		e.process_material = pm
+		var q := QuadMesh.new()
+		q.size = Vector2(0.03, 0.03)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.albedo_texture = _make_dot()
+		m.vertex_color_use_as_albedo = true
+		q.material = m
+		e.draw_pass_1 = q
+		add_child(e)
+		_puffs.append(e)
+
+
+func _puff_at(p: Vector3) -> void:
+	if _puffs.is_empty():
+		return
+	var e: GPUParticles3D = _puffs[_puff_i]
+	_puff_i = (_puff_i + 1) % _puffs.size()
+	e.global_position = p
+	e.restart()
+
+
+## A running step kicks up a little dust at her feet.
+func step_dust(at: Vector3) -> void:
+	_puff_at(at + Vector3.UP * 0.02)
+
+
+## The spreading ring stirs the dust where its edge passes.
+func ring_mote(at: Vector3, rad: float) -> void:
+	var a := randf() * TAU
+	_puff_at(Vector3(at.x + cos(a) * rad, at.y + 0.01, at.z + sin(a) * rad))
 
 
 ## Sparkles when she picks something up.
-func sparkle(at: Vector3, cheese: bool) -> void:
-	_particles(at, 10, Color(1.0, 0.85, 0.35, 0.95) if cheese else Color(0.95, 0.85, 0.6, 0.8), 0.025, 0.6, 0.04, 0.6, -1.2)
+func sparkle(at: Vector3, cheese: bool, layer := 0) -> void:
+	_particles(at, 10, Color(1.0, 0.85, 0.35, 0.95) if cheese else Color(0.95, 0.85, 0.6, 0.8), 0.025, 0.6, 0.04, 0.6, -1.2, layer)
 
 
 ## Noisy things and wobbly cups glint when she comes close, so every trap can be seen in advance.
@@ -176,6 +249,7 @@ static func _fade_tex() -> ImageTexture:
 func _ready() -> void:
 	_make_beacon()  # (the dust in the moonlight lives in LevelBuilder._dust_motes now: along the whole shaft)
 	_make_glints()
+	_make_puff_pool()
 	for z in g.zones:
 		if z is HideSpot:
 			var mi := MeshInstance3D.new()
@@ -208,7 +282,7 @@ func _ready() -> void:
 	add_child(_cone)
 
 
-func ring(at: Vector3, radius: float, big: bool) -> void:
+func _ring_mesh(at: Vector3, col: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var t := TorusMesh.new()
 	t.inner_radius = 0.93
@@ -219,13 +293,21 @@ func ring(at: Vector3, radius: float, big: bool) -> void:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(0.95, 0.76, 0.3, 0.6) if big else Color(0.93, 0.9, 0.85, 0.45)
+	m.albedo_color = col
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.global_position = Vector3(at.x, maxf(at.y, 0.0) + 0.01, at.z)
-	mi.scale = Vector3(0.05, 0.02, 0.05)
-	_rings.append([mi, 0.0, 1.0 if big else 0.6, clampf(radius, 0.5, 6.0)])
+	mi.scale = Vector3(0.001, 0.02, 0.001)
+	return mi
+
+
+func ring(at: Vector3, radius: float, big: bool) -> void:
+	var col := Color(0.95, 0.76, 0.3, 0.6) if big else Color(0.93, 0.9, 0.85, 0.45)
+	_rings.append([_ring_mesh(at, col), 0.0, 1.0 if big else 0.6, clampf(radius, 0.5, 6.0), 0.0])
+	if big:  # a loud sound: a fainter echo ring trails a beat behind the first
+		var echo_col := Color(col.r, col.g, col.b, col.a * 0.5)
+		_rings.append([_ring_mesh(at, echo_col), -0.15, 1.0, clampf(radius, 0.5, 6.0) * 0.7, 0.0])
 
 
 ## A small glowing mark over food she has sniffed out, for a few seconds.
@@ -302,9 +384,17 @@ func _process(dt: float) -> void:
 			mi.queue_free()
 			_rings.remove_at(i)
 			continue
+		if k <= 0.0:  # an echo ring waiting its beat: invisible until it starts
+			mi.scale = Vector3(0.001, 0.02, 0.001)
+			(mi.material_override as StandardMaterial3D).albedo_color.a = 0.0
+			continue
 		var rad: float = lerpf(0.05, r[3], 1.0 - pow(1.0 - k, 2.0))
 		mi.scale = Vector3(rad, 0.02, rad)
 		(mi.material_override as StandardMaterial3D).albedo_color.a = (1.0 - k) * 0.55
+		r[4] = float(r[4]) - dt
+		if r[4] <= 0.0:
+			r[4] = 0.14  # the ring's edge stirs the dust as it passes
+			ring_mote(mi.global_position, rad)
 
 
 func _draw_cone() -> void:

@@ -605,6 +605,99 @@ func collide(n: Node3D, surface := "") -> void:
 			tri.backface_collision = true
 			cs.shape = tri
 			body.add_child(cs)
+			_top_slabs(m, surface, n.name)
+
+
+## Flat tops on a trimesh piece (a Meshy table, a sofa seat): solid boxes just under the top surface,
+## clustered from the triangles that face up. A trimesh is a shell — a fast body can slip through it
+## and a capsule snags on its triangle edges; the boxes give the rat a floor she can trust. The sink's
+## bowl stays open: its up-facing triangles are the bowl's inside, and she swims there.
+func _top_slabs(m: MeshInstance3D, surface: String, root_name: String) -> void:
+	var nm := (root_name + " " + m.name).to_lower()
+	if nm.contains("sink") or nm.contains("water"):
+		return
+	var faces := m.mesh.get_faces()
+	var ups: Array = []  # [centre height, the triangle's vertices]
+	for t in range(0, faces.size(), 3):
+		var a: Vector3 = faces[t]
+		var b: Vector3 = faces[t + 1]
+		var c: Vector3 = faces[t + 2]
+		var nrm := (b - a).cross(c - a)
+		if nrm.length() < 0.000001:
+			continue
+		if nrm.normalized().y < 0.85:
+			continue
+		ups.append([(a.y + b.y + c.y) / 3.0, a, b, c])
+	if ups.is_empty():
+		return
+	ups.sort_custom(func(x, y): return x[0] < y[0])
+	var clusters: Array = []  # [y_min, y_max, AABB, triangle count]
+	for u in ups:
+		var y: float = u[0]
+		var placed := false
+		for cl in clusters:
+			if absf(y - (float(cl[0]) + float(cl[1])) / 2.0) <= 0.05:
+				cl[0] = minf(float(cl[0]), y)
+				cl[1] = maxf(float(cl[1]), y)
+				for v in [u[1], u[2], u[3]]:
+					cl[2] = (cl[2] as AABB).expand(v)
+				cl[3] = int(cl[3]) + 1
+				placed = true
+				break
+		if not placed:
+			var bb := AABB(u[1], Vector3.ZERO).expand(u[2]).expand(u[3])
+			clusters.append([y, y, bb, 1])
+	# biggest footprints first, at most a few slabs per mesh
+	clusters.sort_custom(func(x, y): return (x[2] as AABB).size.x * (x[2] as AABB).size.z > (y[2] as AABB).size.x * (y[2] as AABB).size.z)
+	var gt := m.global_transform
+	var sc := gt.basis.get_scale()
+	var made := 0
+	for cl in clusters:
+		if made >= 6:
+			break
+		var bb: AABB = cl[2]
+		# round 23: no slab on a top she cannot stand on — a jar's 10 cm lid got a slab that
+		# stuck out over the shelf and vetoed the jump scanner's clearance checks beside it
+		# (the kitchen-upper test died on it). 15 cm is the smallest top worth standing on.
+		if int(cl[3]) < 12 or bb.size.x * sc.x < 0.15 or bb.size.z * sc.z < 0.15:
+			continue
+		# the slab reaches 4 cm past the outermost up-facing triangle on every side: the rat's capsule
+		# is 5.5 cm in radius, and without the margin she slips off the slab's edge into the hollow
+		# shell below (a decor plant's foliage caught her this way — fuzz_top, night 2, run 14).
+		# AABB.grow() takes a float only, so the margin is applied per axis by hand.
+		var gx := 0.04 / maxf(sc.x, 0.01)
+		var gz := 0.04 / maxf(sc.z, 0.01)
+		bb = AABB(bb.position - Vector3(gx, 0.0, gz), bb.size + Vector3(2.0 * gx, 0.0, 2.0 * gz))
+		# the slab's top sits 1 mm ABOVE the cluster's highest vertex: the flat slab, not the
+		# lumpy trimesh, is the floor she stands on. (It used to sit 8 mm under the highest
+		# triangle centre, so the trimesh peaks poked through it and her capsule snagged on
+		# them — she sank into the worktop's corner, the window sill and the armchair's seat.)
+		# The price is floating a few mm over the dips; on a cushion that reads as the crown.
+		var top_y: float = bb.end.y + 0.001
+		var corners: Array = []
+		for cx in [bb.position.x, bb.end.x]:
+			for cy in [top_y - 0.03, top_y]:
+				for cz in [bb.position.z, bb.end.z]:
+					corners.append(gt * Vector3(cx, cy, cz))
+		var wbb := AABB(corners[0], Vector3.ZERO)
+		for p in corners:
+			wbb = wbb.expand(p)
+		var bx := StaticBody3D.new()
+		bx.collision_layer = 1
+		bx.collision_mask = 0
+		bx.top_level = true
+		m.add_child(bx)
+		bx.global_transform = Transform3D(gt.basis.orthonormalized(), gt.origin)
+		if surface != "":
+			bx.set_meta("surface", surface)
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = Vector3(maxf(wbb.size.x, 0.004), maxf(wbb.size.y, 0.004), maxf(wbb.size.z, 0.004))
+		cs.shape = sh
+		cs.position = bx.global_transform.affine_inverse() * wbb.get_center()
+		bx.add_child(cs)
+		g.slab_bodies.append(bx.get_rid())  # round 23: Game._shape_free excludes slabs (see there)
+		made += 1
 
 
 ## The mesh's connected parts: [local AABB, triangle vertices, how much of the AABB it fills (0…1)].
@@ -874,6 +967,7 @@ static func hex(c) -> Color:
 # ---------- build ----------
 
 func build() -> void:
+	g.slab_bodies.clear()  # round 23: last night's slab bodies are gone with the old room
 	root = group("Room", g)
 	furn = group("Furniture")
 	decor = group("Decor")

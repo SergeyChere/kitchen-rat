@@ -415,6 +415,10 @@ func _run(host: Node) -> void:
 		await _fuzz(host)
 		host.get_tree().quit()
 		return
+	if name == "fuzz_top":  # dev: like fuzz, but she starts ON the furniture and jumps off the edges
+		await _fuzz_top(host)
+		host.get_tree().quit()
+		return
 	if name == "slab":  # dev: rays up and down through the kitchen table's top
 		await _wait(host, 0.3)
 		var c := Nights.world(720.0, 445.0, 0.0)
@@ -1009,7 +1013,10 @@ func _open_floor(room := 0.0) -> Vector3:
 				clear_above = false
 		if clear_above and g.grid.free_point(p + Vector3(0, 0, -0.3)).distance_to(p + Vector3(0, 0, -0.3)) < 0.15 and not g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3).is_empty():
 			var h := g.ray(p + Vector3.UP * 0.3, p + Vector3.DOWN * 0.3)
-			if h.position.y < 0.03:
+			# round 23: the rays above are mask 1 and cannot see the cat bed (layer 8, rat-only),
+			# so a point inside the bed passes every check so far — the body check is the one that
+			# sees it (sphere_free now queries the rat's own mask, 1 | 8)
+			if h.position.y < 0.03 and g.sphere_free(h.position + Vector3.UP * 0.07, 0.06):
 				return h.position
 	return _open_floor(room * 0.7) if room > 0.3 else Vector3.ZERO  # nothing that roomy: ask for a little less
 
@@ -1108,7 +1115,16 @@ func _juice(host: Node) -> void:
 	await _wait(host, 0.6)
 	var fov0: float = g.cam.cam.fov
 	fp = _open_floor(1.2)
-	r.teleport(fp + Vector3(0, 0.01, 0.6), Nights.yaw_to(Vector3.FORWARD))
+	# round 23: the 0.6 m step south is NOT covered by _open_floor's checks, and the cat bed
+	# (layer 8, rat-only) sits exactly where a step like that can land — try south, on the
+	# spot, then north, and teleport to the first place her body actually fits, or she wedges
+	# in the bed and the view never widens (she never runs at all)
+	var tp := fp + Vector3(0, 0.01, 0.6)
+	if not g.sphere_free(tp + Vector3.UP * 0.07, 0.06):
+		tp = fp + Vector3(0, 0.01, 0)
+	if not g.sphere_free(tp + Vector3.UP * 0.07, 0.06):
+		tp = fp + Vector3(0, 0.01, -0.6)
+	r.teleport(tp, Nights.yaw_to(Vector3.FORWARD))
 	g.cam.snap(r.rotation.y)
 	Input.action_press("forward"); Input.action_press("run")
 	var fov1 := fov0
@@ -1279,6 +1295,97 @@ func _fuzz(host: Node) -> void:
 		for k in ["forward", "left", "right", "run", "back", "jump"]:
 			Input.action_release(k)
 	print("fuzz done: %d runs, %d sunk, %d stuck" % [runs, sunk_n, stuck_n])
+
+
+func _fuzz_top(host: Node) -> void:
+	var r := g.rat
+	g.grace_t = 9999.0
+	await _wait(host, 0.4)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(OS.get_environment("SEED")) if OS.get_environment("SEED") != "" else 7
+	var pieces: Array = []
+	for n in g._builder.furn.get_children():
+		var bb := LevelBuilder.world_aabb(n)
+		# a top she can stand on and fall off without a stun: knee- to waist-high, big enough to run on
+		if bb.size.y > 0.3 and bb.size.y < 1.0 and bb.size.x > 0.3 and bb.size.z > 0.3:
+			pieces.append([n, bb])
+	var runs := int(OS.get_environment("RUNS")) if OS.get_environment("RUNS") != "" else 30
+	var sunk_n := 0
+	var stuck_n := 0
+	for run in runs:
+		var pick: Array = pieces[rng.randi() % pieces.size()]
+		var bb: AABB = pick[1]
+		var start := Vector3(bb.get_center().x + rng.randf_range(-0.3, 0.3) * bb.size.x, bb.end.y + 0.3, bb.get_center().z + rng.randf_range(-0.3, 0.3) * bb.size.z)
+		# the AABB's top may be a back or a rim, not a floor: drop a ray and stand on what it hits
+		var hit := g.ray(start, start + Vector3.DOWN * (bb.size.y + 0.6))
+		if hit.is_empty():
+			continue
+		start.y = hit.position.y + 0.01
+		if not g.capsule_free(start):  # round 23: her capsule, not a sphere — a sphere misses
+			continue  # a low lip beside her feet (the worktop's back edge) and she spawns wedged
+		r.teleport(start, rng.randf() * TAU)
+		g.cam.snap(r.rotation.y)
+		await _wait(host, 0.15)
+		var keys := ["forward"]
+		var sunk_t := 0.0
+		var last := r.global_position
+		var still_t := 0.0
+		var reported := false
+		for f in 200:  # ~3.3 s
+			if f % 20 == 0:
+				for k in ["forward", "left", "right", "run", "back"]:
+					Input.action_release(k)
+				keys = ["forward"]
+				if rng.randf() < 0.35: keys.append("left" if rng.randf() < 0.5 else "right")
+				if rng.randf() < 0.3: keys.append("run")
+				if rng.randf() < 0.1: keys = ["back"]
+				for k in keys:
+					Input.action_press(k)
+			if rng.randf() < 0.08:
+				Input.action_press("jump")
+			elif Input.is_action_pressed("jump") and rng.randf() < 0.3:
+				Input.action_release("jump")
+			var was_jumping := r.jumping
+			var p0 := r.global_position
+			var s0 := r.surface_id
+			await host.get_tree().physics_frame
+			if str(run) in OS.get_environment("TRACE").split(","):
+				if r.jumping and not was_jumping:
+					print("  trace f%d jump %s from %s to %s" % [f, r._kind, r._from, r._to])
+				elif not r.jumping and r.global_position.distance_to(p0) > 0.05:
+					print("  trace f%d JUMPED %s -> %s (not a jump)" % [f, p0, r.global_position])
+				if r.surface_id != s0:
+					print("  trace f%d surface %s -> %s at %s" % [f, s0, r.surface_id, r.global_position])
+				if r.overlapping() and not r.jumping and f % 10 == 0:
+					print("  trace f%d sunk at %s vel %s floor %s" % [f, r.global_position, r.velocity, r.is_on_floor()])
+			var sunk := r.overlapping() and not r.jumping
+			sunk_t = sunk_t + 1.0 / 60.0 if sunk else 0.0
+			var moved := r.global_position.distance_to(last)
+			last = r.global_position
+			still_t = 0.0 if r.stunned() else (still_t + 1.0 / 60.0 if (moved < 0.0015 and not r.jumping) else 0.0)
+			if not reported and (sunk_t > 0.6 or still_t > 1.5):
+				reported = true
+				var what := ""
+				var q := PhysicsShapeQueryParameters3D.new()
+				var sh := SphereShape3D.new()
+				sh.radius = 0.07
+				q.shape = sh
+				q.transform = Transform3D(Basis(), r.global_position + Vector3.UP * 0.06)
+				q.exclude = [r.get_rid()]
+				for h in g.get_world_3d().direct_space_state.intersect_shape(q, 4):
+					var c: Node = h.collider
+					var up: Node = c
+					while up and up.get_parent() != g._builder.furn and up.get_parent() != null:
+						up = up.get_parent()
+					what += "%s(%s) " % [up.name if up else "?", c.get_class()]
+				if sunk_t > 0.6:
+					sunk_n += 1
+				else:
+					stuck_n += 1
+				print("topfuzz %s run %d near %s at %s y %.3f surf %s keys %s touching %s" % ["SUNK" if sunk_t > 0.6 else "STUCK", run, pick[0].name, r.global_position, r.global_position.y, r.surface_id, keys, what])
+		for k in ["forward", "left", "right", "run", "back", "jump"]:
+			Input.action_release(k)
+	print("topfuzz done: %d runs, %d sunk, %d stuck" % [runs, sunk_n, stuck_n])
 
 
 ## Round 21, night 8: G by the spoon's bowl drops the chicken leg in it; F at the handle flings it off the table in an

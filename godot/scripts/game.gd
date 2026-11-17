@@ -54,6 +54,8 @@ var _nest_grid := {}
 const NEST_CELL := 0.04
 var decor_parent: Node3D  # the burrow, where NestDecor hangs the finds
 var decor_new: Array = []  # finds brought home tonight, still to be given a spot
+var slab_bodies: Array[RID] = []  # round 23: LevelBuilder's top-slab bodies — floors to stand on, not
+	# obstacles: _shape_free excludes them (their 4 cm margin is air beside the real top)
 var spotted := 0  # how many times someone came after her tonight
 var _was_chase := false
 var cut_bars := false
@@ -497,10 +499,21 @@ func ray(a: Vector3, b: Vector3) -> Dictionary:
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
 
-func sphere_free(p: Vector3, r: float) -> bool:
+func sphere_free(p: Vector3, r: float, exclude_slabs := false) -> bool:
 	var sh := SphereShape3D.new()
 	sh.radius = r
-	return _shape_free(sh, p)
+	return _shape_free(sh, p, exclude_slabs)
+
+
+## Round 23: does the rat's own standing capsule fit with her feet at p? A sphere is the wrong
+## shape for this — it narrows toward its bottom, so a low lip beside her feet (the worktop's
+## raised back edge) overlaps her capsule while the sphere sails over it. The capsule matches
+## her stand shape (r 0.055, height 0.12, centre +0.062), shrunk to 0.05 like _overlap_shape.
+func capsule_free(p: Vector3, exclude_slabs := false) -> bool:
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.05
+	cap.height = 0.12
+	return _shape_free(cap, p + Vector3.UP * 0.062, exclude_slabs)
 
 
 func box_free(center: Vector3, half: Vector3) -> bool:
@@ -509,11 +522,21 @@ func box_free(center: Vector3, half: Vector3) -> bool:
 	return _shape_free(sh, center)
 
 
-func _shape_free(sh: Shape3D, p: Vector3) -> bool:
+func _shape_free(sh: Shape3D, p: Vector3, exclude_slabs := false) -> bool:
 	var q := PhysicsShapeQueryParameters3D.new()
 	q.shape = sh
 	q.transform = Transform3D(Basis(), p)
-	q.collision_mask = 1
+	# round 23: mask 1 | 8, the rat's own mask — layer 8 is the cat bed (rat-only, so the cat
+	# can walk into it), and a "fits here" check that cannot see the bed happily lands her
+	# inside it: the juice test's FOV check teleported her into the bed and she wedged there
+	q.collision_mask = 1 | 8
+	# round 23: top slabs are floors, not walls — but ONLY the jump scanner's clearance
+	# check may ignore them (Rat._clear): a slab's 4 cm margin sticks out into air beside
+	# the real top, and it vetoed the landing on the fridge top. Every other "fits here"
+	# check (un-wedge, landing rescue, nav grid, spawns) MUST see slabs: a slab marks real
+	# geometry, and ignoring it there spawns her inside a worktop lip (fuzz_top run 7).
+	if exclude_slabs:
+		q.exclude = slab_bodies
 	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
 
 
@@ -914,6 +937,8 @@ func _footsteps(dt: float) -> void:
 		return
 	_stride = 0.0
 	Sfx.play(step_sound(rat.surface_id), rat.global_position, 0.0 if rat.running else -7.0, 1.0, 0.08)
+	if rat.running:
+		fx.step_dust(rat.global_position)  # round 23: every running step kicks up dust
 	if rat.running and rat.surface_id != "floor":
 		_jiggle(rat.global_position, 0.22, 0.45)
 
@@ -1900,7 +1925,19 @@ func _warm_up() -> void:
 	letters.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	letters.layers = WARM_LAYER
 	add_child(letters)
-	var spots := [Nights.world(240, 300, 25), Nights.world(720, 300, 25), Nights.world(480, 300, 130)]
+	# Round 23: the GPU particle shaders (dust, sparkles, the rat's dust trail) compile the first time
+	# they are drawn — mid-game, as a hitch. Fire one of each where only the warm-up camera looks
+	# (the fourth spot is the nest, so the dust trail at her feet is in view too).
+	var trail_layers := 0
+	if is_instance_valid(rat) and rat._dust_trail:
+		trail_layers = rat._dust_trail.layers
+		rat._dust_trail.layers = WARM_LAYER
+		rat._dust_trail.emitting = true
+	if fx:
+		var burst_at := Nights.world(240, 300, 25) + Vector3(0, 0.2, -1.0)
+		fx.dust(burst_at, true, WARM_LAYER)
+		fx.sparkle(burst_at, true, WARM_LAYER)
+	var spots := [Nights.world(240, 300, 25), Nights.world(720, 300, 25), Nights.world(480, 300, 130), Nights.world(150, 640, 40)]
 	for p in spots:
 		for k in 6:
 			c.global_position = p
@@ -1912,6 +1949,9 @@ func _warm_up() -> void:
 			if not is_instance_valid(vp):
 				return
 	_warming = false
+	if is_instance_valid(rat) and rat._dust_trail:
+		rat._dust_trail.emitting = false
+		rat._dust_trail.layers = trail_layers
 	for n in shown:
 		if is_instance_valid(n) and n is Trap:
 			n.visible = not (n as Trap).hidden  # food sorts itself out every frame of play; traps stay hidden until found
