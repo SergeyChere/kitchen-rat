@@ -570,6 +570,11 @@ func build(list: Array) -> void:
 			"vase": place("furniture/vase", f, "vase", 0.0, null)
 			"book": place("props/book_red", f, "book", 0.0, float(f.get("rot", 0.0)))
 			"toyBlock": place("props/block_star", f, "block", 0.0, float(f.get("rot", 0.0)))
+			# round 28: Sergii's Meshy models (Nov 2026), converted by tools/blender/swap_prop.py
+			"duckRubber": place("props/duck_rubber", f, "duck", 0.0, float(f.get("rot", 0.0)))
+			"bagPlastic": place("props/bag_plastic", f, "bag", 0.0, float(f.get("rot", 0.0)))
+			"boxLid": place("furniture/box_lid", f, "box", float(f.get("ht", 28)), null, "cardboard")
+			"hangersWood": place("props/hangers_wood", f, "hangers", 0.0, float(f.get("rot", 0.0)))
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)
 	# round 3: a plug-in night light in the living rooms — a small warm source you can actually see
