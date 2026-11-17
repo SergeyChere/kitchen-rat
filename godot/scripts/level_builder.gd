@@ -1253,6 +1253,30 @@ func _lighting() -> void:
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
 
+	# round 25: a second directional light, OFF except during a lightning flash. The moon's
+	# flash boost only deepens shadows that are already there; each bolt comes from its own
+	# patch of sky (game.gd re-aims it per bolt), so the furniture's shadows JUMP to a new
+	# angle and print across the floor — that is the storm. Same tight shadow frustum as the
+	# moon, so the printed shadows are crisp; invisible the rest of the time, so it costs
+	# nothing between bolts.
+	if bool(night.get("storm", false)):
+		var bolt := DirectionalLight3D.new()
+		bolt.name = "Lightning"
+		bolt.light_color = Color(0.82, 0.88, 1.0)
+		bolt.light_energy = 0.0
+		bolt.shadow_enabled = true
+		bolt.shadow_opacity = 0.85
+		bolt.shadow_blur = 0.6
+		bolt.shadow_bias = 0.08
+		bolt.shadow_normal_bias = 2.5
+		bolt.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		bolt.directional_shadow_max_distance = 11.5
+		bolt.directional_shadow_fade_start = 0.95
+		bolt.visible = false
+		root.add_child(bolt)
+		g.lightning = bolt
+		bolt.rotation = moon.rotation
+
 	# Round 10, the cinematic scheme's shaped FILL: a faint cool directional from
 	# over the camera's shoulder (south-east, high). Flat ambient alone modelled
 	# nothing — this gives south faces a gentle blue modelling so the rat's
@@ -1513,7 +1537,7 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	# GPU particles (Forward+): the CPU ones never rendered on the player's machine.
 	var p := GPUParticles3D.new()
 	p.name = "Dust motes"
-	p.amount = 120
+	p.amount = 220  # round 25: the beams should feel dusty — 120 specks vanished against the room
 	p.lifetime = 11.0
 	p.preprocess = 11.0
 	p.local_coords = true
@@ -1559,7 +1583,7 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	m.distance_fade_min_distance = 0.9   # (up close they were snowflakes; they are specks in a beam seen from a way off)
 	m.distance_fade_max_distance = 2.4
 	var q := QuadMesh.new()
-	q.size = Vector2(0.015, 0.015)
+	q.size = Vector2(0.018, 0.018)
 	q.material = m
 	p.draw_pass_1 = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1750,6 +1774,17 @@ func _room() -> void:
 		var d := Vector3(wcx, bot, z0)
 		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
 			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		# round 25: two diagonal sheets across the beam (corner to corner of the glass), so the
+		# shaft reads as a volume from the sides too, not just head-on. Same material and alpha
+		# as the first two sheets — more presence, not a brighter core (round 6 asked for soft).
+		var d1a := Vector3(wcx - ww / 2.0, top, z0)
+		var d1b := Vector3(wcx + ww / 2.0, bot, z0)
+		_add_shaft_quad([d1a, d1b, d1b + sdir * (bot / -sdir.y), d1a + sdir * (top / -sdir.y)],
+			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		var d2a := Vector3(wcx + ww / 2.0, top, z0)
+		var d2b := Vector3(wcx - ww / 2.0, bot, z0)
+		_add_shaft_quad([d2a, d2b, d2b + sdir * (bot / -sdir.y), d2a + sdir * (top / -sdir.y)],
+			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
 		# the light the window throws into the room, with the tree's leaves swaying through it (asked for: "a
 		# tree outside, swaying, and its shadows moving in the room"). The real moon shadow is too faint against
 		# the room's fill to show leaves, so the patch is painted by a box round the beam (moon_patch.gdshader).
@@ -1813,13 +1848,20 @@ func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_m
 				m.set_surface_override_material(i, clear)
 			elif src and model == "wall_window" and src.resource_name == "c9ac4e8":
 				# the panes were opaque blue: now clear glass with a faint cool sheen, so the tree and the sky
-				# outside (window_sky.gd) show through
-				var glass := StandardMaterial3D.new()
-				glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-				glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-				glass.albedo_color = Color(0.6, 0.72, 0.95, 0.12)
-				glass.cull_mode = BaseMaterial3D.CULL_DISABLED
-				m.set_surface_override_material(i, glass)
+				# outside (window_sky.gd) show through. In storm nights the same pane carries rain:
+				# the shader keeps the sheen and adds streaks running down the glass.
+				if bool(night.get("storm", false)):
+					var rain := ShaderMaterial.new()
+					rain.shader = preload("res://shaders/rain_glass.gdshader")
+					rain.render_priority = 1
+					m.set_surface_override_material(i, rain)
+				else:
+					var glass := StandardMaterial3D.new()
+					glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+					glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					glass.albedo_color = Color(0.6, 0.72, 0.95, 0.12)
+					glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+					m.set_surface_override_material(i, glass)
 	if model == "wall_mousehole":
 		_mouse_hole(n)
 	return n

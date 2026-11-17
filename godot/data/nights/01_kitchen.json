@@ -31,7 +31,7 @@
  "starTip": "",
  "openFood": true,
  "tvOff": false,
- "storm": false,
+ "storm": true,
  "blackout": 0,
  "pups": [],
  "pupAge": 0,

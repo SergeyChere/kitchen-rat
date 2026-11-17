@@ -191,7 +191,9 @@ func _make_ring_pool() -> void:
 	for i in 6:
 		var e := GPUParticles3D.new()
 		e.amount = 256  # a 3 m ring is 19 m round: fewer than this reads as stray specks, not a ring
-		e.lifetime = 0.6  # the trail behind the edge stays a moment, so the ring has a body
+		e.lifetime = 0.25  # round 25: SHORT. At 0.6 s the specks spawned near her were still alive
+			# when the edge was metres out, so the ring filled in and read as a glow around her
+			# instead of a ring. At 0.25 s only the leading edge is lit — the centre clears.
 		e.one_shot = false
 		e.explosiveness = 0.0
 		e.emitting = false
@@ -217,14 +219,16 @@ func _make_ring_pool() -> void:
 		scale_tex.curve = c
 		pm.scale_curve = scale_tex
 		var grad := Gradient.new()
-		grad.set_color(0, Color(0.8, 0.76, 0.7, 0.8))
+		grad.set_color(0, Color(0.8, 0.76, 0.7, 0.75))
+		grad.add_point(0.35, Color(0.8, 0.76, 0.7, 0.35))  # each mote fades fast: the ring is
+			# a thin dusty edge, not a filled disc
 		grad.set_color(1, Color(0.8, 0.76, 0.7, 0.0))
 		var ramp_tex := GradientTexture1D.new()
 		ramp_tex.gradient = grad
 		pm.color_ramp = ramp_tex
 		e.process_material = pm
 		var q := QuadMesh.new()
-		q.size = Vector2(0.07, 0.07)
+		q.size = Vector2(0.06, 0.06)
 		var m := StandardMaterial3D.new()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
