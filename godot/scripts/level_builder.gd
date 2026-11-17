@@ -1848,20 +1848,15 @@ func _wall(model: String, x: float, y: float, rot: float, parent: Node3D, wall_m
 				m.set_surface_override_material(i, clear)
 			elif src and model == "wall_window" and src.resource_name == "c9ac4e8":
 				# the panes were opaque blue: now clear glass with a faint cool sheen, so the tree and the sky
-				# outside (window_sky.gd) show through. In storm nights the same pane carries rain:
-				# the shader keeps the sheen and adds streaks running down the glass.
-				if bool(night.get("storm", false)):
-					var rain := ShaderMaterial.new()
-					rain.shader = preload("res://shaders/rain_glass.gdshader")
-					rain.render_priority = 1
-					m.set_surface_override_material(i, rain)
-				else:
-					var glass := StandardMaterial3D.new()
-					glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-					glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					glass.albedo_color = Color(0.6, 0.72, 0.95, 0.12)
-					glass.cull_mode = BaseMaterial3D.CULL_DISABLED
-					m.set_surface_override_material(i, glass)
+				# outside (window_sky.gd) show through. (Round 25 put a rain shader on this pane in storm
+				# nights; round 26 reverted it — Sergii did not like the rain. The shader file stays in
+				# res://shaders/rain_glass.gdshader, unused.)
+				var glass := StandardMaterial3D.new()
+				glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				glass.albedo_color = Color(0.6, 0.72, 0.95, 0.12)
+				glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+				m.set_surface_override_material(i, glass)
 	if model == "wall_mousehole":
 		_mouse_hole(n)
 	return n

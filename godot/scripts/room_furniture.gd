@@ -560,6 +560,16 @@ func build(list: Array) -> void:
 			"ottoman": place("furniture/ottoman", f, "ottoman", 0.0, 0.0, "fabric")
 			"beanbag": place("furniture/beanbag", f, "beanbag", 0.0, float(f.get("rot", 25.0)))  # round 22: soft, quiet to land on
 			"barCart": place("furniture/bar_cart", f, "cart", 0.0, 0.0)
+			# round 27: Sergii's Meshy models (Nov 2026), converted by tools/blender/swap_prop.py
+			"shelfWood": place("furniture/shelf_wood", f, "shelf", 0.0, null, "wood")
+			"chest": place("furniture/chest_wood", f, "box", 0.0, null, "wood")
+			"workbenchVise":
+				place("furniture/workbench_vise", f, "table", 0.0, 0.0, "wood_dark")
+				hide("table", f)  # open space under it, like the pantry bench
+			"boxSealed": place("furniture/box_sealed", f, "box", float(f.get("ht", 31)), null, "cardboard")
+			"vase": place("furniture/vase", f, "vase", 0.0, null)
+			"book": place("props/book_red", f, "book", 0.0, float(f.get("rot", 0.0)))
+			"toyBlock": place("props/block_star", f, "block", 0.0, float(f.get("rot", 0.0)))
 			_:
 				push_warning("Kitchen Rat: no builder for furniture " + t)
 	# round 3: a plug-in night light in the living rooms — a small warm source you can actually see
@@ -673,7 +683,7 @@ func _hang(models: Array) -> void:
 			continue
 		var tall := false
 		for f in g.night.get("furn", []):
-			if float(f.y) < 60.0 and x > float(f.x) - 40.0 and x < float(f.x) + float(f.get("w", 40)) + 40.0 and str(f.t) in ["bookcase", "shelfUnit", "tvStand", "cabinetTall", "plant", "wall"]:
+			if float(f.y) < 60.0 and x > float(f.x) - 40.0 and x < float(f.x) + float(f.get("w", 40)) + 40.0 and str(f.t) in ["bookcase", "shelfUnit", "shelfWood", "tvStand", "cabinetTall", "plant", "wall"]:
 				tall = true
 		if tall:
 			continue
