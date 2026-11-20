@@ -233,7 +233,7 @@
     "text": "Find the lost cufflink",
     "hint": "",
     "type": "flag",
-    "arg": "button",
+    "arg": "cufflink",
     "n": 0,
     "reveal": -1
    }
@@ -417,9 +417,9 @@
  ],
  "secrets": [
   {
-   "kind": "button",
-   "x": 60,
-   "y": 560,
+   "kind": "cufflink",
+   "x": 110,
+   "y": 540,
    "floor": true,
    "always": false,
    "label": "A lost cufflink!"

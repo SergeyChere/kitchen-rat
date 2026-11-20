@@ -135,6 +135,51 @@ func _make_glints() -> void:
 		_glints.append([s, n, randf() * TAU])
 
 
+## The way out, seen from inside the burrow (muse/forward-plus, round 24): a short green column over the hole's mouth
+## (the pocket's roof is 0.95 m) and a green ring on the floor where the hole is.
+var _beacon_in: MeshInstance3D
+var _hole_ring: MeshInstance3D
+
+
+func _make_beacon_in() -> void:
+	_beacon_in = MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.07
+	cyl.bottom_radius = 0.07
+	cyl.height = 0.9
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	_beacon_in.mesh = cyl
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_texture = _fade_tex()
+	m.albedo_color = Color(0.35, 1.0, 0.45, 0.5)
+	_beacon_in.material_override = m
+	_beacon_in.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_beacon_in.visible = false
+	add_child(_beacon_in)
+	_beacon_in.global_position = g.hole + Vector3(0, 0.45, 0.32)
+	_hole_ring = MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.1
+	tm.outer_radius = 0.14
+	tm.rings = 32
+	_hole_ring.mesh = tm
+	var rm := StandardMaterial3D.new()
+	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rm.albedo_color = Color(0.55, 1.0, 0.4, 0.6)
+	_hole_ring.material_override = rm
+	_hole_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_hole_ring.visible = false
+	_hole_ring.scale = Vector3(1, 0.05, 1)
+	add_child(_hole_ring)
+	_hole_ring.global_position = g.hole + Vector3(0, 0.01, 0.3)
+
+
 func _make_beacon() -> void:
 	_beacon = MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
@@ -169,6 +214,7 @@ static func _fade_tex() -> ImageTexture:
 
 
 func _ready() -> void:
+	_make_beacon_in()
 	_make_beacon()  # (the dust in the moonlight lives in LevelBuilder._dust_motes now: along the whole shaft)
 	_make_glints()
 	for z in g.zones:
@@ -254,6 +300,11 @@ func _scent_marks(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_scent_marks(dt)
+	if _beacon_in and is_instance_valid(g.rat):
+		_beacon_in.visible = g.rat.in_nest
+		_hole_ring.visible = g.rat.in_nest
+		if _beacon_in.visible:
+			(_beacon_in.material_override as StandardMaterial3D).albedo_color.a = 0.4 + 0.12 * sin(Time.get_ticks_msec() / 250.0)
 	# round 5: the kettle on the stove steams — small white puffs, always rising
 	_steam_t -= dt
 	if g.kettle_pos != null and _steam_t <= 0.0:

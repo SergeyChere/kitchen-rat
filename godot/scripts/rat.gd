@@ -27,7 +27,7 @@ const CARRY_CLIP := 0.08
 # exactly as measured — it is NOT softened.
 var gravity := 18.0  # demo polish: was 12.0 — she floated on high hops and falls. Falls are snappier now;
 # hop_impulse grew with it (v = 1.7 * sqrt(18/12)), so the hop reaches the same height as before
-var max_jump_up := 0.54  # round 11: the tall wall climb is DELETED (the user's call) — one spring
+var max_jump_up := 0.56  # round 11: the tall wall climb is DELETED (the user's call) — one spring
 # is all she has; anything higher is reached over other furniture (chair 0.41 → counter
 # 0.92 is a 0.51 step; the pantry crates climb in 0.40 steps; a 0.52 stool tops the bench)
 var max_jump_reach := 0.9

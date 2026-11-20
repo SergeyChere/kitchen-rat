@@ -26,6 +26,7 @@ var run := {"catWoke": false, "chased": false, "seenOwner": false, "poisonDelive
 	"dogWoke": false, "dogChased": false, "pupCaught": false, "stuck": false, "caged": false, "sleeperWoke": false}
 var env: Environment
 var moon: DirectionalLight3D
+var lightning: DirectionalLight3D  # storm nights only, off except during a flash (muse/forward-plus, round 25)
 var flickers: Array = []  # [light, base energy, "fire" | "tv" | "steady"]
 var tv_light: OmniLight3D
 var tv_on := false
@@ -513,7 +514,7 @@ func _shape_free(sh: Shape3D, p: Vector3) -> bool:
 	var q := PhysicsShapeQueryParameters3D.new()
 	q.shape = sh
 	q.transform = Transform3D(Basis(), p)
-	q.collision_mask = 1
+	q.collision_mask = 1 | 8  # (layer 8 is the cat bed, rat-only: a check that can't see it landed her inside it — muse/forward-plus, round 23)
 	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
 
 
@@ -1346,6 +1347,8 @@ func _tick_world(dt: float) -> void:
 	var rp := rat.global_position
 	if _tunnel_from() >= 0:
 		prompt = "%s — crawl through the wall" % Keys.label("jump")
+	elif rat.in_nest:
+		prompt = "The green light marks the way out"
 	if _wash_t > 0.0:
 		_wash_t -= dt
 		if _wash_zone and randf() < dt * 3.0:
@@ -1393,6 +1396,10 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 	if _next_bolt <= 0.0:
 		_next_bolt = 11.0 + randf() * 9.0
 		_flash_t = 0.35
+		if lightning:
+			# each bolt comes from its own patch of sky, so the shadows it prints jump to a new angle (muse, round 25)
+			lightning.rotation = Vector3(deg_to_rad(-38.0 + randf_range(-14.0, 10.0)), deg_to_rad(165.0 + randf_range(-30.0, 30.0)), 0)
+			lightning.visible = true
 		_thunder_t = 1.1
 		if rat.hidden():
 			tasks.set_flag("hidLightning")
@@ -1417,6 +1424,12 @@ func _tick_storm(dt: float, rp: Vector3) -> void:
 		env.ambient_light_energy = _ambient * (0.55 if _blackout else 1.0) + _flash_t * 4.0
 	if moon:
 		moon.light_energy = _moon_e * (0.6 if _blackout else 1.0) * moon_cloud + _flash_t * 5.0
+	if lightning:
+		if _flash_t > 0.0:
+			lightning.light_energy = 9.0 * (_flash_t / 0.35) * (0.72 + 0.28 * sin(Time.get_ticks_msec() / 11.0))  # a bolt flickers
+		else:
+			lightning.visible = false
+			lightning.light_energy = 0.0
 	var bo := float(night.get("blackout", 0))
 	if bo > 0.0 and not _blackout and night_time > float(night.get("seconds", 900)) * bo:
 		_blackout = true
