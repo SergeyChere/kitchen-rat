@@ -1203,6 +1203,25 @@ func _lighting() -> void:
 	root.add_child(moon)
 	g.moon = moon
 	moon.rotation = Vector3(deg_to_rad(-38.0), deg_to_rad(165.0), 0)  # from the window in the north wall
+	# (muse/forward-plus, round 25) storm nights: a second directional light, off except during a lightning flash;
+	# game.gd re-aims it every bolt, so the furniture's shadows jump to a new angle and print across the floor
+	if bool(night.get("storm", false)):
+		var bolt := DirectionalLight3D.new()
+		bolt.name = "Lightning"
+		bolt.light_color = Color(0.82, 0.88, 1.0)
+		bolt.light_energy = 0.0
+		bolt.shadow_enabled = true
+		bolt.shadow_opacity = 0.85
+		bolt.shadow_blur = 0.6
+		bolt.shadow_bias = 0.08
+		bolt.shadow_normal_bias = 2.5
+		bolt.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		bolt.directional_shadow_max_distance = 11.5
+		bolt.directional_shadow_fade_start = 0.95
+		bolt.visible = false
+		root.add_child(bolt)
+		g.lightning = bolt
+		bolt.rotation = moon.rotation
 
 	# Round 10, the cinematic scheme's shaped FILL: a faint cool directional from
 	# over the camera's shoulder (south-east, high). Flat ambient alone modelled
@@ -1463,7 +1482,7 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	var length := from.y / -dir.y  # down to the floor
 	var p := CPUParticles3D.new()
 	p.name = "Dust motes"
-	p.amount = 120
+	p.amount = 220  # (muse/forward-plus, round 25: more motes in the beam)
 	p.lifetime = 11.0
 	p.preprocess = 11.0
 	p.randomness = 1.0
@@ -1506,7 +1525,7 @@ func _dust_motes(from: Vector3, dir: Vector3, width: float, height: float) -> vo
 	m.distance_fade_min_distance = 0.9   # (up close they were snowflakes; they are specks in a beam seen from a way off)
 	m.distance_fade_max_distance = 2.4
 	var q := QuadMesh.new()
-	q.size = Vector2(0.015, 0.015)
+	q.size = Vector2(0.018, 0.018)
 	q.material = m
 	p.mesh = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1697,6 +1716,13 @@ func _room() -> void:
 		var d := Vector3(wcx, bot, z0)
 		_add_shaft_quad([c, d, d + sdir * (bot / -sdir.y), c + sdir * (top / -sdir.y)],
 			[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
+		# (muse/forward-plus, round 25) two diagonal sheets across the beam, corner to corner of the glass: the shaft
+		# reads as a volume from the sides too. Same material and alpha — more presence, not a brighter core.
+		for dg in [[wcx - ww / 2.0, wcx + ww / 2.0], [wcx + ww / 2.0, wcx - ww / 2.0]]:
+			var da := Vector3(dg[0], top, z0)
+			var db := Vector3(dg[1], bot, z0)
+			_add_shaft_quad([da, db, db + sdir * (bot / -sdir.y), da + sdir * (top / -sdir.y)],
+				[Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)], smat)
 		# the light the window throws into the room, with the tree's leaves swaying through it (asked for: "a
 		# tree outside, swaying, and its shadows moving in the room"). The real moon shadow is too faint against
 		# the room's fill to show leaves, so the patch is painted by a box round the beam (moon_patch.gdshader).

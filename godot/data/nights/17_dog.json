@@ -33,7 +33,7 @@
  "starTip": "The owner will come if you’re too loud",
  "openFood": true,
  "tvOff": false,
- "storm": false,
+ "storm": true,
  "blackout": 0,
  "pups": [
   "shy",
