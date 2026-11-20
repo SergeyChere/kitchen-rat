@@ -46,6 +46,7 @@ func spawn(path: String, pos: Vector3, rot_deg := 0.0, parent: Node3D = null) ->
 	(parent if parent else root).add_child(n)
 	n.global_position = pos
 	n.rotation.y = deg_to_rad(rot_deg)
+	n.set_meta("model", path)
 	toonify(n)
 	return n
 
@@ -563,6 +564,8 @@ func fit_keep(n: Node3D, w: float, d: float, h: float, lim: Array) -> void:
 func collide(n: Node3D, surface := "") -> void:
 	if n == null:
 		return
+	if _collide_boxes(n, surface):
+		return
 	var parts := n.get_parent() == furn or n.get_parent() == decor or (n.get_parent() != null and n.get_parent().get_parent() == decor)
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
@@ -605,6 +608,48 @@ func collide(n: Node3D, surface := "") -> void:
 			tri.backface_collision = true
 			cs.shape = tri
 			body.add_child(cs)
+
+
+## Round 22 (the player: "the mouse keeps getting stuck inside the table, inside the sofa"): a painted model is one
+## hollow skin, a table top often a single sheet, and as a triangle mesh she could end up inside it.
+## tools/blender/collision_boxes.py fills the model with solid boxes (<model>.collision.json); when a model has them,
+## they are its collision instead of the skin: no hollow inside, flat tops, clean edges to climb.
+static var _box_cache := {}
+
+
+func _collide_boxes(n: Node3D, surface: String) -> bool:
+	var model := str(n.get_meta("model", ""))
+	if model == "":
+		return false
+	if not _box_cache.has(model):
+		_box_cache[model] = []
+		var p := MODELS + model + ".collision.json"
+		if FileAccess.file_exists(p):
+			var d = JSON.parse_string(FileAccess.get_file_as_string(p))
+			if d is Dictionary:
+				_box_cache[model] = d.get("boxes", [])
+	var boxes: Array = _box_cache[model]
+	if boxes.is_empty():
+		return false
+	var gt := n.global_transform
+	var sc := gt.basis.get_scale()
+	var bx := StaticBody3D.new()
+	bx.collision_layer = 1
+	bx.collision_mask = 0
+	bx.top_level = true
+	n.add_child(bx)
+	bx.global_transform = Transform3D(gt.basis.orthonormalized(), gt.origin)
+	if surface != "":
+		bx.set_meta("surface", surface)
+	var inv := bx.global_transform.affine_inverse()
+	for b in boxes:
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = Vector3(maxf(float(b[3]) * sc.x, 0.004), maxf(float(b[4]) * sc.y, 0.004), maxf(float(b[5]) * sc.z, 0.004))
+		cs.shape = sh
+		cs.position = inv * (gt * Vector3(float(b[0]), float(b[1]), float(b[2])))
+		bx.add_child(cs)
+	return true
 
 
 ## The mesh's connected parts: [local AABB, triangle vertices, how much of the AABB it fills (0…1)].

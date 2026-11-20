@@ -857,7 +857,8 @@ func _inward(p: Vector3, f: Vector3) -> Vector3:
 
 
 func _clear(p: Vector3) -> bool:
-	return Game.I.sphere_free(p + Vector3.UP * 0.08, 0.05)
+	# round 22: her whole height (a grab under a seat's overhang left her head inside it)
+	return Game.I.sphere_free(p + Vector3.UP * 0.08, 0.05) and Game.I.sphere_free(p + Vector3.UP * 0.11, 0.04)
 
 
 func _path_clear(a: Vector3, b: Vector3) -> bool:
@@ -914,6 +915,12 @@ func _tick_jump(dt: float) -> void:
 			velocity = away.normalized() * 0.4 + Vector3.DOWN * 0.5
 			Sfx.play("thud", global_position, -10.0, 1.6)
 			return
+		if hit and p.y < global_position.y:
+			# round 22 (she sank into the coffee table jumping off it): coming down onto something on the way — the
+			# edge she jumped from, a seat — she lands on it there instead of flying on through it
+			p = global_position + hit.get_travel()
+			_to = p
+			t = 1.0
 	global_position = p
 	# round 7: cancel the clip's root motion (see _climb_rig) — the path moves her,
 	# the clip only poses her
