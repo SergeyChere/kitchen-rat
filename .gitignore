@@ -59,3 +59,7 @@ $RECYCLE.BIN/
 ehthumbs.db
 ._*
 *.log
+
+# unfinished browser downloads (a Chrome .crdownload got committed and blocked a push)
+*.crdownload
+*.part
