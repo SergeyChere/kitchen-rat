@@ -147,6 +147,7 @@ func _process(dt: float) -> void:
 
 	if mode != Mode.LEAVING and mode != Mode.CHASE and _see > 0.35:
 		mode = Mode.CHASE; _lost = 0.0; _repath = 0.0
+		G.spotted_by("owner", "sight")
 		G.add_alarm(6.0)
 		G.bubble_on("Why, you little…!" if randf() < 0.5 else "There you are!", self, 1.95, 1.6)
 

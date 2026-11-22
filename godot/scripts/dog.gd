@@ -122,6 +122,7 @@ func _process(dt: float) -> void:
 	sees = G.grace_t <= 0.0 and _see()
 	if sees and mode != Mode.CHASE and mode != Mode.PLAY:
 		mode = Mode.CHASE
+		G.spotted_by("dog", "sight")
 		_lost = 0.0
 		G.run.dogChased = true
 	match mode:

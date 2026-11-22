@@ -289,6 +289,8 @@ func _climb_out() -> bool:
 ## low shelf, between legs and a crossbar…). She slips out to the nearest spot where she fits, the way she was
 ## heading if she can.
 var _wedged_t := 0.0
+var _safe := Vector3.INF  # round 22 (M1): the last spot where she stood free, the way back when nothing near is
+var _safe_t := 0.0
 
 
 ## Is her body (either collider) pushed into furniture right now?
@@ -311,6 +313,10 @@ func _overlap_shape(cs: CollisionShape3D) -> bool:
 
 
 func _unwedge(d: Vector3, dt: float) -> void:
+	_safe_t -= dt
+	if _safe_t <= 0.0 and is_on_floor() and not jumping and carrier == null and not in_nest and not overlapping():
+		_safe_t = 0.5
+		_safe = global_position
 	if d.length() < 0.1 or move_speed > 0.03 or jumping or not is_on_floor() or Game.I == null:
 		_wedged_t = 0.0
 		return
@@ -337,7 +343,11 @@ func _unwedge(d: Vector3, dt: float) -> void:
 				best_score = score
 				best = ground.position
 			break
+	if best == Vector3.INF and _safe != Vector3.INF and _safe.distance_to(global_position) < 3.0:
+		best = _safe  # nothing free close by: back to where she last stood free
+		Sfx.play("squeak", global_position, -10.0, 1.3)
 	if best != Vector3.INF:
+		PlaytestLog.event("unstuck", {"at": PlaytestLog.xz(global_position), "to": PlaytestLog.xz(best)})
 		global_position = best + Vector3.UP * 0.005
 		velocity = Vector3.ZERO
 
@@ -474,6 +484,7 @@ func carry_weight() -> int:
 
 func carry(f: Food) -> void:
 	carried.append(f)
+	PlaytestLog.progress("pickup", {"food": f.type})
 	f.carried = true
 	var i := carried.size() - 1
 	f.reparent(mouth if mouth else self, false)

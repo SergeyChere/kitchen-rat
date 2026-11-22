@@ -462,6 +462,10 @@ func _run(host: Node) -> void:
 		print("hole at room cm %.0f, %.0f" % [g.hole_point().x * 100.0 + Nights.ROOM_W / 2.0, g.hole_point().z * 100.0 + Nights.ROOM_D / 2.0])
 		host.get_tree().quit()
 		return
+	if name == "journal":  # round 22: the playtest journal
+		await _journal(host)
+		host.get_tree().quit()
+		return
 	if name == "catapult":  # night 8: fling the chicken leg off the table with the spoon
 		await _catapult(host)
 		host.get_tree().quit()
@@ -1283,6 +1287,36 @@ func _fuzz(host: Node) -> void:
 
 ## Round 21, night 8: G by the spoon's bowl drops the chicken leg in it; F at the handle flings it off the table in an
 ## arc to the floor by the hole, where she can pick it up again.
+## Round 22 (the plan's M1): with the journal on, a night's start, a crumb picked up and delivered, a minute with
+## nothing done, the cat spotting her and a catch all land in the file, one JSON object per line.
+func _journal(host: Node) -> void:
+	PlaytestLog.force = true
+	PlaytestLog.start(g.night_id, {"goal": int(g.night.goal)})
+	var rat := g.rat
+	rat.teleport(Nights.world(400, 500, 1), PI)
+	await _wait(host, 0.3)
+	g.spawn_food("crumb", rat.global_position + Vector3(0, 0, -0.05), "test", false)
+	await _wait(host, 0.2)
+	rat.teleport(Nights.world(180, 680, 2), PI)
+	await _wait(host, 0.3)
+	PlaytestLog._idle = PlaytestLog.IDLE  # as if a minute went by with nothing done
+	await _wait(host, 0.2)
+	g.grace_t = 0.0
+	g.spotted_by("cat", "sight")
+	g.caught("Gotcha!", rat.global_position)
+	await _wait(host, 0.2)
+	var lines := FileAccess.get_file_as_string(PlaytestLog.path).split("\n", false)
+	var evs := []
+	for line in lines:
+		var row = JSON.parse_string(line)
+		if row is Dictionary and row.has("t"):
+			evs.append(str(row.ev))
+	_check("every line is a JSON event with a time", lines.size() > 0 and evs.size() == lines.size(), "%d lines, %d events" % [lines.size(), evs.size()])
+	for ev in ["night_start", "pickup", "food_delivered", "no_progress", "spotted", "caught"]:
+		_check("the journal notes %s" % ev, ev in evs, str(evs))
+	_check("the catch says who and why", '"by":"cat"' in lines[-1] and '"cause":"sight"' in lines[-1], lines[-1])
+
+
 func _catapult(host: Node) -> void:
 	var r := g.rat
 	g.grace_t = 999.0

@@ -89,11 +89,16 @@ func _open_more(announce := true) -> void:
 
 func flag(n: String, add := 1) -> void:
 	flags[n] = int(flags.get(n, 0)) + add
+	if n in ["stuck", "mistakes", "nearMiss", "poisonSeen"]:  # (things that happen to her, not progress)
+		PlaytestLog.event("task", {"flag": n, "value": flags[n]})
+	else:
+		PlaytestLog.progress("task", {"flag": n, "value": flags[n]})
 
 
 func set_flag(n: String) -> void:
 	if not flags.has(n):
 		flags[n] = 1
+		PlaytestLog.progress("task", {"flag": n})
 
 
 func flag_value(n: String) -> int:

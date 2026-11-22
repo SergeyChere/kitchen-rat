@@ -47,6 +47,9 @@ var _swipe := 0.0
 var _play_cd := 0.0
 
 
+var _noise_lead := false  # it came to look because of a noise (round 22: why it spotted her)
+
+
 func awake() -> bool: return mode != Mode.AWAY and mode != Mode.SLEEP
 
 
@@ -113,6 +116,7 @@ func hear(at: Vector3, radius: float, big: bool, amt: float, from_knock: bool) -
 		if mode != Mode.INVESTIGATE:
 			Sfx.play("meow_q", global_position + Vector3.UP * 0.3)
 		mode = Mode.INVESTIGATE
+		_noise_lead = true
 		_last = at
 		alert = maxf(alert, 0.25 if radius < 1.0 else 0.4)
 		path_to(at)
@@ -311,6 +315,7 @@ func _process(dt: float) -> void:
 		if near:
 			mode = Mode.CHASE; alert = 1.0
 			G.bubble_on("MEOW!", self, 0.5, 1.2)
+			G.spotted_by("cat", "close" if dist < 0.4 else "sight")
 		return
 
 	if mode == Mode.SLEEP:
@@ -352,10 +357,14 @@ func _process(dt: float) -> void:
 		G.add_alarm(dt * 4.0)
 	elif mode != Mode.CHASE and mode != Mode.WATCH:
 		alert -= dt * 0.45
+		if alert <= 0.05:
+			_noise_lead = false
 	alert = clampf(alert, 0.0, 1.0)
 
 	if alert >= 1.0 and mode != Mode.CHASE and mode != Mode.WATCH:
 		mode = Mode.WATCH if rat_high else Mode.CHASE
+		G.spotted_by("cat", "close" if dist < 0.34 and not in_cone else ("noise" if _noise_lead else "sight"))
+		_noise_lead = false
 		_lost = 0.0; _watch = 4.0; _repath = 0.0; _sit = 0.0
 		G.add_alarm(6.0)
 		G.bubble_on("Meow?!" if rat_high else "MEOW!", self, 0.52, 1.2)

@@ -605,6 +605,17 @@ func _hand_over(f: Food) -> void:
 		Sfx.play("squeak", to, -6.0, randf_range(1.4, 1.7))
 		var cp := ClipPlayer.new(pup)
 		cp.play("eat", 0.1)
+		for p in nest_pups:  # round 22 (M1): the whole litter cheers when food comes in, not just the one that eats
+			if p != pup and p.visible:
+				var y0: float = p.get_meta("y0", p.position.y)
+				p.set_meta("y0", y0)
+				var hop := create_tween()
+				hop.tween_property(p, "position:y", y0 + 0.035, 0.12).set_delay(randf_range(0.0, 0.15))
+				hop.tween_property(p, "position:y", y0, 0.12)
+				hop.tween_property(p, "position:y", y0 + 0.022, 0.1)
+				hop.tween_property(p, "position:y", y0, 0.1)
+		if is_instance_valid(pup) and randf() < 0.6:
+			bubble_on(["Yay!", "Mom!", "Squee!"].pick_random(), pup, 0.12, 1.2)
 		get_tree().create_timer(1.6).timeout.connect(func(): if is_instance_valid(pup): cp.play("idle", 0.3)))
 
 
@@ -627,6 +638,7 @@ func deliver() -> void:
 		tasks.set_flag("full")
 	rat.carried.clear()
 	fed = maxi(0, fed + value - poison * 4)
+	PlaytestLog.progress("food_delivered", {"value": value, "poison": poison, "fed": fed, "goal": int(night.goal)})
 	var top := hole + Vector3.UP * 0.32
 	Sfx.play("poison" if poison > 0 else "deliver")
 	if cheese:
@@ -645,6 +657,28 @@ func deliver() -> void:
 			break
 
 
+var _spot_cause := {}  # who spotted her last, and why: "sight", "noise" (came to look, then saw), "close"
+var _spot_told := {}
+
+
+## An enemy has just spotted her (round 22, the plan's M1: "always clear why you were seen"): the playtest journal
+## notes who and why, and the first time in a night each reason is said in words.
+func spotted_by(who: String, cause: String) -> void:
+	_spot_cause[who] = cause
+	PlaytestLog.event("spotted", {"by": who, "cause": cause, "at": PlaytestLog.xz(rat.global_position)})
+	var key := who + "/" + cause
+	var why: String = {
+		"cat/sight": "The cat saw you! Keep out of its sight: behind and under things",
+		"cat/noise": "The noise brought the cat over, and it saw you",
+		"cat/close": "Too close! The cat sensed you right next to it",
+		"owner/sight": "The owner saw you!",
+		"dog/sight": "The dog found you!",
+	}.get(key, "")
+	if why != "" and not _spot_told.has(key) and state == "play":
+		_spot_told[key] = true
+		toast(why)
+
+
 func caught(text: String, at: Vector3) -> void:
 	if grace_t > 0.0 or state != "play":
 		return
@@ -652,6 +686,8 @@ func caught(text: String, at: Vector3) -> void:
 		rat.balloon.release()
 	lives -= 1
 	run.caught = true
+	var by := "owner" if text.begins_with("WHACK") else ("dog" if text.begins_with("WOOF") else ("water" if text.begins_with("Glub") else "cat"))
+	PlaytestLog.event("caught", {"by": by, "cause": _spot_cause.get(by, ""), "text": text, "lives": lives, "at": PlaytestLog.xz(rat.global_position)})
 	Sfx.play("caught")
 	cam.shake(0.7)
 	feel.slowmo(0.25, 0.3)
@@ -681,6 +717,7 @@ func caught(text: String, at: Vector3) -> void:
 func knock_landed(k: Knockable, at: Vector3) -> void:
 	var breaks := k.kind == "cup" and at.y < 0.2  # a mug that hits the floor breaks
 	print_verbose("knock landed ", k.kind, " at ", at)
+	PlaytestLog.progress("item_used", {"kind": k.kind, "how": "knock", "at": PlaytestLog.xz(at)})
 	noise(at, 4.6, "Crash!" if breaks else k.sound(), true, -1.0, true)
 	var loud := clampf(remap(k._speed, 1.2, 4.0, -8.0, 2.0), -8.0, 2.0)  # harder hit, louder
 	Sfx.play("crash" if breaks else KNOCK_SND.get(k.kind, "thud"), at, loud)
@@ -798,6 +835,8 @@ func _unhandled_input(e: InputEvent) -> void:
 
 func _process(dt: float) -> void:
 	fade = move_toward(fade, _fade_to, dt / 0.35)
+	if state == "play":
+		PlaytestLog.tick(dt, rat.global_position)
 	if state == "backdrop":
 		_tick_backdrop(dt)
 		return
@@ -1740,6 +1779,7 @@ func begin() -> void:
 		pups[i].global_position = on_nest(Nights.world(150 + i * 20, 660))
 	state = "play"
 	rat.frozen = false
+	PlaytestLog.start(night_id, {"goal": int(night.goal), "lives": lives})
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	var st := str(night.get("startTitle", ""))
 	if st != "":
@@ -2459,6 +2499,7 @@ func _apply_light_shadows() -> void:
 func _end(won: bool, title: String, text: String) -> void:
 	if state != "play":
 		return
+	PlaytestLog.event("night_end", {"won": won, "title": title, "fed": fed, "goal": int(night.goal), "lives": lives})
 	if won:
 		tasks.finish_night()
 	end_title = title
@@ -2673,10 +2714,12 @@ func _show_result(won: bool) -> void:
 
 
 func _restart() -> void:
+	PlaytestLog.event("restart")
 	Main.I.start_night(night_id)
 
 
 func _exit_tree() -> void:
+	PlaytestLog.event("leave", {"state": state})
 	if nav:
 		nav.dispose()
 	if is_instance_valid(_rain):
