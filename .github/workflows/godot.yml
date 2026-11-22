@@ -52,7 +52,7 @@ jobs:
         run: |
           # Some checks are timed against real frames (coyote time, jump buffer) and miss now and then on a busy
           # runner: a test gets a second try, and only fails the build when it fails twice.
-          for nt in 1:bugs 1:rules 1:physics 1:juice 1:sink 1:under 1:walk 1:climb 1:upper 3:yarn 7:zip 8:catapult 13:toycar 14:balloon; do
+          for nt in 1:bugs 1:rules 1:physics 1:juice 1:sink 1:under 1:walk 1:climb 1:upper 1:journal 3:yarn 7:zip 8:catapult 13:toycar 14:balloon; do
             n=${nt%%:*}; t=${nt##*:}
             ok=0
             for try in 1 2; do
@@ -74,6 +74,8 @@ jobs:
           ~/godot/godot --headless --path godot --export-release "Windows Demo"
           ~/godot/godot --headless --path godot --export-release "Linux Demo"
           ~/godot/godot --headless --path godot --export-release "Mac Demo"
+          mkdir -p build/godot-playtest/windows
+          ~/godot/godot --headless --path godot --export-release "Windows Playtest"
           ls -laR build/godot build/godot-demo
 
       - name: Pack
@@ -118,6 +120,13 @@ jobs:
         with:
           name: KitchenRat-Demo-Mac
           path: build/godot-demo/mac
+          if-no-files-found: error
+
+      # the blind playtests: the demo with the playtest journal on (it writes playtest_logs/ next to the .exe)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KitchenRat-Playtest-Windows
+          path: build/godot-playtest/windows
           if-no-files-found: error
 
       - name: Attach to release
