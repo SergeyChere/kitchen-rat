@@ -35,6 +35,8 @@ var _pivot_y := INF
 var _run_k := 0.0    # 0…1 how fast she runs: a wider, trailing view
 var _sneak_k := 0.0  # 0…1 sneaking: closer and calmer
 var _trauma := 0.0   # camera shake (shake())
+var _len := -1.0     # the lens's distance along the arm, eased (round 22, M1: a chair leg or a table edge passing
+	# behind her pulled the view in and threw it back out at once; now it comes in fast but goes back out gently)
 var _shake_t := 0.0
 
 
@@ -63,6 +65,7 @@ func snap(new_yaw: float) -> void:
 	_pitch_t = -16.0
 	_ground_y = INF
 	_pivot_y = INF
+	_len = -1.0
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -132,6 +135,9 @@ func _process(_dt: float) -> void:
 		if _nest_k > 0.0:
 			rotation.x = deg_to_rad(lerpf(pitch, -32.0, _nest_k))  # in the burrow: down at the floor and the hole
 		cam.near = 0.02
+	var hit := arm.get_hit_length()
+	_len = hit if _len < 0.0 else lerpf(_len, hit, clampf(_dt * (25.0 if hit < _len else 2.5), 0.0, 1.0))
+	cam.position = Vector3(0.0, 0.0, _len)
 	if rat and rat.model:
 		# hidden in the rat's-eye view, and when a wall has pushed the camera right up to her
 		rat.model.visible = not first_person and cam.global_position.distance_to(global_position) > (0.1 if _nest_k > 0.5 else 0.2)
